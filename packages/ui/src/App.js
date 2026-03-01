@@ -6,6 +6,7 @@ import './App.css';
 var shortid = require('shortid');
 
 var baseUrl = process.env.REACT_APP_LIGHTPANEL_API_SERVER || 'http://localhost:3000';
+var wsUrl = process.env.REACT_APP_LIGHTPANEL_WS_SERVER || baseUrl.replace(/^http(s?)/, 'ws$1').replace(/:\d+$/, ':3001');
 
 const defaultWavelet = {
     "id": null,
@@ -315,15 +316,16 @@ class PresetConfig extends Component {
           <PresetList presets={this.state.presets} currentPresetId={this.state.currentPresetId} onClick={this.handlePresetListClick} onNewPresetClick={this.handleNewPresetClick}/>
         </div>
         <div className="col-md">
-          <PresetItem 
-            presetConfig={this.state.presetConfig} 
-            onPresetNameChange={this.handlePresetNameChange} 
+          <PresetItem
+            presetConfig={this.state.presetConfig}
+            onPresetNameChange={this.handlePresetNameChange}
             onDeletePresetClick={this.handleDeletePresetClick}
-            onWaveletChange={this.handleWaveletChange} 
-            onNewWaveletClick={this.handleNewWaveletClick} 
-            onDeleteWaveletClick={this.handleDeleteWaveletClick} 
+            onWaveletChange={this.handleWaveletChange}
+            onNewWaveletClick={this.handleNewWaveletClick}
+            onDeleteWaveletClick={this.handleDeleteWaveletClick}
             onSoloWaveletClick={this.handleSoloWaveletClick}
           />
+          <LEDPanel />
         </div>
       </div>
     );
@@ -547,6 +549,64 @@ class WaveletItem extends Component
 
       </div>
     );  
+  }
+}
+
+class LEDPanel extends Component {
+  constructor(props) {
+    super(props);
+    this.canvasRef = React.createRef();
+    this.state = { connected: false };
+    this.ws = null;
+  }
+
+  componentDidMount() {
+    this.ws = new WebSocket(wsUrl);
+    this.ws.onopen = () => this.setState({ connected: true });
+    this.ws.onclose = () => this.setState({ connected: false });
+    this.ws.onerror = () => this.setState({ connected: false });
+    this.ws.onmessage = (e) => {
+      this.drawPixels(JSON.parse(e.data));
+    };
+  }
+
+  componentWillUnmount() {
+    if (this.ws) this.ws.close();
+  }
+
+  drawPixels(pixels) {
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const COLS = 30;
+    const ROWS = 8;
+    const W = canvas.width / COLS;
+    const H = canvas.height / ROWS;
+    const radius = Math.min(W, H) / 2 * 0.75;
+
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    pixels.forEach(([r, g, b], i) => {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.beginPath();
+      ctx.arc(col * W + W / 2, row * H + H / 2, radius, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  render() {
+    if (!this.state.connected) return null;
+    return (
+      <canvas
+        ref={this.canvasRef}
+        width={600}
+        height={160}
+        style={{ background: '#111', borderRadius: 4, width: '100%', marginTop: '1rem' }}
+      />
+    );
   }
 }
 

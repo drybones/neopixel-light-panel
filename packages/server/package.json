@@ -9,12 +9,15 @@
     "express": "^4.17.1",
     "node-persist": "^2.1.0",
     "nodejs": "0.0.0",
-    "shortid": "^2.2.15"
+    "shortid": "^2.2.15",
+    "ws": "^8.0.0"
   },
   "devDependencies": {
     "eslint": "^7.8.1"
   },
   "scripts": {
+    "start": "node app.js",
+    "dev": "VIRTUAL=1 node app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

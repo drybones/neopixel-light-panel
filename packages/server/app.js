@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-var OPC = require('./opc')
+var OPC = process.env.VIRTUAL ? require('./virtual-opc') : require('./opc');
 var client = new OPC(process.env.FADECANDY_SERVER || 'localhost', 7890);
 var model = OPC.loadModel(__dirname + '/layout.json');
 
