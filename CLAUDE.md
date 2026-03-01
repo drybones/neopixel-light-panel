@@ -21,7 +21,7 @@ npm start            # start server with real Fadecandy hardware
 
 From **`packages/ui/`**:
 ```bash
-npm start            # React dev server on port 5000
+npm start            # React dev server on port 3002
 npm run build        # production build into build/
 npm test             # jest tests
 npm test -- --testPathPattern=App  # single test file
@@ -95,4 +95,4 @@ Server runs on port 3000. UI defaults to `http://localhost:3000` via `REACT_APP_
 | `FADECANDY_SERVER` | `localhost` | Fadecandy hostname (server only) |
 | `VIRTUAL` | unset | Set to `1` to use virtual OPC (WebSocket) instead of Fadecandy |
 
-UI dev port is forced to `5000` via `cross-env PORT=5000` to avoid conflicting with the server on 3000.
+UI dev port is `3002`, set via `packages/ui/.env` (`PORT=3002`). Port 5000 is avoided because AirPlay occupies it on macOS.

@@ -1,0 +1,78 @@
+/* ── STICKY HEADER ── */
+.preset-item-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: #fff;
+  padding: 0.75rem 0 0.5rem;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  transition: padding 0.2s ease;
+}
+
+/* ── MINI CANVAS SLOT (hidden by default) ── */
+.preset-item-mini-canvas-wrap {
+  flex-shrink: 0;
+  overflow: hidden;
+  width: 0;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: width 0.2s ease, opacity 0.2s ease, max-height 0.2s ease;
+}
+
+.preset-item-mini-canvas {
+  display: block;
+  width: 150px;
+  aspect-ratio: 30 / 8;
+  border-radius: 3px;
+  background: #111;
+}
+
+/* ── MINI MODE (desktop): canvas to left, name row fills remaining space ── */
+.preset-item-header--mini .preset-item-mini-canvas-wrap {
+  width: 150px;
+  max-height: 200px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Remove Bootstrap form-group bottom margin inside the flex header */
+.preset-item-name-group {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+/* ── FULL PANEL SENTINEL ── */
+.preset-item-full-panel-sentinel {
+  margin-bottom: 1rem;
+}
+
+/* ── MOBILE / PORTRAIT (< 768px) ── */
+@media (max-width: 767.98px) {
+  /* Mini canvas appears ABOVE the name row (column layout) */
+  .preset-item-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  /* Full-width strip, reduced height */
+  .preset-item-mini-canvas-wrap {
+    width: auto;
+    max-height: 0; /* still hidden until mini mode */
+  }
+
+  .preset-item-header--mini .preset-item-mini-canvas-wrap {
+    width: auto;
+    max-height: 200px;
+  }
+
+  .preset-item-mini-canvas {
+    width: 100%;
+  }
+}

@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { Component, useState, useEffect, useRef } from 'react';
 import reactCSS from 'reactcss'
 import { ChromePicker } from 'react-color';
 import './App.css';
@@ -67,6 +67,7 @@ class PresetConfig extends Component {
     this.handlePresetNameChange = this.handlePresetNameChange.bind(this);
     this.handleSoloWaveletClick = this.handleSoloWaveletClick.bind(this);
     this.handleGlobalBrightnessChange = this.handleGlobalBrightnessChange.bind(this);
+    this.miniCanvasRef = React.createRef();
   }
 
   componentDidMount() {
@@ -318,6 +319,8 @@ class PresetConfig extends Component {
         <div className="col-md">
           <PresetItem
             presetConfig={this.state.presetConfig}
+            miniCanvasRef={this.miniCanvasRef}
+            ledPanel={<LEDPanel miniCanvasRef={this.miniCanvasRef} />}
             onPresetNameChange={this.handlePresetNameChange}
             onDeletePresetClick={this.handleDeletePresetClick}
             onWaveletChange={this.handleWaveletChange}
@@ -325,7 +328,6 @@ class PresetConfig extends Component {
             onDeleteWaveletClick={this.handleDeleteWaveletClick}
             onSoloWaveletClick={this.handleSoloWaveletClick}
           />
-          <LEDPanel />
         </div>
       </div>
     );
@@ -373,42 +375,87 @@ function PresetList(props)
   );
 }
 
-function PresetItem(props)
-{
-  if(props.presetConfig) {
+function PresetItem(props) {
+  const [isMini, setIsMini] = useState(false);
+  const headerRef = useRef(null);
+  const topSentinelRef = useRef(null);
+  const fullPanelRef = useRef(null);
+
+  useEffect(() => {
+    setIsMini(false);
+    const sentinel = topSentinelRef.current;
+    if (!sentinel) return;
+    const headerHeight = headerRef.current ? headerRef.current.offsetHeight : 0;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const panelHasHeight = fullPanelRef.current && fullPanelRef.current.offsetHeight > 0;
+        setIsMini(!entry.isIntersecting && entry.boundingClientRect.top < headerHeight && panelHasHeight);
+      },
+      { threshold: 0, rootMargin: `-${headerHeight}px 0px 0px 0px` }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [props.presetConfig ? props.presetConfig.id : null]);
+
+  if (props.presetConfig) {
     let waveletList = props.presetConfig.wavelets.map((waveletConfig) =>
-      <WaveletItem 
-        waveletConfig={waveletConfig} 
-        key={waveletConfig.id} 
-        onWaveletChange={(e) => props.onWaveletChange(waveletConfig.id, e)} 
-        onDeleteWaveletClick={() => props.onDeleteWaveletClick(waveletConfig.id)} 
+      <WaveletItem
+        waveletConfig={waveletConfig}
+        key={waveletConfig.id}
+        onWaveletChange={(e) => props.onWaveletChange(waveletConfig.id, e)}
+        onDeleteWaveletClick={() => props.onDeleteWaveletClick(waveletConfig.id)}
         onSoloWaveletClick={() => props.onSoloWaveletClick(waveletConfig.id)}
-        />
+      />
     );
     return (
       <div id="PresetItem">
-        <div className="form-group">
-          <div className="form-row">
-            <div className="col-md">
-              <input className="form-control form-control-lg" placeholder="Preset Name" type="text" name="name" value={props.presetConfig.name} onChange={props.onPresetNameChange}/>
-            </div>
-            <div className="col-md-auto">
-              <span className="text-muted">Preset ID<br/>{props.presetConfig.id}</span> 
-            </div>
-            <div className="col-md-auto">
-              <button className="btn btn-danger btn-lg" onClick={() => props.onDeletePresetClick(props.presetConfig.id)}>Delete</button>
+
+        {/* ── STICKY HEADER ── */}
+        <div ref={headerRef} className={`preset-item-header${isMini ? ' preset-item-header--mini' : ''}`}>
+          <div className="preset-item-mini-canvas-wrap">
+            <canvas
+              ref={props.miniCanvasRef}
+              width={300}
+              height={80}
+              className="preset-item-mini-canvas"
+            />
+          </div>
+          <div className="form-group preset-item-name-group">
+            <div className="form-row">
+              <div className="col-md">
+                <input className="form-control form-control-lg" placeholder="Preset Name"
+                  type="text" name="name" value={props.presetConfig.name}
+                  onChange={props.onPresetNameChange} />
+              </div>
+              <div className="col-md-auto">
+                <span className="text-muted">Preset ID<br/>{props.presetConfig.id}</span>
+              </div>
+              <div className="col-md-auto">
+                <button className="btn btn-danger btn-lg"
+                  onClick={() => props.onDeletePresetClick(props.presetConfig.id)}>Delete</button>
+              </div>
             </div>
           </div>
         </div>
 
-        {waveletList}
+        {/* ── ZERO-HEIGHT SENTINEL: fires as soon as panel top hides behind header ── */}
+        <div ref={topSentinelRef} style={{ height: 0 }} />
 
+        {/* ── FULL LED PANEL ── */}
+        <div ref={fullPanelRef} className="preset-item-full-panel-sentinel">
+          {props.ledPanel}
+        </div>
+
+        {waveletList}
         <button className="btn btn-secondary" onClick={props.onNewWaveletClick}>+ Add new wavelet</button>
       </div>
     );
   } else {
     return (
-      <div className="alert alert-info">No interactive preset selected. Choose one from the list, or add a new one.</div>
+      <div>
+        <div className="alert alert-info">No interactive preset selected. Choose one from the list, or add a new one.</div>
+        {props.ledPanel}
+      </div>
     );
   }
 }
@@ -454,7 +501,7 @@ class WaveletItem extends Component
         },
         popover: {
           position: 'absolute',
-          zIndex: '2',
+          zIndex: '25',
         },
         cover: {
           position: 'fixed',
@@ -574,19 +621,15 @@ class LEDPanel extends Component {
     if (this.ws) this.ws.close();
   }
 
-  drawPixels(pixels) {
-    const canvas = this.canvasRef.current;
+  drawToCanvas(canvas, pixels) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const COLS = 30;
-    const ROWS = 8;
+    const COLS = 30, ROWS = 8;
     const W = canvas.width / COLS;
     const H = canvas.height / ROWS;
     const radius = Math.min(W, H) / 2 * 0.75;
-
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     pixels.forEach(([r, g, b], i) => {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
@@ -595,6 +638,12 @@ class LEDPanel extends Component {
       ctx.arc(col * W + W / 2, row * H + H / 2, radius, 0, Math.PI * 2);
       ctx.fill();
     });
+  }
+
+  drawPixels(pixels) {
+    this.drawToCanvas(this.canvasRef.current, pixels);
+    const mini = this.props.miniCanvasRef && this.props.miniCanvasRef.current;
+    if (mini) this.drawToCanvas(mini, pixels);
   }
 
   render() {
