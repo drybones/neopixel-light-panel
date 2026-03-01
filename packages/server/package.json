@@ -1,0 +1,30 @@
+{
+  "name": "neopixel-light-panel",
+  "version": "1.0.0",
+  "description": "Simple web controlled NeoPixel light panel",
+  "main": "app.js",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "cors": "^2.8.5",
+    "express": "^4.17.1",
+    "node-persist": "^2.1.0",
+    "nodejs": "0.0.0",
+    "shortid": "^2.2.15"
+  },
+  "devDependencies": {
+    "eslint": "^7.8.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/drybones/NeoPixelLightPanel.git"
+  },
+  "author": "drybones",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/drybones/NeoPixelLightPanel/issues"
+  },
+  "homepage": "https://github.com/drybones/NeoPixelLightPanel#readme"
+}
