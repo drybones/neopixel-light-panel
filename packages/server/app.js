@@ -12,9 +12,7 @@ var cors = require('cors');
 var app = express();
 app.use(cors());
 
-var bodyParser = require('body-parser');
 var storage = require('node-persist');
-var shortid = require('shortid');
 
 const WAVE_CONFIG_KEY = 'wave_config';
 const GLOBAL_BRIGHTNESS_CONFIG_KEY = 'global_brightness';
@@ -37,12 +35,12 @@ const fixedConfig = [
 // Current state of all dynamic config. Default to something sane. 
 var waveConfig = [
     {
-        id: shortid.generate(),
+        id: crypto.randomUUID(),
         name: "default",
         type: "wavelet",
         wavelets: [
             {
-                id: shortid.generate(),
+                id: crypto.randomUUID(),
                 color: '#ffffff',
                 freq: 0.3,
                 lambda: 0.3,
@@ -61,25 +59,29 @@ var global_brightness = 1.0;
 var currentPreset = offPreset;
 
 app.use(express.static(__dirname + '/site'));
-app.use(bodyParser.json());
+app.use(express.json());
 
-storage.init({interval: 1000}).then(function() {
-    storage.getItem(WAVE_CONFIG_KEY).then(function(value) {
-        if(value) {
-            waveConfig = value;
+async function initStorage() {
+    try {
+        await storage.init({interval: 1000});
+        const waveValue = await storage.getItem(WAVE_CONFIG_KEY);
+        if (waveValue) {
+            waveConfig = waveValue;
         } else {
-            storage.setItem(WAVE_CONFIG_KEY, waveConfig);
+            await storage.setItem(WAVE_CONFIG_KEY, waveConfig);
         }
-    });
-    storage.getItem(GLOBAL_BRIGHTNESS_CONFIG_KEY).then(function(value) {
-        if(value) {
-            global_brightness = parseFloat(value);
-            client.brightness = global_brightness
+        const brightnessValue = await storage.getItem(GLOBAL_BRIGHTNESS_CONFIG_KEY);
+        if (brightnessValue) {
+            global_brightness = parseFloat(brightnessValue);
+            client.brightness = global_brightness;
         } else {
-            storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness);
+            await storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness);
         }
-    });
-});
+    } catch (err) {
+        console.error('Storage initialization failed:', err);
+    }
+}
+initStorage();
 
 app.get('/api/brightness/', function(req,res) {
     res.send(global_brightness.toString()); // Cast to string; a number implies an http status code
@@ -87,7 +89,7 @@ app.get('/api/brightness/', function(req,res) {
 app.put('/api/brightness/:brightness', function(req,res) {
     global_brightness = req.params.brightness;
     client.brightness = global_brightness;
-    storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness);
+    storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness).catch(err => console.error('Failed to save brightness:', err));
     res.sendStatus(200);
 })
 
@@ -131,7 +133,7 @@ app.put('/api/wave_config/:config_id', function(req, res) {
     {
         waveConfig.push(newConfig);
     }
-    storage.setItem(WAVE_CONFIG_KEY, waveConfig);
+    storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
 
     currentPreset = newConfig;
 
@@ -142,8 +144,8 @@ app.delete('/api/wave_config/:config_id', function(req, res) {
     if(index != -1) {
         waveConfig.splice(index, 1);
     }
-    storage.setItem(WAVE_CONFIG_KEY, waveConfig);
-    
+    storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
+
     if(currentPreset.id === req.params.config_id) {
         currentPreset = offPreset;
     }
@@ -155,7 +157,7 @@ app.get('/api/all_wave_config/', function(req, res) {
 })
 app.put('/api/all_wave_config/', function(req, res) {
     waveConfig = req.body;
-    storage.setItem(WAVE_CONFIG_KEY, waveConfig);
+    storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
     res.sendStatus(200);
 })
 

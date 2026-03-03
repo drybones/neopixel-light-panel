@@ -21,10 +21,9 @@ npm start            # start server with real Fadecandy hardware
 
 From **`packages/ui/`**:
 ```bash
-npm start            # React dev server on port 3002
-npm run build        # production build into build/
-npm test             # jest tests
-npm test -- --testPathPattern=App  # single test file
+npm start            # Vite dev server on port 3002
+npm run build        # production build into dist/
+npm test             # vitest tests
 ```
 
 From **`packages/server/`**:
@@ -49,15 +48,15 @@ Key files:
 
 ## UI Architecture (`packages/ui/`)
 
-Single-page React app (Create React App, React 16). All component logic lives in `src/App.js` — no component directory structure.
+Single-page React app (Vite + React 18). All component logic lives in `src/App.jsx` — no component directory structure.
 
 **Component hierarchy:**
-- `App` — root
-- `PresetConfig` — main stateful class component; owns all state and API calls
+- `App` — root function component
+- `PresetConfig` — main stateful function component (hooks); owns all state and API calls
   - `BrightnessControl` — global brightness slider
   - `PresetList` — sidebar preset list
   - `PresetItem` — right-side detail panel for selected preset
-    - `WaveletItem` — per-wavelet editor with colour picker
+    - `WaveletItem` — per-wavelet editor with `react-colorful` colour picker
   - `LEDPanel` — canvas visualiser; connects to WebSocket (port 3001); hidden when not available
 
 State is managed entirely in `PresetConfig`. Changes are sent to the backend on every input event — no debounce, no save button.
@@ -76,7 +75,7 @@ Server runs on port 3000. UI defaults to `http://localhost:3000` via `REACT_APP_
 
 **Preset types:**
 - `"fixed"` — hardcoded server animations. IDs: `f:off`, `f:embers`, `f:particle_trail`, `f:candy_sparkler`, `f:pastel_spots`
-- `"wavelet"` — user-created, persisted via node-persist. IDs are shortids.
+- `"wavelet"` — user-created, persisted via node-persist. IDs are `crypto.randomUUID()` values.
 
 **Wavelet:**
 ```js
@@ -95,4 +94,6 @@ Server runs on port 3000. UI defaults to `http://localhost:3000` via `REACT_APP_
 | `FADECANDY_SERVER` | `localhost` | Fadecandy hostname (server only) |
 | `VIRTUAL` | unset | Set to `1` to use virtual OPC (WebSocket) instead of Fadecandy |
 
-UI dev port is `3002`, set via `packages/ui/.env` (`PORT=3002`). Port 5000 is avoided because AirPlay occupies it on macOS.
+UI dev port is `3002`, set in `packages/ui/vite.config.js`. Port 5000 is avoided because AirPlay occupies it on macOS.
+
+The `REACT_APP_*` env var prefix is preserved in Vite via `envPrefix: 'REACT_APP_'` in `vite.config.js`; referenced in code as `import.meta.env.REACT_APP_*`.
