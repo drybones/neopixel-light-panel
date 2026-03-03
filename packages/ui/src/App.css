@@ -5,7 +5,6 @@
   z-index: 20;
   background-color: #fff;
   padding: 0.75rem 0 0.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -26,15 +25,22 @@
 
 .preset-item-mini-canvas {
   display: block;
-  width: 150px;
+  /* height matches Bootstrap .form-control-lg: calc(1.5em + 1rem + 2px) at font-size 1.25rem */
+  height: calc(1.5 * 1.25rem + 1rem + 2px);
+  width: auto;
   aspect-ratio: 30 / 8;
   border-radius: 3px;
   background: #111;
 }
 
 /* ── MINI MODE (desktop): canvas to left, name row fills remaining space ── */
+.preset-item-header--mini {
+  /* negative spread clips shadow on sides/top; only bottom edge bleeds through */
+  box-shadow: 0 4px 6px -2px rgba(0,0,0,0.12);
+}
+
 .preset-item-header--mini .preset-item-mini-canvas-wrap {
-  width: 150px;
+  width: calc((1.5 * 1.25rem + 1rem + 2px) * 30 / 8); /* height × 3.75 ratio */
   max-height: 200px;
   opacity: 1;
   pointer-events: auto;
@@ -74,5 +80,6 @@
 
   .preset-item-mini-canvas {
     width: 100%;
+    height: auto;
   }
 }
