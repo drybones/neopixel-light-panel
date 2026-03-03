@@ -59,6 +59,7 @@ typings/
 
 # react build directory
 build
+dist
 
 # Mac
 .DS_Store

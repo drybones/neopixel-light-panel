@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+var path = require('path');
 var OPC = process.env.VIRTUAL ? require('./virtual-opc') : require('./opc');
 var client = new OPC(process.env.FADECANDY_SERVER || 'localhost', 7890);
 var model = OPC.loadModel(__dirname + '/layout.json');
@@ -70,7 +71,7 @@ var global_brightness = 1.0;
 
 var currentPreset = offPreset;
 
-app.use(express.static(__dirname + '/site'));
+app.use(express.static(path.join(__dirname, '../ui/dist')));
 app.use(express.json());
 
 async function initStorage() {

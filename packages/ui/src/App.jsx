@@ -2,7 +2,7 @@ import React, { Component, useState, useEffect, useRef } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import './App.css';
 
-var baseUrl = import.meta.env.REACT_APP_LIGHTPANEL_API_SERVER || 'http://localhost:3000';
+var baseUrl = import.meta.env.REACT_APP_LIGHTPANEL_API_SERVER || window.location.origin;
 var wsUrl = import.meta.env.REACT_APP_LIGHTPANEL_WS_SERVER || baseUrl.replace(/^http(s?)/, 'ws$1').replace(/:\d+$/, ':3001');
 
 const defaultWavelet = {
