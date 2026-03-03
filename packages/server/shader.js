@@ -5,52 +5,62 @@ class Shader {
         this.model = model;
         this.particles = [];
         this.particles.mode = null;
+        // Pre-flatten layout for faster inner-loop access
+        this.modelX = new Float32Array(model.length);
+        this.modelZ = new Float32Array(model.length);
+        for (var i = 0; i < model.length; i++) {
+            this.modelX[i] = model[i].point[0];
+            this.modelZ[i] = model[i].point[2];
+        }
+        // Pre-allocated particle array for particle_trail
+        this.trailParticles = new Array(50);
     }
 
     interactive_wave(config) {
-        var millis = new Date().getTime();
-        for (var pixel = 0; pixel < this.model.length; pixel++) {
-            var p = this.model[pixel];
-            var red = 0;
-            var green = 0;
-            var blue = 0;
-            var displayWavelets = config.wavelets.filter(w => w.solo);
-            if (displayWavelets.length === 0) {
-                displayWavelets = config.wavelets;
+        var millis = Date.now();
+        // Use pre-cached displayWavelets (set by preprocessConfig in app.js).
+        // Filter is moved outside the pixel loop — was a bug (ran 240× per frame).
+        var displayWavelets = config._displayWavelets || config.wavelets;
+        var numWavelets = displayWavelets.length;
+        var modelX = this.modelX;
+        var modelZ = this.modelZ;
+
+        for (var pixel = 0; pixel < modelX.length; pixel++) {
+            var px = modelX[pixel];
+            var pz = modelZ[pixel];
+            var red = 0, green = 0, blue = 0;
+
+            for (var wi = 0; wi < numWavelets; wi++) {
+                var w = displayWavelets[wi];
+                var dx = px - w.x;
+                var dz = pz + w.y;
+                var r = Math.sqrt(dx * dx + dz * dz);
+                var theta = millis * 0.00628 * w.freq - r / w.lambda;
+                var brightness = w.min + (w.max - w.min) * 0.5 * (Math.sin(theta + w.delta) + 1);
+                // Use pre-cached RGB (set by preprocessConfig in app.js)
+                var rgb = w._rgb || Shader.hexToRgb(w.color);
+                var wr = rgb.r * brightness;
+                var wg = rgb.g * brightness;
+                var wb = rgb.b * brightness;
+                if (w.clip) {
+                    wr = Math.min(Math.max(wr, 0), 255);
+                    wg = Math.min(Math.max(wg, 0), 255);
+                    wb = Math.min(Math.max(wb, 0), 255);
+                }
+                red += wr; green += wg; blue += wb;
             }
-            displayWavelets.forEach(wavelet => {
-                var rgb = this._wavelet(p, wavelet, millis);
-                red += rgb[0];
-                green += rgb[1];
-                blue += rgb[2];
-            });
+
             this.client.setPixel(pixel, red, green, blue);
         }
         this.client.writePixels();
     }
 
-    _wavelet(p, options, millis) {
-        var r = Math.sqrt((p.point[0] - options.x) * (p.point[0] - options.x) + (p.point[2] + options.y) * (p.point[2] + options.y)); // y coordinate is reversed for my layout
-        var theta = millis * 0.00628 * options.freq - r / options.lambda;
-        var rgb = Shader.hexToRgb(options.color);
-        var red = rgb.r * (options.min + (options.max - options.min) * 0.5 * (Math.sin(theta + options.delta) + 1));
-        var green = rgb.g * (options.min + (options.max - options.min) * 0.5 * (Math.sin(theta + options.delta) + 1));
-        var blue = rgb.b * (options.min + (options.max - options.min) * 0.5 * (Math.sin(theta + options.delta) + 1));
-
-        if (options.clip) {
-            red = Math.min(Math.max(red, 0), 255);
-            green = Math.min(Math.max(green, 0), 255);
-            blue = Math.min(Math.max(blue, 0), 255);
-        }
-
-        return [red, green, blue];
-    }
-
     particle_trail() {
-        var millis = new Date().getTime();
+        var millis = Date.now();
         var time = 0.009 * millis;
         var numParticles = 50;
-        var particles = [];
+        var particles = this.trailParticles;
+        particles.length = 0;
 
         particles[0] = {
             point: [],          // Arbitrary location
@@ -80,7 +90,7 @@ class Shader {
     }
 
     embers() {
-        var millis = new Date().getTime();
+        var millis = Date.now();
 
         if (!this.particles.mode || this.particles.mode != "embers") {
             this.particles = [];
@@ -123,7 +133,7 @@ class Shader {
     }
 
     candy_sparkler() {
-        var millis = new Date().getTime();
+        var millis = Date.now();
 
         if (!this.particles.mode || this.particles.mode != "candy_sparkler") {
             this.particles = [];
@@ -174,7 +184,7 @@ class Shader {
     }
 
     pastel_spots() {
-        var millis = new Date().getTime();
+        var millis = Date.now();
 
         var hue = millis / 70000 % 1.0;
 

@@ -13,6 +13,7 @@ var VirtualOPC = function(host, port, brightness)
 {
     this.brightness = (brightness !== undefined) ? brightness : 1.0;
     this.pixelBuffer = null;
+    this._pixelArray = null;
 
     this.wss = new WebSocket.Server({ port: 3001 });
     console.log('Virtual OPC: WebSocket server listening on port 3001');
@@ -39,12 +40,26 @@ VirtualOPC.prototype.setPixel = function(num, r, g, b)
 VirtualOPC.prototype.writePixels = function()
 {
     if (!this.pixelBuffer) return;
+    // Skip serialization when no browser is watching
+    if (this.wss.clients.size === 0) return;
 
-    var pixels = [];
-    for (var i = 0; i < this.pixelBuffer.length; i += 3) {
-        pixels.push([this.pixelBuffer[i], this.pixelBuffer[i + 1], this.pixelBuffer[i + 2]]);
+    var numPixels = this.pixelBuffer.length / 3;
+    // Allocate once; reuse every frame
+    if (!this._pixelArray || this._pixelArray.length !== numPixels) {
+        this._pixelArray = new Array(numPixels);
+        for (var j = 0; j < numPixels; j++) {
+            this._pixelArray[j] = [0, 0, 0];
+        }
     }
-    var msg = JSON.stringify(pixels);
+    // Update in-place — no array allocations
+    for (var i = 0; i < numPixels; i++) {
+        var offset = i * 3;
+        var triple = this._pixelArray[i];
+        triple[0] = this.pixelBuffer[offset];
+        triple[1] = this.pixelBuffer[offset + 1];
+        triple[2] = this.pixelBuffer[offset + 2];
+    }
+    var msg = JSON.stringify(this._pixelArray);
 
     this.wss.clients.forEach(function(client) {
         if (client.readyState === WebSocket.OPEN) {

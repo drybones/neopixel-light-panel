@@ -32,7 +32,18 @@ const fixedConfig = [
     {id: "f:pastel_spots", name: "Pastel Spots", type: "fixed"},
 ];
 
-// Current state of all dynamic config. Default to something sane. 
+// Lifts hexToRgb (regex parse) and solo filter out of the 100 FPS render loop
+// onto the API write path. Called whenever a wavelet config is created or updated.
+function preprocessConfig(config) {
+    if (!config || !config.wavelets) return;
+    config.wavelets.forEach(function(w) {
+        w._rgb = Shader.hexToRgb(w.color);
+    });
+    var soloWavelets = config.wavelets.filter(function(w) { return w.solo; });
+    config._displayWavelets = soloWavelets.length > 0 ? soloWavelets : config.wavelets;
+}
+
+// Current state of all dynamic config. Default to something sane.
 var waveConfig = [
     {
         id: crypto.randomUUID().split('-')[0],
@@ -53,6 +64,7 @@ var waveConfig = [
         ]
     }
 ];
+waveConfig.forEach(preprocessConfig);
 
 var global_brightness = 1.0;
 
@@ -67,6 +79,7 @@ async function initStorage() {
         const waveValue = await storage.getItem(WAVE_CONFIG_KEY);
         if (waveValue) {
             waveConfig = waveValue;
+            waveConfig.forEach(preprocessConfig);
         } else {
             await storage.setItem(WAVE_CONFIG_KEY, waveConfig);
         }
@@ -111,6 +124,7 @@ app.put('/api/current_preset_id/:id', function (req, res) {
 
     if(preset) {
         currentPreset = preset;
+        if (currentPreset.type === 'wavelet') preprocessConfig(currentPreset);
     } else {
         console.log("Can't find preset id '" + req.params.id + "' so turning off.");
         currentPreset = offPreset;
@@ -135,6 +149,7 @@ app.put('/api/wave_config/:config_id', function(req, res) {
     }
     storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
 
+    preprocessConfig(newConfig);
     currentPreset = newConfig;
 
     res.sendStatus(200);
@@ -157,6 +172,7 @@ app.get('/api/all_wave_config/', function(req, res) {
 })
 app.put('/api/all_wave_config/', function(req, res) {
     waveConfig = req.body;
+    waveConfig.forEach(preprocessConfig);
     storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
     res.sendStatus(200);
 })
