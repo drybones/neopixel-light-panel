@@ -35,12 +35,12 @@ const fixedConfig = [
 // Current state of all dynamic config. Default to something sane. 
 var waveConfig = [
     {
-        id: crypto.randomUUID(),
+        id: crypto.randomUUID().split('-')[0],
         name: "default",
         type: "wavelet",
         wavelets: [
             {
-                id: crypto.randomUUID(),
+                id: crypto.randomUUID().split('-')[0],
                 color: '#ffffff',
                 freq: 0.3,
                 lambda: 0.3,

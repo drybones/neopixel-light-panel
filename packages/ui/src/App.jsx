@@ -107,7 +107,7 @@ function PresetConfig() {
   }
 
   function handleNewPresetClick() {
-    const newPreset = { ...defaultPreset, id: crypto.randomUUID(), wavelets: [] };
+    const newPreset = { ...defaultPreset, id: crypto.randomUUID().split('-')[0], wavelets: [] };
     updateServerConfig(newPreset.id, newPreset);
     putData(baseUrl + '/api/current_preset_id/' + newPreset.id);
     setPresets(prev => [...prev, { id: newPreset.id, name: newPreset.name }]);
@@ -129,7 +129,7 @@ function PresetConfig() {
   }
 
   function handleNewWaveletClick() {
-    const newWavelet = { ...defaultWavelet, id: crypto.randomUUID() };
+    const newWavelet = { ...defaultWavelet, id: crypto.randomUUID().split('-')[0] };
     const newPresetConfig = { ...presetConfig, wavelets: [...presetConfig.wavelets, newWavelet] };
     setPresetConfig(newPresetConfig);
     updateServerConfig(newPresetConfig.id, newPresetConfig);
