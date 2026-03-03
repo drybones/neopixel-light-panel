@@ -75,7 +75,7 @@ Server runs on port 3000. UI defaults to `http://localhost:3000` via `REACT_APP_
 
 **Preset types:**
 - `"fixed"` — hardcoded server animations. IDs: `f:off`, `f:embers`, `f:particle_trail`, `f:candy_sparkler`, `f:pastel_spots`
-- `"wavelet"` — user-created, persisted via node-persist. IDs are `crypto.randomUUID()` values.
+- `"wavelet"` — user-created, persisted via node-persist. IDs are the first segment of `crypto.randomUUID()` (8-char hex, e.g. `f47ac10b`).
 
 **Wavelet:**
 ```js
