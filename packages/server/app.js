@@ -170,12 +170,36 @@ app.delete('/api/wave_config/:config_id', function(req, res) {
 })
 
 app.get('/api/all_wave_config/', function(req, res) {
-    res.json(waveConfig);
+    res.json(waveConfig.map(function(c) {
+        var out = Object.assign({}, c);
+        delete out._displayWavelets;
+        return out;
+    }));
 })
 app.put('/api/all_wave_config/', function(req, res) {
     waveConfig = req.body;
     waveConfig.forEach(preprocessConfig);
     storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(err => console.error('Failed to save wave config:', err));
+    res.sendStatus(200);
+})
+app.post('/api/all_wave_config/', function(req, res) {
+    var incoming = req.body;
+    if (!Array.isArray(incoming)) {
+        return res.status(400).json({ error: 'Import body must be an array' });
+    }
+    incoming.forEach(function(p) {
+        if (!p.id || p.type === 'fixed') return;
+        var idx = waveConfig.findIndex(function(e) { return e.id === p.id; });
+        if (idx !== -1) {
+            waveConfig[idx] = p;
+            preprocessConfig(waveConfig[idx]);
+            if (currentPreset && currentPreset.id === p.id) currentPreset = waveConfig[idx];
+        } else {
+            waveConfig.push(p);
+            preprocessConfig(waveConfig[waveConfig.length - 1]);
+        }
+    });
+    storage.setItem(WAVE_CONFIG_KEY, waveConfig).catch(function(err) { console.error('Failed to save wave config:', err); });
     res.sendStatus(200);
 })
 

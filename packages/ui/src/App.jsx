@@ -68,6 +68,7 @@ function PresetConfig() {
   const [presetConfig, setPresetConfig] = useState(null);
   const [globalBrightness, setGlobalBrightness] = useState(1.0);
   const miniCanvasRef = useRef(null);
+  const importInputRef = useRef(null);
 
   function doFetchPresetConfig(id, presetsList) {
     const preset = presetsList.find(o => o.id === id);
@@ -192,11 +193,78 @@ function PresetConfig() {
     putData(baseUrl + '/api/brightness/' + value);
   }
 
+  function handleExportClick() {
+    fetch(baseUrl + '/api/all_wave_config/')
+      .then(r => r.json())
+      .then(data => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        a.href = url;
+        a.download = `lightpanel-presets-${ts}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+  }
+
+  function handleImportClick() {
+    importInputRef.current.click();
+  }
+
+  function handleImportFileChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    event.target.value = '';
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      let parsed;
+      try {
+        parsed = JSON.parse(e.target.result);
+      } catch (_) {
+        alert('Import failed: file is not valid JSON.');
+        return;
+      }
+      if (!Array.isArray(parsed)) {
+        alert('Import failed: file must contain a JSON array of presets.');
+        return;
+      }
+      fetch(baseUrl + '/api/all_wave_config/', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(parsed),
+      }).then(r => {
+        if (!r.ok) { alert('Import failed: server rejected the file.'); return; }
+        return fetch(baseUrl + '/api/all_presets/')
+          .then(r => r.json())
+          .then(presetList => {
+            setPresets(presetList);
+            return fetch(baseUrl + '/api/current_preset_id/')
+              .then(r => r.text())
+              .then(id => {
+                setCurrentPresetId(id);
+                doFetchPresetConfig(id, presetList);
+              });
+          });
+      });
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="row">
       <div className="col-md-3">
         <BrightnessControl globalBrightness={globalBrightness} onGlobalBrightnessChange={handleGlobalBrightnessChange} />
-        <PresetList presets={presets} currentPresetId={currentPresetId} onClick={handlePresetListClick} onNewPresetClick={handleNewPresetClick}/>
+        <PresetList
+          presets={presets}
+          currentPresetId={currentPresetId}
+          onClick={handlePresetListClick}
+          onNewPresetClick={handleNewPresetClick}
+          onExportClick={handleExportClick}
+          onImportClick={handleImportClick}
+          onImportFileChange={handleImportFileChange}
+          importInputRef={importInputRef}
+        />
       </div>
       <div className="col-md">
         <PresetItem
@@ -250,7 +318,16 @@ function PresetList(props)
       <ul className="list-group">
         {presetItems}
       </ul>
-      <button className="btn btn-secondary btn-block mt-2 mb-3" onClick={props.onNewPresetClick}>+ Add new preset</button>
+      <button className="btn btn-secondary btn-block mt-2" onClick={props.onNewPresetClick}>+ Add new preset</button>
+      <button className="btn btn-outline-secondary btn-block mt-1" onClick={props.onExportClick}>Export presets</button>
+      <button className="btn btn-outline-secondary btn-block mt-1 mb-3" onClick={props.onImportClick}>Import presets</button>
+      <input
+        ref={props.importInputRef}
+        type="file"
+        accept=".json,application/json"
+        style={{ display: 'none' }}
+        onChange={props.onImportFileChange}
+      />
     </div>
   );
 }
