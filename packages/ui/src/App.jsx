@@ -571,9 +571,11 @@ class LEDPanel extends Component {
     const radius = Math.min(W, H) / 2 * 0.75;
     ctx.fillStyle = '#111';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const numPixels = pixels.length;
     pixels.forEach(([r, g, b], i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
+      const di = numPixels - 1 - i;
+      const col = di % COLS;
+      const row = Math.floor(di / COLS);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
       ctx.beginPath();
       ctx.arc(col * W + W / 2, row * H + H / 2, radius, 0, Math.PI * 2);
