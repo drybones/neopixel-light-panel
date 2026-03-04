@@ -81,13 +81,11 @@ class OPC {
     mapPixels(fn, model) {
         // Set all pixels, by mapping each element of "model" through "fn" and setting the
         // corresponding pixel value. The function returns a tuple of three 8-bit RGB values.
-        // Implies 'writePixels' as well. Has no effect if the OPC client is disconnected.
+        // Implies 'writePixels' as well. Always fills the pixel buffer; TCP send is skipped
+        // when disconnected (so the buffer is available for WebSocket mirroring).
 
         if (!this.socket) {
             this._reconnect();
-        }
-        if (!this.connected) {
-            return;
         }
 
         this.setPixelCount(model.length);

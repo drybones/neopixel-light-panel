@@ -4,6 +4,15 @@ var path = require('path');
 var crypto = require('crypto');
 var OPC = process.env.VIRTUAL ? require('./virtual-opc') : require('./opc');
 var client = new OPC(process.env.FADECANDY_SERVER || 'localhost', 7890);
+
+// In hardware mode, mirror pixel data to a WebSocket server so the UI
+// can show a live mini canvas even without virtual-opc.
+var wss = null;
+if (!process.env.VIRTUAL) {
+    var WebSocket = require('ws');
+    wss = new WebSocket.Server({ port: 3001 });
+    console.log('Hardware mode: WebSocket mirror listening on port 3001');
+}
 var model = OPC.loadModel(__dirname + '/layout.json');
 
 var Shader = require('./shader');
@@ -97,6 +106,10 @@ async function initStorage() {
     }
 }
 initStorage();
+
+app.get('/api/virtual', function(req, res) {
+    res.json({ virtual: !!process.env.VIRTUAL });
+});
 
 app.get('/api/brightness/', function(req,res) {
     res.send(global_brightness.toString()); // Cast to string; a number implies an http status code
@@ -235,4 +248,20 @@ function draw() {
     }
 }
 
-setInterval(draw, 10);
+function broadcastPixels() {
+    if (!wss || wss.clients.size === 0 || !client.pixelBuffer) return;
+    var buf = client.pixelBuffer;
+    var numPixels = (buf.length - 4) / 3;
+    if (numPixels <= 0) return;
+    var pixels = new Array(numPixels);
+    for (var i = 0; i < numPixels; i++) {
+        var offset = 4 + i * 3;
+        pixels[i] = [buf[offset], buf[offset + 1], buf[offset + 2]];
+    }
+    var msg = JSON.stringify(pixels);
+    wss.clients.forEach(function(c) {
+        if (c.readyState === WebSocket.OPEN) c.send(msg);
+    });
+}
+
+setInterval(function() { draw(); broadcastPixels(); }, 10);

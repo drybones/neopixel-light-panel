@@ -67,6 +67,7 @@ function PresetConfig() {
   const [currentPresetId, setCurrentPresetId] = useState(null);
   const [presetConfig, setPresetConfig] = useState(null);
   const [globalBrightness, setGlobalBrightness] = useState(1.0);
+  const [isVirtual, setIsVirtual] = useState(null);
   const miniCanvasRef = useRef(null);
   const importInputRef = useRef(null);
 
@@ -95,10 +96,15 @@ function PresetConfig() {
           });
       });
 
-    // Can fetch the brightness in parallel
+    // Can fetch the brightness and virtual mode flag in parallel
     fetch(baseUrl + '/api/brightness/')
       .then(r => r.text())
       .then(setGlobalBrightness);
+
+    fetch(baseUrl + '/api/virtual')
+      .then(r => r.json())
+      .then(d => setIsVirtual(d.virtual))
+      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handlePresetListClick(id) {
@@ -270,7 +276,8 @@ function PresetConfig() {
         <PresetItem
           presetConfig={presetConfig}
           miniCanvasRef={miniCanvasRef}
-          ledPanel={<LEDPanel miniCanvasRef={miniCanvasRef} />}
+          isVirtual={isVirtual}
+          ledPanel={<LEDPanel miniCanvasRef={miniCanvasRef} showFullPanel={isVirtual !== false} />}
           onPresetNameChange={handlePresetNameChange}
           onDeletePresetClick={handleDeletePresetClick}
           onWaveletChange={handleWaveletChange}
@@ -334,6 +341,7 @@ function PresetList(props)
 
 function PresetItem(props) {
   const [isMini, setIsMini] = useState(false);
+  const showMini = isMini || props.isVirtual === false;
   const headerRef = useRef(null);
   const topSentinelRef = useRef(null);
   const fullPanelRef = useRef(null);
@@ -368,7 +376,7 @@ function PresetItem(props) {
       <div id="PresetItem">
 
         {/* ── STICKY HEADER ── */}
-        <div ref={headerRef} className={`preset-item-header${isMini ? ' preset-item-header--mini' : ''}`}>
+        <div ref={headerRef} className={`preset-item-header${showMini ? ' preset-item-header--mini' : ''}`}>
           <div className="preset-item-mini-canvas-wrap">
             <canvas
               ref={props.miniCanvasRef}
@@ -581,6 +589,7 @@ class LEDPanel extends Component {
 
   render() {
     if (!this.state.connected) return null;
+    if (this.props.showFullPanel === false) return null;
     return (
       <canvas
         ref={this.canvasRef}
