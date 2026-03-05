@@ -275,6 +275,7 @@ function PresetConfig() {
       <div className="col-md">
         <PresetItem
           presetConfig={presetConfig}
+          currentPreset={presets.find(o => o.id === currentPresetId) || null}
           miniCanvasRef={miniCanvasRef}
           isVirtual={isVirtual}
           ledPanel={<LEDPanel miniCanvasRef={miniCanvasRef} showFullPanel={isVirtual !== false} />}
@@ -360,7 +361,7 @@ function PresetItem(props) {
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [props.presetConfig ? props.presetConfig.id : null]);
+  }, [props.presetConfig ? props.presetConfig.id : (props.currentPreset ? props.currentPreset.id : null)]);
 
   if (props.presetConfig) {
     let waveletList = props.presetConfig.wavelets.map((waveletConfig) =>
@@ -413,6 +414,35 @@ function PresetItem(props) {
 
         {waveletList}
         <button className="btn btn-secondary" onClick={props.onNewWaveletClick}>+ Add new wavelet</button>
+      </div>
+    );
+  } else if (props.currentPreset && props.currentPreset.type === 'fixed') {
+    return (
+      <div id="PresetItem">
+        <div ref={headerRef} className={`preset-item-header${showMini ? ' preset-item-header--mini' : ''}`}>
+          <div className="preset-item-mini-canvas-wrap">
+            <canvas
+              ref={props.miniCanvasRef}
+              width={300}
+              height={80}
+              className="preset-item-mini-canvas"
+            />
+          </div>
+          <div className="form-group preset-item-name-group">
+            <div className="form-row">
+              <div className="col-md">
+                <span className="form-control form-control-lg">{props.currentPreset.name}</span>
+              </div>
+              <div className="col-md-auto">
+                <span className="text-muted">Preset ID<br/>{props.currentPreset.id}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div ref={topSentinelRef} style={{ height: 0 }} />
+        <div ref={fullPanelRef} className="preset-item-full-panel-sentinel">
+          {props.ledPanel}
+        </div>
       </div>
     );
   } else {
