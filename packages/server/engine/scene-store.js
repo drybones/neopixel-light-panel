@@ -3,16 +3,20 @@
  * write (the generalised preprocessConfig pattern: everything stringy or
  * filtery happens here, never in the render loop), and persistence.
  *
- * Persistence is debounced (trailing 2s) so slider drags don't hammer the
- * SD card; flush() is called from signal handlers on shutdown.
+ * Persistence goes to a single crash-safe JSON document (engine/json-store,
+ * atomic tmp+rename with a .bak fallback) — deliberately NOT node-persist,
+ * whose non-atomic writes lost scene data to a power cut once. Writes are
+ * debounced (trailing 2s) so slider drags don't hammer the SD card;
+ * flush() is called from signal handlers on shutdown.
+ *
+ * Document shape: { version: 2, activeSceneId, seededBuiltins, scenes: [...] }
  */
 
 var crypto = require('crypto');
 var effects = require('../effects');
 var compositorMod = require('./compositor');
+var jsonStore = require('./json-store');
 
-var SCENES_KEY = 'scenes_v2';
-var ACTIVE_KEY = 'active_scene_id';
 var SAVE_DEBOUNCE_MS = 2000;
 
 function newId() {
@@ -53,11 +57,12 @@ function normaliseLayer(layer) {
 }
 
 class SceneStore {
-    constructor(compositor, storage) {
+    constructor(compositor, persistFile) {
         this.compositor = compositor;
-        this.storage = storage;
+        this.persistFile = persistFile || null;
         this.scenes = [];
         this.activeSceneId = null;
+        this.seededBuiltins = false;
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -92,34 +97,53 @@ class SceneStore {
     }
 
     async flush() {
-        if (!this._dirty || !this.storage) return;
+        if (!this._dirty || !this.persistFile) return;
         this._dirty = false;
         try {
-            await this.storage.setItem(SCENES_KEY, this.scenes.map(stripRuntime));
-            await this.storage.setItem(ACTIVE_KEY, this.activeSceneId);
+            jsonStore.save(this.persistFile, {
+                version: 2,
+                activeSceneId: this.activeSceneId,
+                seededBuiltins: this.seededBuiltins,
+                scenes: this.scenes.map(stripRuntime),
+            });
         } catch (err) {
             console.error('Failed to persist scenes:', err);
+            this._dirty = true;
         }
     }
 
-    async load(migrated) {
-        var stored = await this.storage.getItem(SCENES_KEY);
-        if (stored) {
-            this.setScenes(stored);
-        } else if (migrated && migrated.scenes.length > 0) {
-            this.setScenes(migrated.scenes);
-            this._dirty = true;
-            await this.flush();
-            console.log('Migrated ' + migrated.scenes.length + ' wavelet preset(s) to scenes.');
-        } else {
-            this.setScenes([this.defaultScene()]);
-            this._dirty = true;
-            await this.flush();
+    // legacy: { scenes, activeSceneId, seeded, migrated } — values recovered
+    // from node-persist (pre-json-store deployments and the original
+    // wave_config presets). Only consulted when the scene file is absent.
+    async load(legacy) {
+        var doc = this.persistFile
+            ? jsonStore.load(this.persistFile, function(msg) { console.warn('Scene store: ' + msg); })
+            : null;
+        legacy = legacy || {};
+
+        if (doc && Array.isArray(doc.scenes)) {
+            this.setScenes(doc.scenes);
+            this.seededBuiltins = !!doc.seededBuiltins;
+            this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
+            return;
         }
 
-        var active = await this.storage.getItem(ACTIVE_KEY);
-        if (active === undefined && migrated) active = migrated.activeSceneId;
+        var active = null;
+        if (legacy.scenes && legacy.scenes.length > 0) {
+            this.setScenes(legacy.scenes);
+            this.seededBuiltins = !!legacy.seeded;
+            active = legacy.activeSceneId;
+            console.log('Recovered ' + this.scenes.length + ' scene(s) from node-persist.');
+        } else if (legacy.migrated && legacy.migrated.scenes.length > 0) {
+            this.setScenes(legacy.migrated.scenes);
+            active = legacy.migrated.activeSceneId;
+            console.log('Migrated ' + this.scenes.length + ' wavelet preset(s) to scenes.');
+        } else {
+            this.setScenes([this.defaultScene()]);
+        }
         this.activeSceneId = (active && this.get(active)) ? active : null;
+        this._dirty = true;
+        await this.flush();
     }
 
     setScenes(rawScenes) {
@@ -252,4 +276,4 @@ class SceneStore {
     }
 }
 
-module.exports = { SceneStore, stripRuntime, normaliseLayer, newId, SCENES_KEY, ACTIVE_KEY };
+module.exports = { SceneStore, stripRuntime, normaliseLayer, newId };
