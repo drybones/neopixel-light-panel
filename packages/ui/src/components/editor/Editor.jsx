@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../../state/store';
+import { setLayerScene } from '../../api/lightStream';
 import PreviewStage from './PreviewStage';
 import LayerStack from './LayerStack';
 import ParamPanel from './ParamPanel';
@@ -30,6 +31,8 @@ export default function Editor({ sceneId, onClose }) {
   useEffect(() => {
     if (!scene) loadSceneDetail(sceneId).catch(() => onClose());
     if (activeSceneId !== sceneId) activateScene(sceneId);
+    setLayerScene(sceneId);
+    return () => setLayerScene(null);
   }, [sceneId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import NumberControl from '../controls/NumberControl';
 import RangeControl from '../controls/RangeControl';
 import EnumSelect from '../controls/EnumSelect';
 import ColorControl from '../controls/ColorControl';
 import XYPad from '../controls/XYPad';
 import GradientStopsEditor from '../controls/GradientStopsEditor';
-import { subscribeComposite } from '../../api/lightStream';
+import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 
 const BLEND_OPTIONS = [
   { value: 'normal', label: 'Normal' },
@@ -19,6 +19,20 @@ const BLEND_OPTIONS = [
 // opacity; the rest of the controls come from the effect's schema, so new
 // server-side effects get a UI for free.
 export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete, onDuplicate }) {
+  const layerId = layer ? layer.id : null;
+  // The XY pad's background is the selected layer's own live render (WS
+  // v2); falls back to the composite until a layer frame arrives.
+  const subscribeSelectedLayer = useCallback((cb) => {
+    if (!layerId) return subscribeComposite(cb);
+    const unsubComposite = subscribeComposite(cb);
+    let gotLayerFrame = false;
+    const unsubLayer = subscribeLayer(layerId, (frame) => {
+      if (!gotLayerFrame) { gotLayerFrame = true; unsubComposite(); }
+      cb(frame);
+    });
+    return () => { unsubLayer(); if (!gotLayerFrame) unsubComposite(); };
+  }, [layerId]);
+
   if (!layer) {
     return <div className="param-panel param-panel--empty">Select a layer to edit it</div>;
   }
@@ -57,7 +71,7 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             x={layer.params[entry.xKey]}
             y={layer.params[entry.yKey]}
             color={layer.params.color}
-            subscribe={subscribeComposite}
+            subscribe={subscribeSelectedLayer}
             onChange={(x, y) => setParams({ [entry.xKey]: x, [entry.yKey]: y })}
             onCommit={onCommit}
           />

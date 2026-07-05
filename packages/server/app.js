@@ -107,6 +107,7 @@ function tick() {
     if (scene) {
         compositor.renderFrame(scene, Date.now());
         broadcaster.tick();
+        broadcaster.tickLayers(scene, compositor);
         offRendered = false;
     } else if (!offRendered) {
         compositor.renderBlack();

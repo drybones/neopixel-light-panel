@@ -1,10 +1,19 @@
-import React from 'react';
-import { layerSwatches } from '../../lib/colors';
+import React, { useCallback } from 'react';
+import LedCanvas from '../preview/LedCanvas';
+import { subscribeLayer } from '../../api/lightStream';
+
+// Live animated thumbnail of a single layer, fed by the WS v2 stream.
+// Falls back to colour swatches until the first frame arrives (the
+// canvas starts black, so keep it cheap: render canvas immediately).
+function LayerThumb({ layerId }) {
+  const subscribe = useCallback((cb) => subscribeLayer(layerId, cb), [layerId]);
+  return <LedCanvas subscribe={subscribe} width={120} height={32} dots={false} style={{ width: '100%', height: '100%' }} />;
+}
 
 // Layer list, topmost layer first (Photoshop-style; the scene stores
 // layers bottom-first). Each row: swatch/thumbnail, effect name, blend +
 // opacity summary, visibility eye and solo toggle.
-export function LayerRow({ layer, effectName, selected, soloActive, onSelect, onToggleEnabled, onToggleSolo, thumbnail }) {
+export function LayerRow({ layer, effectName, selected, soloActive, onSelect, onToggleEnabled, onToggleSolo }) {
   const dimmed = soloActive ? !layer.solo : !layer.enabled;
   return (
     <div
@@ -15,11 +24,7 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
     >
       <div className="layer-row-thumb">
-        {thumbnail || (
-          <div className="layer-row-swatches">
-            {layerSwatches(layer).map((c, i) => <span key={i} style={{ background: c }} />)}
-          </div>
-        )}
+        <LayerThumb layerId={layer.id} />
       </div>
       <div className="layer-row-main">
         <div className="layer-row-name">{effectName}</div>
@@ -45,7 +50,7 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
   );
 }
 
-export default function LayerStack({ scene, effects, selectedLayerId, onSelect, onUpdateLayer, onMoveLayer, onAddClick, layerThumbnail }) {
+export default function LayerStack({ scene, effects, selectedLayerId, onSelect, onUpdateLayer, onMoveLayer, onAddClick }) {
   const soloActive = scene.layers.some((l) => l.solo && l.enabled);
   const topFirst = [...scene.layers].reverse();
 
@@ -85,7 +90,6 @@ export default function LayerStack({ scene, effects, selectedLayerId, onSelect, 
           onSelect={() => onSelect(layer.id)}
           onToggleEnabled={() => onUpdateLayer({ ...layer, enabled: !layer.enabled }, true)}
           onToggleSolo={() => onUpdateLayer({ ...layer, solo: !layer.solo }, true)}
-          thumbnail={layerThumbnail ? layerThumbnail(layer) : null}
         />
       ))}
       <button className="btn layer-stack-add" onClick={onAddClick}>+ Add layer</button>
