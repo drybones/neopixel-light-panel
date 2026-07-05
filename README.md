@@ -1,6 +1,6 @@
 # NeoPixel Light Panel
 
-A web-controlled LED light panel built from NeoPixel strips and a Fadecandy controller. A Node.js server drives the animations at 100 FPS while a React UI lets you create, tweak and switch between presets from any browser on the network.
+A web-controlled LED light panel built from NeoPixel strips and a Fadecandy controller. A Node.js server drives the animations at 100 FPS while a React UI works as a visual mixer: each scene is a stack of effect layers (waves, gradients, particles, noise) composited with blend modes and opacity, edited live with direct-manipulation controls and switched from any browser on the network.
 
 Video demo: https://youtu.be/4FmCFS33W90
 
@@ -90,19 +90,17 @@ The project is an npm workspaces monorepo with two packages.
 
 ### `packages/server/` -- API server and animation engine
 
-The server is a small Express app (`app.js`) with a `setInterval` render loop running at 100 FPS. On each tick it calls the current animation function and writes pixel data out via the Open Pixel Control protocol.
+The server is a small Express app (`app.js`) with a `setInterval` render loop running at 100 FPS. On each tick the compositor renders every layer of the active scene into its own buffer, blends them bottom→top (normal/add/multiply/screen/overlay with per-layer opacity), and writes the result out via the Open Pixel Control protocol.
 
-`shader.js` contains all the animation algorithms. Fixed presets (Embers, Particle Trail, Candy Sparkler, Pastel Spots) are methods on the `Shader` class, called by dynamic dispatch from the render loop. User-created "wavelet" presets drive `interactive_wave()`, which sums configurable sinusoidal wave components across the 2D grid to produce interference patterns.
+Effects live in `effects/` as self-contained modules — each declares a parameter schema (which drives the UI), precomputes expensive work on the API write path, and keeps per-layer animation state in an instance, so two ember layers flicker independently. Current effects: wavelet, solid colour, gradient, embers, particle trail, candy sparkler, noise field, twinkle.
 
-`opc.js` is the OPC client that talks to Fadecandy over TCP. `virtual-opc.js` is a drop-in replacement that broadcasts pixel state over a WebSocket on port 3001 instead. The server swaps between them based on the `VIRTUAL` env var.
+`opc.js` is the OPC client that talks to Fadecandy over TCP; `virtual-opc.js` is a drop-in replacement used when `VIRTUAL=1` is set. In both modes `engine/broadcast.js` streams pixel state over a WebSocket on port 3001 for the UI's live previews (composite at ~30 FPS, plus optional per-layer frames for the editor).
 
-Wavelet presets and brightness are persisted with `node-persist` so they survive restarts.
+Scenes and brightness are persisted with `node-persist` (debounced, SD-card friendly). On first boot after upgrading from the old preset model, wavelet presets are migrated to scenes automatically.
 
 ### `packages/ui/` -- React control interface
 
-A single-page React 18 app built with Vite. All components live in `src/App.jsx`. The UI provides a sidebar list of presets (both fixed and user-created), a wavelet editor with colour pickers and sliders for each wave parameter, a global brightness control, and preset import/export. Changes are sent to the server immediately on every input event.
-
-The `LEDPanel` component connects to the WebSocket on port 3001 and renders the pixel stream as a 30x8 grid of coloured circles on a canvas element.
+A React 18 app built with Vite (zustand for state). The default view is a scene switcher — a responsive card grid with a live preview on the active scene, designed to work well on a phone. Opening a scene switches to the editor: a large live preview you can drag effects around on directly, a layer stack with animated per-layer thumbnails, and a parameter panel rendered from each effect's schema (colour swatches, XY pads, gradient-stop strips, perceptual sliders). Edits stream to the server as you drag — the panel itself is the ultimate preview.
 
 ## API
 

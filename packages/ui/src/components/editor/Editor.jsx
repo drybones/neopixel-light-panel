@@ -112,6 +112,15 @@ export default function Editor({ sceneId, onClose }) {
     onClose();
   }
 
+  async function handleDuplicateScene() {
+    const copy = {
+      name: `${scene.name} copy`,
+      layers: scene.layers.map((l) => ({ ...JSON.parse(JSON.stringify(l)), id: newLayerId() })),
+    };
+    const created = await useStore.getState().createScene(copy);
+    window.location.hash = `#/edit/${created.id}`;
+  }
+
   return (
     <div className="editor">
       <div className="editor-toolbar">
@@ -126,6 +135,7 @@ export default function Editor({ sceneId, onClose }) {
         />
         <div className="editor-toolbar-right">
           <BrightnessSlider />
+          <button className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
           <button className="btn btn-ghost btn-danger" onClick={handleDeleteScene}>Delete scene</button>
         </div>
       </div>

@@ -23,6 +23,10 @@ export function layerSwatches(layer) {
       return p.color ? [p.color] : [];
     case 'gradient':
       return (p.stops || []).map((s) => s.color);
+    case 'noise':
+      return [p.c1, p.c2].filter(Boolean);
+    case 'twinkle':
+      return p.color ? [p.color] : [];
     case 'embers':
       return [hsvToHex(p.hue ?? 0.035, 1, 1)];
     case 'candy_sparkler':

@@ -4,104 +4,38 @@ Base URL: `http://<host>:3000`
 
 All endpoints use JSON for request/response bodies unless noted. CORS is enabled.
 
-## Presets
+## Concepts
 
-The panel supports two preset types:
+The panel plays one **scene** at a time. A scene is an ordered stack of **layers**; each layer is an instance of an **effect** with its own parameters, blend mode and opacity. Layers composite bottom→top (`layers[0]` is the bottom of the stack), like image-editor layers.
 
-- **Fixed** presets are built-in animations with IDs prefixed `f:` (e.g. `f:off`, `f:embers`, `f:particle_trail`, `f:candy_sparkler`, `f:pastel_spots`).
-- **Wavelet** presets are user-created. Each contains an array of wavelets that combine to produce an interference-pattern animation. IDs are 8-character hex strings (e.g. `a3b7c901`).
+- Scene and layer IDs are 8-character hex strings (the first segment of a UUID v4). Generate them yourself when creating layers client-side.
+- Blend modes: `normal`, `add`, `multiply`, `screen`, `overlay`. Opacity is `0..1`, applied after the blend.
+- `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render.
+- "Off" is not a scene: set the active scene to `null`.
 
----
-
-## Endpoints
-
-### List all presets
-
-```
-GET /api/all_presets/
-```
-
-Returns an array of `{ id, name, type }` objects for every preset (fixed and wavelet).
-
-```json
-[
-  { "id": "f:off", "name": "Off", "type": "fixed" },
-  { "id": "f:embers", "name": "Embers", "type": "fixed" },
-  { "id": "a3b7c901", "name": "Sunset", "type": "wavelet" }
-]
-```
-
----
-
-### Get active preset
-
-```
-GET /api/current_preset_id/
-```
-
-Returns the ID of the currently active preset as **plain text**.
-
----
-
-### Set active preset
-
-```
-PUT /api/current_preset_id/:id
-```
-
-Activates the preset with the given ID. If the ID is not found, the panel switches off (`f:off`). Returns `200`.
-
-Example: `PUT /api/current_preset_id/f:embers`
-
----
-
-### Get brightness
-
-```
-GET /api/brightness/
-```
-
-Returns the current global brightness as a **plain text** number between `0` and `1`.
-
----
-
-### Set brightness
-
-```
-PUT /api/brightness/:value
-```
-
-Sets global brightness. `value` is a number between `0` (dark) and `1` (full). Returns `200`.
-
-Example: `PUT /api/brightness/0.5`
-
----
-
-### Get a wavelet preset
-
-```
-GET /api/wave_config/:id
-```
-
-Returns the full wavelet preset object for the given ID.
+### Scene shape
 
 ```json
 {
   "id": "a3b7c901",
-  "name": "Sunset",
-  "type": "wavelet",
-  "wavelets": [
+  "name": "Sunset drift",
+  "layers": [
     {
-      "id": "b2c3d4e5",
-      "color": "#ff6633",
-      "freq": 0.3,
-      "lambda": 0.3,
-      "delta": 0.0,
-      "x": 0,
-      "y": 0,
-      "min": 0.2,
-      "max": 0.4,
-      "clip": false,
+      "id": "9f31ab02",
+      "effectType": "gradient",
+      "params": { "stops": [ { "position": 0, "color": "#241040" }, { "position": 1, "color": "#e04f1f" } ], "mode": "linear", "angle": 0, "cx": 0, "cy": 0, "animate": "scroll", "speed": 0.05 },
+      "blendMode": "normal",
+      "opacity": 1,
+      "enabled": true,
+      "solo": false
+    },
+    {
+      "id": "c22e10fa",
+      "effectType": "wavelet",
+      "params": { "color": "#2ee6a8", "freq": 0.3, "lambda": 0.5, "delta": 0, "x": -1.2, "y": 0, "min": 0, "max": 0.8 },
+      "blendMode": "add",
+      "opacity": 0.9,
+      "enabled": true,
       "solo": false
     }
   ]
@@ -110,55 +44,103 @@ Returns the full wavelet preset object for the given ID.
 
 ---
 
-### Create or update a wavelet preset
+## Endpoints
+
+### Effect catalog
 
 ```
-PUT /api/wave_config/:id
+GET /api/effects
 ```
 
-Body: a full wavelet preset object (see above). If a preset with the given ID already exists it is replaced; otherwise a new one is created. The preset is also **activated immediately**. Returns `200`.
+Returns every available effect with its parameter schema and defaults — enough to render an editor UI generically:
 
-When creating a new preset, generate the preset and wavelet IDs yourself as 8-character hex strings (the first segment of a UUID v4).
+```json
+[
+  {
+    "type": "wavelet",
+    "name": "Wavelet",
+    "schema": [
+      { "key": "color", "type": "color", "label": "Colour" },
+      { "key": "freq", "type": "number", "label": "Speed", "min": 0, "max": 2, "step": 0.01, "scale": "linear", "modulatable": true },
+      { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.6, 3.6], "yRange": [-0.9, 0.9], "draggable": true }
+    ],
+    "defaults": { "color": "#ffffff", "freq": 0.2 }
+  }
+]
+```
+
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+
+Effect types: `wavelet`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
 
 ---
 
-### Delete a wavelet preset
+### List scenes
 
 ```
-DELETE /api/wave_config/:id
+GET /api/scenes
 ```
 
-Removes the preset. If it was the active preset, the panel switches to `f:off`. Returns `200`.
+Returns `[{ "id", "name", "layerCount" }]`.
+
+### Create a scene
+
+```
+POST /api/scenes
+```
+
+Body: `{ "name"?, "layers"? }` — the server assigns the scene ID, fills missing layer fields from effect defaults, and returns the full scene with `201`.
+
+### Get / replace / delete a scene
+
+```
+GET    /api/scenes/:id
+PUT    /api/scenes/:id
+DELETE /api/scenes/:id
+```
+
+`PUT` replaces the whole scene (rename, add/remove/reorder layers). It does **not** activate the scene. `DELETE` of the active scene switches the panel off. Unknown IDs return `404`.
+
+### Update a single layer
+
+```
+PUT /api/scenes/:sceneId/layers/:layerId
+```
+
+Body: a full layer object. This is the high-frequency path for parameter edits (drags) — small payload, applied immediately to the running animation. Returns the normalised layer.
 
 ---
 
-### Export all wavelet presets
+### Active scene
 
 ```
-GET /api/all_wave_config/
+GET /api/active_scene        →  { "id": "a3b7c901" }  or  { "id": null }
+PUT /api/active_scene        body { "id": "a3b7c901" }  or  { "id": null }
 ```
 
-Returns an array of all wavelet preset objects (suitable for backup/export).
+`{ "id": null }` switches the panel off (renders one black frame, then idles). Activating an unknown ID returns `404`.
 
 ---
 
-### Replace all wavelet presets
+### Brightness
 
 ```
-PUT /api/all_wave_config/
+GET /api/brightness/          →  plain-text number 0..1
+PUT /api/brightness/:value
 ```
 
-Body: an array of wavelet preset objects. **Replaces** the entire wavelet preset list. Returns `200`.
+Global brightness, applied on top of all scenes. The UI maps sliders through an arctangent curve for perceptual uniformity, but the API value is linear.
 
 ---
 
-### Import/merge wavelet presets
+### Export / import
 
 ```
-POST /api/all_wave_config/
+GET  /api/scenes/export       →  { "version": 2, "scenes": [ ... ] }
+POST /api/scenes/import       body: same shape
 ```
 
-Body: an array of wavelet preset objects. Presets with matching IDs are updated in place; new IDs are appended. Fixed presets in the array are ignored. Returns `200`.
+Import merges by scene ID: matching IDs are replaced, new IDs appended. Anything other than `version: 2` is rejected with `400`.
 
 ---
 
@@ -168,28 +150,45 @@ Body: an array of wavelet preset objects. Presets with matching IDs are updated 
 GET /api/virtual
 ```
 
-Returns `{ "virtual": true }` if the server is running in virtual mode (no hardware), or `{ "virtual": false }` for hardware mode.
+Returns `{ "virtual": true }` if the server is running without Fadecandy hardware.
 
 ---
 
 ## Wavelet parameters
 
-Each wavelet in a preset controls one wave component of the animation.
+The `wavelet` effect renders one sinusoidal wave radiating from a point; stack several with the `add` blend for interference patterns.
 
 | Field    | Type    | Description |
 |----------|---------|-------------|
-| `id`     | string  | 8-char hex identifier |
 | `color`  | string  | Hex colour, e.g. `"#ff6633"` |
 | `freq`   | number  | Oscillation speed (higher = faster) |
 | `lambda` | number  | Spatial wavelength (higher = wider waves) |
 | `delta`  | number  | Phase offset |
-| `x`      | number  | Wave origin X position on the panel (range approx -3.6 to 3.6) |
-| `y`      | number  | Wave origin Y position on the panel (range approx -0.9 to 0.9) |
-| `min`    | number  | Minimum intensity (uses non-linear arctan mapping) |
-| `max`    | number  | Maximum intensity (uses non-linear arctan mapping) |
-| `clip`   | boolean | Whether to clip values outside min/max |
-| `solo`   | boolean | When true, only wavelets with `solo: true` are rendered |
+| `x`      | number  | Wave origin X on the panel (approx -3.6 to 3.6) |
+| `y`      | number  | Wave origin Y on the panel (approx -0.9 to 0.9) |
+| `min`    | number  | Minimum intensity (UI uses non-linear arctan slider mapping) |
+| `max`    | number  | Maximum intensity |
 
 ## WebSocket pixel stream
 
-A WebSocket server on port `3001` broadcasts the current pixel state at 100 FPS. Each message is a JSON array of 240 `[r, g, b]` triples (values 0-255), representing the 30x8 LED grid in layout order. This is available in both virtual and hardware modes.
+A WebSocket server on port `3001` streams pixel state in both virtual and hardware modes.
+
+**v1 (default):** on connect, each message is a JSON array of 240 `[r, g, b]` triples (0–255) — the composite output after brightness — at ~30 FPS. The most recent frame is replayed to new connections.
+
+**v2 (layer previews):** send
+
+```json
+{ "type": "subscribe_layers", "sceneId": "a3b7c901" }
+```
+
+and while that scene is active you receive, at ~15 FPS:
+
+```json
+{ "type": "frame", "composite": [[r,g,b], ...], "layers": { "<layerId>": [[r,g,b], ...] } }
+```
+
+instead of v1 frames. Layer frames are pre-opacity and pre-brightness (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
+
+## Migration from the preset API
+
+The old preset endpoints (`/api/all_presets/`, `/api/current_preset_id/`, `/api/wave_config/`, `/api/all_wave_config/`) were removed. On first boot after upgrading, persisted wavelet presets are automatically converted to scenes (one `wavelet` layer per wavelet, `add` blend) under the same IDs; the old `wave_config` storage key is left in place for rollback. The old fixed presets exist as ordinary editable scenes seeded once ("Embers", "Particle Trail", "Candy Sparkler"); `pastel_spots` was retired.

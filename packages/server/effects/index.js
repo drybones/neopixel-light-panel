@@ -14,6 +14,8 @@ var modules = [
     require('./embers'),
     require('./particle-trail'),
     require('./candy-sparkler'),
+    require('./noise'),
+    require('./twinkle'),
 ];
 
 var byType = {};

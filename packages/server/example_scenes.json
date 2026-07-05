@@ -1,0 +1,73 @@
+{
+  "version": 2,
+  "scenes": [
+    {
+      "id": "d1f00a01",
+      "name": "Sunset drift",
+      "layers": [
+        {
+          "id": "d1f00a02",
+          "effectType": "gradient",
+          "params": {
+            "stops": [
+              { "position": 0, "color": "#241040" },
+              { "position": 1, "color": "#e04f1f" }
+            ],
+            "mode": "linear",
+            "angle": 0,
+            "cx": 0,
+            "cy": 0,
+            "animate": "scroll",
+            "speed": 0.02
+          },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "d1f00a03",
+          "effectType": "wavelet",
+          "params": { "color": "#2ee6a8", "freq": 0.25, "lambda": 0.6, "delta": 0, "x": -1.2, "y": 0, "min": 0, "max": 0.7 },
+          "blendMode": "add",
+          "opacity": 0.9,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "d1f00a04",
+          "effectType": "embers",
+          "params": { "hue": 0.035, "hueSpread": 0.11, "count": 20, "speed": 1, "glow": 0.03 },
+          "blendMode": "screen",
+          "opacity": 0.7,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "d1f00b01",
+      "name": "Night sky",
+      "layers": [
+        {
+          "id": "d1f00b02",
+          "effectType": "noise",
+          "params": { "c1": "#050a1e", "c2": "#12306b", "scale": 0.8, "speed": 0.15, "contrast": 1.8 },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "d1f00b03",
+          "effectType": "twinkle",
+          "params": { "color": "#ffe9c4", "density": 0.2, "speed": 0.8, "background": 0 },
+          "blendMode": "screen",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    }
+  ]
+}
