@@ -5,7 +5,9 @@ import SceneGrid from './components/switcher/SceneGrid';
 import Editor from './components/editor/Editor';
 
 function parseHash() {
-  const m = window.location.hash.match(/^#\/edit\/([0-9A-Za-z]+)/);
+  // Scene ids are 8-char hex for new scenes, but migrated presets keep
+  // their old shortid ids, which can include _ and - (e.g. HJ_f5ckwf).
+  const m = window.location.hash.match(/^#\/edit\/([\w-]+)/);
   return m ? { view: 'editor', sceneId: m[1] } : { view: 'switcher' };
 }
 
