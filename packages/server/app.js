@@ -26,38 +26,58 @@ app.use(express.static(path.join(__dirname, '../ui/dist')));
 app.use(express.json());
 
 var storage = require('node-persist');
-var store = new SceneStore(compositor, storage);
+
+// Scenes live in their own crash-safe file (atomic writes + .bak) — a
+// power cut once corrupted a node-persist file, which made init() reject
+// and every scene "vanish". node-persist remains for brightness and the
+// legacy keys, with forgiveParseErrors so one bad file can't sink boot.
+var SCENES_FILE = path.join(__dirname, '.node-persist', 'scenes-v2.json');
+var store = new SceneStore(compositor, SCENES_FILE);
 
 const GLOBAL_BRIGHTNESS_CONFIG_KEY = 'global_brightness';
 var global_brightness = 1.0;
 
 async function initStorage() {
+    // Collect legacy/auxiliary state from node-persist first; any failure
+    // here must not stop the scene file from loading.
+    var legacy = {};
     try {
-        // Pin storage next to the server code so behaviour doesn't depend
-        // on the working directory (matches the Pi service, which runs
-        // with WorkingDirectory=packages/server).
-        await storage.init({ dir: path.join(__dirname, '.node-persist/storage'), interval: 1000 });
+        // Storage dir pinned next to the server code so behaviour doesn't
+        // depend on the working directory (matches the Pi service, which
+        // runs with WorkingDirectory=packages/server).
+        await storage.init({
+            dir: path.join(__dirname, '.node-persist/storage'),
+            interval: 1000,
+            forgiveParseErrors: true,
+        });
 
-        var migrated = await migrate.migrate(storage);
-        await store.load(migrated);
-        await seedBuiltins();
-        console.log('Loaded ' + store.scenes.length + ' scene(s); active: ' + store.activeSceneId);
+        legacy.scenes = await storage.getItem('scenes_v2');
+        legacy.activeSceneId = await storage.getItem('active_scene_id');
+        legacy.seeded = await storage.getItem('seeded_builtins_v1');
+        legacy.migrated = await migrate.migrate(storage);
 
         const brightnessValue = await storage.getItem(GLOBAL_BRIGHTNESS_CONFIG_KEY);
         if (brightnessValue) {
             global_brightness = parseFloat(brightnessValue);
             client.brightness = global_brightness;
-        } else {
-            await storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness);
         }
     } catch (err) {
-        console.error('Storage initialization failed:', err);
+        console.error('node-persist initialization failed (continuing with scene file only):', err);
+    }
+
+    try {
+        await store.load(legacy);
+        await seedBuiltins();
+        console.log('Loaded ' + store.scenes.length + ' scene(s); active: ' + store.activeSceneId);
+    } catch (err) {
+        console.error('Scene store load failed:', err);
     }
 }
-// Recreate the old fixed presets as ordinary editable scenes, once.
-const SEEDED_BUILTINS_KEY = 'seeded_builtins_v1';
+// Recreate the old fixed presets as ordinary editable scenes, once. The
+// flag lives inside the scene document so it can't get out of sync with
+// the scene list.
 async function seedBuiltins() {
-    if (await storage.getItem(SEEDED_BUILTINS_KEY)) return;
+    if (store.seededBuiltins) return;
     [
         { name: 'Embers', effectType: 'embers' },
         { name: 'Particle Trail', effectType: 'particle_trail' },
@@ -65,7 +85,8 @@ async function seedBuiltins() {
     ].forEach(function(b) {
         store.create({ name: b.name, layers: [{ effectType: b.effectType }] });
     });
-    await storage.setItem(SEEDED_BUILTINS_KEY, true);
+    store.seededBuiltins = true;
+    store.markDirty();
     await store.flush();
 }
 
