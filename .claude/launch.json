@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["packages/server/app.js"],
+      "env": { "VIRTUAL": "1" },
+      "port": 3000,
+      "autoPort": false
+    },
+    {
+      "name": "ui",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start", "--workspace=packages/ui"],
+      "port": 3002
+    }
+  ]
+}
