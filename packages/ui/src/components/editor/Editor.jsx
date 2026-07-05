@@ -6,10 +6,7 @@ import LayerStack from './LayerStack';
 import ParamPanel from './ParamPanel';
 import EffectPicker from './EffectPicker';
 import BrightnessSlider from '../switcher/BrightnessSlider';
-
-function newLayerId() {
-  return crypto.randomUUID().split('-')[0];
-}
+import { newId as newLayerId } from '../../lib/id';
 
 export default function Editor({ sceneId, onClose }) {
   const scene = useStore((s) => s.sceneDetails[sceneId]);
