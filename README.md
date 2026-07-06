@@ -96,7 +96,7 @@ Effects live in `effects/` as self-contained modules — each declares a paramet
 
 `opc.js` is the OPC client that talks to Fadecandy over TCP; `virtual-opc.js` is a drop-in replacement used when `VIRTUAL=1` is set. In both modes `engine/broadcast.js` streams pixel state over a WebSocket on port 3001 for the UI's live previews (composite at ~30 FPS, plus optional per-layer frames for the editor).
 
-Scenes and brightness are persisted with `node-persist` (debounced, SD-card friendly). On first boot after upgrading from the old preset model, wavelet presets are migrated to scenes automatically.
+Scenes are persisted to a crash-safe JSON file (atomic tmp+rename writes with a `.bak` fallback, debounced to be SD-card friendly) so a power cut can't lose them; brightness and legacy keys stay in `node-persist`. On first boot after upgrading from the old preset model, wavelet presets are migrated to scenes automatically.
 
 ### `packages/ui/` -- React control interface
 
