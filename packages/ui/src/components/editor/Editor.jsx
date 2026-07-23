@@ -5,7 +5,6 @@ import PreviewStage from './PreviewStage';
 import LayerStack from './LayerStack';
 import ParamPanel from './ParamPanel';
 import EffectPicker from './EffectPicker';
-import BrightnessSlider from '../switcher/BrightnessSlider';
 import { newId as newLayerId } from '../../lib/id';
 
 export default function Editor({ sceneId, onClose }) {
@@ -131,7 +130,6 @@ export default function Editor({ sceneId, onClose }) {
           aria-label="Scene name"
         />
         <div className="editor-toolbar-right">
-          <BrightnessSlider />
           <button className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
           <button className="btn btn-ghost btn-danger" onClick={handleDeleteScene}>Delete scene</button>
         </div>

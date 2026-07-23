@@ -3,6 +3,7 @@ import { useStore } from './state/store';
 import { subscribeStatus } from './api/lightStream';
 import SceneGrid from './components/switcher/SceneGrid';
 import Editor from './components/editor/Editor';
+import BrightnessSlider from './components/switcher/BrightnessSlider';
 
 function parseHash() {
   // Scene ids are 8-char hex for new scenes, but migrated presets keep
@@ -39,13 +40,16 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <button className="app-title" onClick={closeEditor} aria-label="Back to scenes">
-          Lightpanel
-        </button>
-        <span
-          className={`ws-dot${wsConnected ? ' ws-dot--on' : ''}`}
-          title={wsConnected ? 'Live preview connected' : 'Live preview disconnected'}
-        />
+        <div className="app-header-brand">
+          <button className="app-title" onClick={closeEditor} aria-label="Back to scenes">
+            Lightpanel
+          </button>
+          <span
+            className={`ws-dot${wsConnected ? ' ws-dot--on' : ''}`}
+            title={wsConnected ? 'Live preview connected' : 'Live preview disconnected'}
+          />
+        </div>
+        {loaded && <BrightnessSlider />}
       </header>
       {!loaded ? (
         <div className="app-loading">Connecting…</div>
