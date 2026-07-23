@@ -173,7 +173,7 @@ The `wavelet` effect renders one sinusoidal wave radiating from a point; stack s
 
 A WebSocket server on port `3001` streams pixel state in both virtual and hardware modes.
 
-**v1 (default):** on connect, each message is a JSON array of 240 `[r, g, b]` triples (0–255) — the composite output after brightness — at ~30 FPS. The most recent frame is replayed to new connections.
+**v1 (default):** on connect, each message is a JSON array of 240 `[r, g, b]` triples (0–255) — the composite output **before** global brightness — at ~30 FPS. The most recent frame is replayed to new connections. Streamed frames are deliberately pre-fader: previews always show the scene at full brightness, and only the panel dims with `/api/brightness`.
 
 **v2 (layer previews):** send
 
@@ -187,7 +187,7 @@ and while that scene is active you receive, at ~15 FPS:
 { "type": "frame", "composite": [[r,g,b], ...], "layers": { "<layerId>": [[r,g,b], ...] } }
 ```
 
-instead of v1 frames. Layer frames are pre-opacity and pre-brightness (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
+instead of v1 frames. `composite` is pre-brightness like v1; layer frames are additionally pre-opacity (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
 
 ## Migration from the preset API
 

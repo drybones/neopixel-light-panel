@@ -1,8 +1,10 @@
 /*
  * Virtual OPC client — drop-in replacement for opc.js when no Fadecandy
  * is attached. Just a pixel-buffer sink: brightness and clamping are
- * applied exactly like the real client, and engine/broadcast.js reads
- * pixelBuffer to feed the browser visualiser (it owns the WebSocket now).
+ * applied exactly like the real client. The browser visualiser is fed by
+ * engine/broadcast.js (which owns the WebSocket) straight from the
+ * compositor, so pixelBuffer here goes nowhere — it only keeps the
+ * virtual client behaviourally identical to the hardware one.
  */
 
 var fs = require('fs');
