@@ -46,9 +46,9 @@ Key modules:
 - `engine/scene-store.js` — scene list + active id, `preprocess()` on every write (attaches `_prepared`, `_blend`, `_displayLayers` so the hot loop never parses/filters), debounced writes (2s trailing; flushed on SIGINT/SIGTERM).
 - `engine/json-store.js` — **scenes persist to `packages/server/.node-persist/scenes-v2.json` via atomic tmp+fsync+rename with a `.bak` fallback**, NOT node-persist: node-persist's plain `fs.writeFile` lost scene data to a power cut once. node-persist (with `forgiveParseErrors: true`) remains only for brightness and legacy keys (`wave_config`, old `scenes_v2`), which the store falls back to when the scene file is absent.
 - `engine/migrate.js` — one-time `wave_config` → scenes conversion (one wavelet layer per wavelet, `add` blend). Old key kept for rollback.
-- `engine/broadcast.js` — the only WebSocket server (port 3001), both modes. v1: bare `[[r,g,b],…]` composite frames ~30 FPS, last frame replayed to new connections. v2: `subscribe_layers` → `{type:"frame", composite, layers}` at ~15 FPS, only serialised while subscribers exist.
+- `engine/broadcast.js` — the only WebSocket server (port 3001), both modes. Serialises from `compositor.composite`, i.e. **pre-brightness** — UI previews are a pre-fader meter and never dim; only the panel does. v1: bare `[[r,g,b],…]` composite frames ~30 FPS, last frame replayed to new connections. v2: `subscribe_layers` → `{type:"frame", composite, layers}` at ~15 FPS, only serialised while subscribers exist.
 - `effects/*.js` — one module per effect: `{type, name, schema, defaults, prepare(params), createInstance(ctx)}`. `prepare()` runs on the API write path (hex→rgb, LUTs); `createInstance()` holds per-layer animation state and is recreated **only** on effectType change (param edits must not reset particles). Hot loops are allocation-free.
-- `opc.js` / `virtual-opc.js` — pixel sinks; swapped on `VIRTUAL` env var. Hardware buffer has a 4-byte OPC header (broadcast uses `headerOffset`).
+- `opc.js` / `virtual-opc.js` — pixel sinks; swapped on `VIRTUAL` env var. Hardware buffer has a 4-byte OPC header; broadcast doesn't care, it reads the compositor instead.
 - `layout.json` — 240 LED positions; x ∈ ±3.625, z ∈ ±0.875, 0.25 spacing. Effect `y` params negate z (`dz = pz + y`).
 
 ## UI Architecture (`packages/ui/`)

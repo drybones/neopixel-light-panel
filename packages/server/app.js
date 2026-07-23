@@ -13,10 +13,9 @@ var createScenesRouter = require('./routes/scenes');
 
 var compositor = new Compositor(client, model);
 
-// The hardware OPC buffer carries a 4-byte protocol header; virtual doesn't.
-var broadcaster = new Broadcaster(client, model.length, {
-    headerOffset: process.env.VIRTUAL ? 0 : 4,
-});
+// Previews stream the compositor's pre-brightness composite, so they stay
+// legible (pre-fader meter) while only the panel dims.
+var broadcaster = new Broadcaster(compositor, model.length);
 
 var express = require('express');
 var cors = require('cors');
@@ -128,7 +127,7 @@ function tick() {
     if (scene) {
         compositor.renderFrame(scene, Date.now());
         broadcaster.tick();
-        broadcaster.tickLayers(scene, compositor);
+        broadcaster.tickLayers(scene);
         offRendered = false;
     } else if (!offRendered) {
         compositor.renderBlack();

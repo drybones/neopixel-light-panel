@@ -1,8 +1,14 @@
 /*
  * Single WebSocket broadcaster (port 3001) for both hardware and virtual
  * modes — replaces the WSS that lived inside virtual-opc.js plus the
- * hardware-mode mirror in app.js (which assumed a 4-byte OPC header that
- * virtual buffers don't have; headerOffset makes that explicit).
+ * hardware-mode mirror in app.js.
+ *
+ * Frames are serialised from compositor.composite, i.e. *before* global
+ * brightness is applied on the client.setPixel() write path: the UI
+ * previews are a pre-fader meter, always showing the scene as authored,
+ * and only the panel itself dims. (Reading the compositor rather than
+ * client.pixelBuffer also sidesteps the 4-byte OPC header that hardware
+ * buffers carry and virtual ones don't.)
  *
  * v1 protocol (default): bare [[r,g,b], ...] JSON frames of the
  * composite, throttled to ~30 fps. New connections get the last frame
@@ -29,10 +35,9 @@ function clamp255(v) {
 }
 
 class Broadcaster {
-    constructor(client, numPixels, options) {
-        this.client = client;
+    constructor(compositor, numPixels, options) {
+        this.compositor = compositor;
         this.numPixels = numPixels;
-        this.headerOffset = (options && options.headerOffset) || 0;
         this._pixelArray = null;
         this._lastMsg = null;
         this._lastSent = 0;
@@ -59,7 +64,7 @@ class Broadcaster {
         });
     }
 
-    _serialiseBuffer(buf, offset, target) {
+    _serialiseBuffer(buf, target) {
         var n = this.numPixels;
         if (!target || target.length !== n) {
             target = new Array(n);
@@ -67,7 +72,7 @@ class Broadcaster {
         }
         for (var i = 0; i < n; i++) {
             var triple = target[i];
-            var o = offset + i * 3;
+            var o = i * 3;
             triple[0] = clamp255(buf[o]);
             triple[1] = clamp255(buf[o + 1]);
             triple[2] = clamp255(buf[o + 2]);
@@ -80,11 +85,11 @@ class Broadcaster {
         var now = Date.now();
         if (!force && now - this._lastSent < FRAME_INTERVAL_MS) return;
         if (this.wss.clients.size === 0 && !force) return;
-        var buf = this.client.pixelBuffer;
+        var buf = this.compositor.composite;
         if (!buf) return;
         this._lastSent = now;
 
-        this._pixelArray = this._serialiseBuffer(buf, this.headerOffset, this._pixelArray);
+        this._pixelArray = this._serialiseBuffer(buf, this._pixelArray);
         this._lastMsg = JSON.stringify(this._pixelArray);
 
         var msg = this._lastMsg;
@@ -95,7 +100,7 @@ class Broadcaster {
 
     // Layer broadcast (v2), called every render tick with the active scene;
     // does nothing unless someone subscribed to that scene's layers.
-    tickLayers(scene, compositor, force) {
+    tickLayers(scene, force) {
         var now = Date.now();
         if (!force && now - this._lastLayerSent < LAYER_FRAME_INTERVAL_MS) return;
 
@@ -108,15 +113,15 @@ class Broadcaster {
         if (subscribers.length === 0) return;
         this._lastLayerSent = now;
 
-        var buf = this.client.pixelBuffer;
-        this._pixelArray = this._serialiseBuffer(buf, this.headerOffset, this._pixelArray);
+        var buf = this.compositor.composite;
+        this._pixelArray = this._serialiseBuffer(buf, this._pixelArray);
 
         var layers = {};
         for (var i = 0; i < scene.layers.length; i++) {
             var layer = scene.layers[i];
-            var layerBuf = compositor.getLayerBuffer(layer.id);
+            var layerBuf = this.compositor.getLayerBuffer(layer.id);
             if (!layerBuf) continue;
-            var arr = this._serialiseBuffer(layerBuf, 0, this._layerArrays.get(layer.id));
+            var arr = this._serialiseBuffer(layerBuf, this._layerArrays.get(layer.id));
             this._layerArrays.set(layer.id, arr);
             layers[layer.id] = arr;
         }
