@@ -2,7 +2,6 @@ import React, { useRef } from 'react';
 import { useStore } from '../../state/store';
 import { api } from '../../api/client';
 import SceneCard from './SceneCard';
-import BrightnessSlider from './BrightnessSlider';
 
 export default function SceneGrid({ onEdit }) {
   const scenes = useStore((s) => s.scenes);
@@ -92,18 +91,15 @@ export default function SceneGrid({ onEdit }) {
         </div>
       </div>
       <div className="switcher-footer">
-        <BrightnessSlider />
-        <div className="switcher-footer-actions">
-          <button className="btn btn-ghost" onClick={handleExport}>Export</button>
-          <button className="btn btn-ghost" onClick={() => importInputRef.current.click()}>Import</button>
-          <input
-            ref={importInputRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: 'none' }}
-            onChange={handleImportFile}
-          />
-        </div>
+        <button className="btn btn-ghost" onClick={handleExport}>Export</button>
+        <button className="btn btn-ghost" onClick={() => importInputRef.current.click()}>Import</button>
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={handleImportFile}
+        />
       </div>
     </>
   );

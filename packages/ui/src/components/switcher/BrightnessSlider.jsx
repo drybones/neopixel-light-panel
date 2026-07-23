@@ -1,6 +1,5 @@
 import React from 'react';
 import { useStore } from '../../state/store';
-import { sliderToValue, valueToSlider } from '../../lib/perceptual';
 
 export default function BrightnessSlider() {
   const brightness = useStore((s) => s.brightness);
@@ -12,11 +11,11 @@ export default function BrightnessSlider() {
       <input
         type="range"
         min="0"
-        max="10"
+        max="1"
         step="0.01"
-        value={valueToSlider(brightness)}
-        onChange={(e) => setBrightness(sliderToValue(Number(e.target.value)))}
-        aria-label="Global brightness"
+        value={brightness}
+        onChange={(e) => setBrightness(Number(e.target.value))}
+        aria-label="Brightness"
       />
       <span className="brightness-value">{Number(brightness).toFixed(2)}</span>
     </div>

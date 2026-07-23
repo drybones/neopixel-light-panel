@@ -107,7 +107,7 @@ app.get('/api/brightness/', function(req, res) {
     res.send(global_brightness.toString()); // Cast to string; a number implies an http status code
 });
 app.put('/api/brightness/:brightness', function(req, res) {
-    global_brightness = req.params.brightness;
+    global_brightness = Math.min(1, Math.max(0, parseFloat(req.params.brightness)));
     client.brightness = global_brightness;
     storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness).catch(err => console.error('Failed to save brightness:', err));
     res.sendStatus(200);

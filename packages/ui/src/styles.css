@@ -32,8 +32,23 @@ body {
 .app-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 10px 20px;
+  flex-wrap: wrap;
   padding: 14px 0;
+}
+
+.app-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Shared brightness control lives in the header, identical on both views.
+   Grows to fill the row on desktop; wraps to its own full-width row when
+   the brand and slider no longer fit side by side. */
+.app-header .brightness {
+  flex: 1 1 240px;
+  min-width: 200px;
 }
 
 .app-title {
@@ -156,9 +171,10 @@ body {
 .switcher-footer {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 8px;
   margin-top: 22px;
-  flex-wrap: wrap;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
 }
 
 .brightness {
@@ -177,8 +193,6 @@ body {
   width: 36px;
   text-align: right;
 }
-
-.switcher-footer-actions { display: flex; gap: 8px; }
 
 /* ── Range inputs ── */
 
@@ -246,7 +260,6 @@ input[type="range"]::-moz-range-thumb {
   gap: 12px;
   margin-left: auto;
 }
-.editor-toolbar-right .brightness { min-width: 200px; flex: none; }
 
 .preview-stage {
   position: relative;
