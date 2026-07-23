@@ -1,0 +1,16 @@
+[Unit]
+Description=NeoPixel Light Panel - kernel undervoltage watcher
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/github/neopixel-light-panel/packages/server
+ExecStart=/home/pi/github/neopixel-light-panel/packages/server/scripts/power-watch.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
