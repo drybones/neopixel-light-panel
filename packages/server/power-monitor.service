@@ -1,0 +1,16 @@
+[Unit]
+Description=NeoPixel Light Panel - power/brightness correlation monitor
+After=network.target lightpanel.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/github/neopixel-light-panel/packages/server
+ExecStart=/home/pi/github/neopixel-light-panel/packages/server/scripts/power-monitor.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
