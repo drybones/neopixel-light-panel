@@ -9,6 +9,7 @@
  */
 
 var color = require('../engine/color');
+var panel = require('../engine/panel');
 
 module.exports = {
     type: 'wavelet',
@@ -18,7 +19,12 @@ module.exports = {
         { key: 'freq', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.05, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
-        { type: 'xy', label: 'Position', xKey: 'x', yKey: 'y', xRange: [-3.6, 3.6], yRange: [-0.9, 0.9], draggable: true },
+        // margin (world units) expands the pad past the panel on all four sides;
+        // farLimit adds a compressed outer frame reaching that distance, where
+        // the wave reads as planar. Both are in world units — see engine/panel.
+        { type: 'xy', label: 'Position', xKey: 'x', yKey: 'y',
+          xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
+          margin: 2, farLimit: 1000 },
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
     ],
     defaults: {

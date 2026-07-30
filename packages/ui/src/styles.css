@@ -261,27 +261,17 @@ input[type="range"]::-moz-range-thumb {
   margin-left: auto;
 }
 
+/* No max-height: pairing one with aspect-ratio makes the height clamp while
+   the width keeps growing, so past ~900px of content the panel rendered
+   stretched sideways — 19% at the widest, enough to turn the LEDs into ovals.
+   The .app max-width already bounds this to about 285px tall. */
 .preview-stage {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
   aspect-ratio: 30 / 8;
-  max-height: 240px;
   width: 100%;
 }
-
-.stage-handle {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
-  transform: translate(-50%, -50%);
-  cursor: grab;
-  touch-action: none;
-}
-.stage-handle:active { cursor: grabbing; }
 
 .editor-columns {
   display: grid;
@@ -470,11 +460,12 @@ input[type="range"]::-moz-range-thumb {
 
 /* XY pad */
 .control-row--pad { align-items: flex-start; }
+.xy-pad-wrap { flex: 1; min-width: 200px; }
 .xy-pad {
   position: relative;
-  flex: 1;
-  min-width: 200px;
-  aspect-ratio: 30 / 8;
+  width: 100%;
+  /* aspect-ratio is set inline from padGeometry — the pad is the panel plus an
+     equal world-unit margin, so its shape depends on that margin. */
   border-radius: 8px;
   overflow: hidden;
   cursor: crosshair;
@@ -494,6 +485,77 @@ input[type="range"]::-moz-range-thumb {
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
+/* Pinned to the edge because the value is beyond what the pad can show. */
+.xy-pad-handle--clamped {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.xy-pad-fields {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.xy-pad-zoom {
+  display: flex;
+  gap: 2px;
+  margin-right: 8px;
+}
+.xy-pad-zoom-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.xy-pad-zoom-btn:hover { border-color: var(--border); }
+.xy-pad-zoom-btn.is-active {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+.xy-pad-note {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-left: 6px;
+}
+
+/* Numeric entry beside a pad or dial. Reads as a plain value until you reach
+   for it — same idiom as .editor-name, so typing an exact number stays
+   available without competing with the drag control it sits under. */
+.control-num {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 4px;
+  width: 56px;
+}
+.control-num:hover { border-color: var(--border); }
+.control-num:focus {
+  border-color: var(--border-strong);
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.control-row--dial { align-items: flex-start; }
+.angle-dial {
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  flex: none;
+}
+.angle-dial:active { cursor: grabbing; }
+.angle-dial:focus { outline: none; }
+.angle-dial:focus-visible { outline: 2px solid var(--accent-dim); }
+.dial-readout { display: flex; align-items: center; gap: 2px; }
 
 /* Gradient stops */
 .control-row--stops { align-items: flex-start; }

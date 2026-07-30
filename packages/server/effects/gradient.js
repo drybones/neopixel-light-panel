@@ -7,13 +7,13 @@
  */
 
 var color = require('../engine/color');
+var panel = require('../engine/panel');
 
 var LUT_SIZE = 256;
 
-// Panel extent: x is ±3.625 (30 cols × 0.25), z is ±0.875 (8 rows × 0.25).
-var HALF_X = 3.625;
-var HALF_Z = 0.875;
-var MAX_RADIUS = Math.sqrt(HALF_X * HALF_X + HALF_Z * HALF_Z);
+var HALF_X = panel.HALF_X;
+var HALF_Z = panel.HALF_Z;
+var MAX_RADIUS = panel.RADIUS;
 
 function buildLut(stops) {
     var sorted = stops.slice().sort(function(a, b) { return a.position - b.position; });
@@ -43,7 +43,12 @@ module.exports = {
             { value: 'radial', label: 'Radial' },
         ]},
         { key: 'angle', type: 'number', label: 'Angle', min: 0, max: 360, step: 1, scale: 'linear', modulatable: true },
-        { type: 'xy', label: 'Centre', xKey: 'cx', yKey: 'cy', xRange: [-3.6, 3.6], yRange: [-0.9, 0.9], draggable: true },
+        // margin (world units) expands the pad past the panel on all four sides
+        // so an off-panel centre stays grabbable. No farLimit: a radial centre a
+        // thousand units away is just a flat wash, so there's nothing out there
+        // worth reaching for.
+        { type: 'xy', label: 'Centre', xKey: 'cx', yKey: 'cy',
+          xRange: [-HALF_X, HALF_X], yRange: [-HALF_Z, HALF_Z], margin: 2 },
         { key: 'animate', type: 'enum', label: 'Motion', options: [
             { value: 'none', label: 'Still' },
             { value: 'scroll', label: 'Scroll' },

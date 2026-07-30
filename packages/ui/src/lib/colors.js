@@ -19,6 +19,7 @@ export function layerSwatches(layer) {
   const p = layer.params || {};
   switch (layer.effectType) {
     case 'wavelet':
+    case 'planewave':
     case 'solid':
       return p.color ? [p.color] : [];
     case 'gradient':
@@ -34,7 +35,11 @@ export function layerSwatches(layer) {
     case 'particle_trail':
       return ['#4fefb8', '#4fa5ef'];
     default:
-      return [];
+      // Unlike ParamPanel this cannot be driven off the schema, since a
+      // representative colour is a judgement per effect. Falling back to a
+      // plain `color` param at least stops a new effect leaving scene cards
+      // blank until they are opened, which is how planewave first showed up.
+      return p.color ? [p.color] : [];
   }
 }
 

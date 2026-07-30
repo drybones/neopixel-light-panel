@@ -9,6 +9,7 @@
 
 var modules = [
     require('./wavelet'),
+    require('./planewave'),
     require('./solid'),
     require('./gradient'),
     require('./embers'),

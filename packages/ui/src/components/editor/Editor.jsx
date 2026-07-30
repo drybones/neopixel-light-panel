@@ -48,11 +48,6 @@ export default function Editor({ sceneId, onClose }) {
     if (immediate) flushLayer(sceneId, updated.id);
   }
 
-  function handleParamsPatch(patch) {
-    if (!layer) return;
-    handleLayerUpdate({ ...layer, params: { ...layer.params, ...patch } });
-  }
-
   function commitSelected() {
     if (layer) flushLayer(sceneId, layer.id);
   }
@@ -135,12 +130,7 @@ export default function Editor({ sceneId, onClose }) {
         </div>
       </div>
 
-      <PreviewStage
-        layer={layer}
-        effect={effect}
-        onUpdateParams={handleParamsPatch}
-        onCommit={commitSelected}
-      />
+      <PreviewStage />
 
       <div className="editor-columns">
         <LayerStack

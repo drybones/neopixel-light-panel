@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const wavelet = require('../effects/wavelet');
+const planewave = require('../effects/planewave');
 const solid = require('../effects/solid');
 const gradient = require('../effects/gradient');
 const effects = require('../effects');
@@ -45,6 +46,39 @@ test('wavelet render clamps output to [0, 255]', () => {
     const instance = wavelet.createInstance(ctx2);
     const out = new Float32Array(6);
     instance.render(out, 99999, p);
+    assert.ok(out.every(v => v >= 0 && v <= 255));
+});
+
+test('planewave prepare bakes the direction into cos/sin', () => {
+    const p = planewave.prepare({ ...planewave.defaults, angle: 90 });
+    assert.ok(Math.abs(p.ca - 0) < 1e-12);
+    assert.ok(Math.abs(p.sa - 1) < 1e-12);
+    assert.strictEqual(p.angle, undefined, 'degrees should not reach the render loop');
+});
+
+test('planewave wavefronts are parallel and perpendicular to the direction', () => {
+    // Two pixels offset only along z. At 0 degrees the wave travels along x,
+    // so both sit on the same wavefront and must match; at 90 degrees the wave
+    // travels along z, so they must not.
+    const ctx = {
+        numPixels: 2,
+        modelX: new Float32Array([1, 1]),
+        modelZ: new Float32Array([-0.5, 0.5]),
+    };
+    const instance = planewave.createInstance(ctx);
+    const out = new Float32Array(6);
+
+    instance.render(out, 0, planewave.prepare({ ...planewave.defaults, angle: 0, color: '#ffffff' }));
+    assert.ok(Math.abs(out[0] - out[3]) < 1e-9, 'wavefront should be flat across z at 0 degrees');
+
+    instance.render(out, 0, planewave.prepare({ ...planewave.defaults, angle: 90, color: '#ffffff' }));
+    assert.ok(Math.abs(out[0] - out[3]) > 1, 'the wave should vary along z at 90 degrees');
+});
+
+test('planewave render clamps output to [0, 255]', () => {
+    const p = planewave.prepare({ ...planewave.defaults, color: '#ffffff', min: -5, max: 10 });
+    const out = new Float32Array(6);
+    planewave.createInstance(ctx2).render(out, 99999, p);
     assert.ok(out.every(v => v >= 0 && v <= 255));
 });
 
