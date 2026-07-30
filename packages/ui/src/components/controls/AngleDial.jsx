@@ -3,11 +3,11 @@ import NumField from './NumField';
 
 // Direction control for schema `angle` entries. The dial draws the wavefronts
 // themselves — parallel lines perpendicular to the direction — which is what
-// makes "the wave arrives from here" legible at a glance; a bare rotary knob
-// would not say which way the stripes run.
+// makes the stripe orientation legible at a glance; a bare rotary knob would
+// not say which way they run.
 //
-// Convention matches the planewave effect: 0 degrees arrives from the right,
-// 90 from the top, increasing anticlockwise on screen.
+// The arrow points the way the wave *travels*, matching what you see moving on
+// the panel: 0 degrees is rightwards, 90 upwards, increasing anticlockwise.
 const SIZE = 128;
 
 function normalise(deg) {

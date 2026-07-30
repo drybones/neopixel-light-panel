@@ -1,13 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-
-const COLS = 30;
-const ROWS = 8;
+import { COLS, ROWS, cellForFrameIndex } from '../../lib/panelGrid';
 
 // Shared 30×8 LED dot renderer. `subscribe` is a function like
 // lightStream.subscribeComposite — it gets a callback and returns an
 // unsubscribe function. Frames are painted imperatively; nothing here
-// touches React state. The di reversal matches the physical serpentine
-// strip order (and the old LEDPanel).
+// touches React state. Strip-order-to-grid mapping lives in lib/panelGrid so
+// the position pad's backdrop cannot drift from this.
 export function drawFrame(canvas, pixels, dots = true) {
   if (!canvas) return;
   const ctx = canvas.getContext('2d');
@@ -21,9 +19,7 @@ export function drawFrame(canvas, pixels, dots = true) {
   const numPixels = pixels.length;
   for (let i = 0; i < numPixels; i++) {
     const [r, g, b] = pixels[i];
-    const di = numPixels - 1 - i;
-    const col = di % COLS;
-    const row = Math.floor(di / COLS);
+    const { col, row } = cellForFrameIndex(i, numPixels);
     ctx.fillStyle = `rgb(${r},${g},${b})`;
     if (dots && radius >= 1.5) {
       ctx.beginPath();

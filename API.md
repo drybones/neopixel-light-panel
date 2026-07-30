@@ -69,7 +69,7 @@ Returns every available effect with its parameter schema and defaults — enough
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
 
 `xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields shape the editor's pad:
 
@@ -186,11 +186,11 @@ The `planewave` effect is the far-field limit of `wavelet`: parallel wavefronts 
 | `freq`   | number  | Oscillation speed |
 | `lambda` | number  | Spatial wavelength |
 | `delta`  | number  | Phase offset |
-| `angle`  | number  | Direction the wave arrives from, in degrees. 0 = from the right, 90 = from the top |
+| `angle`  | number  | Direction the wave travels, in degrees. 0 = rightwards, 90 = upwards |
 | `min`    | number  | Minimum intensity |
 | `max`    | number  | Maximum intensity |
 
-A `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x)` render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. That identity is what the conversion in `engine/planewave-migrate.js` uses.
+A `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. That identity is what the conversion in `engine/planewave-migrate.js` uses.
 
 ## WebSocket pixel stream
 

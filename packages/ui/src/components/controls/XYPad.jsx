@@ -3,9 +3,8 @@ import NumField from './NumField';
 import {
   padGeometry, worldToPad, padToWorld, clampHandle, directionDegrees, isFarField,
 } from '../../lib/xyPad';
+import { COLS, ROWS, NUM_PIXELS, cellForFrameIndex } from '../../lib/panelGrid';
 
-const COLS = 30;
-const ROWS = 8;
 const CANVAS_W = 600;
 
 // Draggable position pad for schema `xy` entries. The pad shows the panel plus
@@ -27,15 +26,19 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
 
   // Pixel positions are fixed by the geometry, so resolve them once rather than
   // per frame — this redraws at the stream rate.
+  //
+  // Indexed by *frame* index, which is strip order rather than grid order —
+  // see lib/panelGrid. Getting this wrong puts the render 180 degrees from a
+  // correctly-placed handle.
   const ledPositions = useMemo(() => {
-    const out = [];
-    for (let row = 0; row < ROWS; row++) {
-      for (let col = 0; col < COLS; col++) {
-        const wx = -geo.panelX + col * (geo.panelX * 2) / (COLS - 1);
-        const wy = geo.panelY - row * (geo.panelY * 2) / (ROWS - 1);
-        const { fx, fy } = worldToPad(geo, wx, wy);
-        out.push([fx * CANVAS_W, fy * canvasH]);
-      }
+    const n = NUM_PIXELS;
+    const out = new Array(n);
+    for (let i = 0; i < n; i++) {
+      const { col, row } = cellForFrameIndex(i, n);
+      const wx = -geo.panelX + col * (geo.panelX * 2) / (COLS - 1);
+      const wy = geo.panelY - row * (geo.panelY * 2) / (ROWS - 1);
+      const { fx, fy } = worldToPad(geo, wx, wy);
+      out[i] = [fx * CANVAS_W, fy * canvasH];
     }
     return out;
   }, [geo, canvasH]);
@@ -158,7 +161,10 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
             onChange={(v) => onChange(x, v)} onCommit={onCommit} />
           {far && (
             <span className="xy-pad-note">
-              planar · {Math.round(directionDegrees(x, y))}°
+              {/* The source's bearing, not the direction of travel — the wave
+                  moves the other way. Said explicitly so this cannot be read
+                  as the same quantity the Plane Wave dial shows. */}
+              planar · from {Math.round(directionDegrees(x, y))}°
             </span>
           )}
         </div>

@@ -47,7 +47,9 @@ function wrap(radians) {
 
 function waveletToPlanewave(params) {
     var distance = Math.sqrt(params.x * params.x + params.y * params.y);
-    var degrees = Math.atan2(params.y, params.x) * 180 / Math.PI;
+    // planewave's angle is the direction of travel, and a wave moves *away*
+    // from its source — so it is the bearing of the source plus 180.
+    var degrees = Math.atan2(params.y, params.x) * 180 / Math.PI + 180;
     return {
         color: params.color,
         freq: params.freq,
@@ -55,7 +57,7 @@ function waveletToPlanewave(params) {
         // The source's distance is a fixed phase lead; drop the distance, keep
         // the phase, and the panel sees exactly the same wave.
         delta: wrap(params.delta - distance / params.lambda),
-        angle: degrees < 0 ? degrees + 360 : degrees,
+        angle: ((degrees % 360) + 360) % 360,
         min: params.min,
         max: params.max,
     };

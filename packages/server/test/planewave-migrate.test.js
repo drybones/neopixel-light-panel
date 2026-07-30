@@ -123,14 +123,43 @@ test('leaves near sources and short wavelengths alone', () => {
     assert.strictEqual(planewave.shouldConvert(null), false);
 });
 
-test('angle follows the screen convention', () => {
+test('angle is the direction of travel, opposite the source bearing', () => {
     const base = { color: '#fff', freq: 0.2, lambda: 0.5, delta: 0, min: 0, max: 1 };
     const at = (x, y) => planewave.waveletToPlanewave(Object.assign({ x, y }, base)).angle;
 
-    assert.ok(Math.abs(at(1000, 0) - 0) < 1e-9, 'from the right is 0 degrees');
-    assert.ok(Math.abs(at(0, 1000) - 90) < 1e-9, 'from the top is 90 degrees');
-    assert.ok(Math.abs(at(-1000, 0) - 180) < 1e-9);
-    assert.ok(Math.abs(at(0, -1000) - 270) < 1e-9, 'negative angles wrap into 0-360');
+    assert.ok(Math.abs(at(1000, 0) - 180) < 1e-9, 'a source on the right sends the wave leftwards');
+    assert.ok(Math.abs(at(0, 1000) - 270) < 1e-9, 'a source above sends the wave downwards');
+    assert.ok(Math.abs(at(-1000, 0) - 0) < 1e-9);
+    assert.ok(Math.abs(at(0, -1000) - 90) < 1e-9, 'results wrap into 0-360');
+});
+
+test('crests advance along the angle, not against it', () => {
+    // The bug this guards: the dial pointed one way and the animation ran the
+    // other. Track a crest's position over time and check it moves with the
+    // stated angle.
+    const ctx = {
+        numPixels: 60,
+        modelX: new Float32Array(60),
+        modelZ: new Float32Array(60),
+    };
+    for (let i = 0; i < 60; i++) ctx.modelX[i] = -3.625 + i * 0.125;
+
+    const effect = effects.get('planewave');
+    const instance = effect.createInstance(ctx);
+    const out = new Float32Array(180);
+    const brightestX = (millis, angle) => {
+        instance.render(out, millis, effect.prepare({
+            ...effect.defaults, color: '#ffffff', angle, freq: 0.2, lambda: 2, min: 0, max: 1,
+        }));
+        let best = 0, bi = 0;
+        for (let i = 0; i < 60; i++) if (out[i * 3] > best) { best = out[i * 3]; bi = i; }
+        return ctx.modelX[bi];
+    };
+
+    // 0 degrees means rightwards, so the crest's x should grow with time.
+    assert.ok(brightestX(600, 0) > brightestX(0, 0), 'at 0 degrees the crest must move right');
+    // 180 degrees is the reverse.
+    assert.ok(brightestX(600, 180) < brightestX(0, 180), 'at 180 degrees the crest must move left');
 });
 
 test('delta is wrapped into a phase the UI slider can show', () => {
@@ -201,12 +230,41 @@ test('loading a document converts distant layers and records the flag', async ()
 
 test('the pre-conversion document is kept for rollback', async () => {
     const file = tmpFile('scenes.json');
-    const store = makeStore(file);
-    await store.load({ scenes: [DISTANT_SCENE] });
+    const backupPath = file.replace(/\.json$/, '') + '.pre-planewave.json';
 
-    const backup = JSON.parse(fs.readFileSync(file.replace(/\.json$/, '') + '.pre-planewave.json'));
+    // Write a realistic document first, so the conversion has a file to read
+    // and the snapshot has the surrounding fields to preserve.
+    const seed = makeStore(file);
+    seed.planeWaveMigrated = true; // suppress conversion while seeding
+    await seed.load({ scenes: [DISTANT_SCENE], activeSceneId: 'aaaaaaaa', seeded: true });
+    seed.planeWaveMigrated = false; // ...but leave the file looking un-migrated
+    seed.markDirty();
+    await seed.flush();
+
+    const store = makeStore(file);
+    await store.load({});
+    assert.strictEqual(store.scenes[0].layers[0].effectType, 'planewave');
+
+    const backup = JSON.parse(fs.readFileSync(backupPath));
     assert.strictEqual(backup.scenes[0].layers[0].effectType, 'wavelet');
     assert.strictEqual(backup.scenes[0].layers[0].params.x, 1000);
+
+    // Copying the backup over the scene file has to be a complete rollback —
+    // a scenes-only snapshot would lose this and re-seed the built-in scenes.
+    assert.strictEqual(backup.seededBuiltins, true, 'snapshot must preserve seededBuiltins');
+    assert.strictEqual(backup.activeSceneId, 'aaaaaaaa', 'snapshot must preserve the active scene');
+
+    // Copying it back must restore a usable store. Conversion runs again — the
+    // flag lives in the document, so a still-new binary re-converts, which is
+    // what you want — but everything a scenes-only snapshot would have dropped
+    // has to come back intact.
+    fs.copyFileSync(backupPath, file);
+    const rolledBack = makeStore(file);
+    await rolledBack.load({});
+    assert.strictEqual(rolledBack.seededBuiltins, true, 'rollback must not re-seed the built-in scenes');
+    assert.strictEqual(rolledBack.activeSceneId, 'aaaaaaaa');
+    assert.strictEqual(rolledBack.scenes.length, 1);
+    assert.strictEqual(rolledBack.scenes[0].layers[1].params.x, 1, 'untouched layers survive verbatim');
 });
 
 test('conversion does not run a second time', async () => {

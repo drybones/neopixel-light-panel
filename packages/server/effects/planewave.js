@@ -1,6 +1,12 @@
 /*
  * Plane wave — parallel wavefronts crossing the panel at a chosen direction.
  *
+ * `angle` is the direction the wave *travels*, in screen terms: 0 degrees
+ * moves right, 90 moves up. That is what the dial's arrow points along, so
+ * the control agrees with the motion you can see. Note it is the opposite of
+ * where an equivalent wavelet's source would sit — waves move away from their
+ * source — which is why the migration below adds 180 degrees.
+ *
  * This is the far-field limit of wavelet. For a source at S = (x, -y) a
  * distance D from the centre, wavelet's r = |P - S| approaches D - P·û with
  * û = S/D, so its phase
@@ -9,14 +15,15 @@
  *
  * becomes
  *
- *     theta = wt + (px·cos a - pz·sin a)/lambda + (delta - D/lambda)
+ *     theta = wt - (px·cos a - pz·sin a)/lambda + (delta - D/lambda)
  *
- * with a = atan2(y, x). The D/lambda term is *constant*, so it folds into
- * delta — which is what engine/planewave-migrate exploits to convert the old
- * "shove the source 1000 units away" presets without changing a pixel.
+ * with a = atan2(y, x) + 180. The D/lambda term is *constant*, so it folds
+ * into delta — which is what engine/planewave-migrate exploits to convert the
+ * old "shove the source 1000 units away" presets without changing a pixel.
  *
- * Angle convention follows the wavelet dz = pz + y sign quirk: 0 degrees is a
- * wave arriving from the right, 90 from the top.
+ * The minus on the projection is what makes crests advance along `angle`
+ * rather than against it: holding theta constant as t grows requires P·d to
+ * increase, so the wavefronts move in +d.
  *
  * Unlike wavelet this needs no per-pixel sqrt. It is also the exact answer at
  * short wavelengths, where the wavelet pad's finite far edge (farLimit, 1000
@@ -33,7 +40,7 @@ module.exports = {
         { key: 'freq', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.05, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'angle', type: 'angle', label: 'Direction', min: 0, max: 360, step: 1, modulatable: true },
+        { key: 'angle', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1, modulatable: true },
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
     ],
     defaults: {
@@ -71,7 +78,7 @@ module.exports = {
                 var phase = millis * 0.00628 * p.freq + p.delta;
                 for (var i = 0; i < n; i++) {
                     var proj = modelX[i] * p.ca - modelZ[i] * p.sa;
-                    var theta = phase + proj / p.lambda;
+                    var theta = phase - proj / p.lambda;
                     var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta) + 1);
 
                     var wr = p.r * brightness;

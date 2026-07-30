@@ -126,7 +126,7 @@ class SceneStore {
 
         if (doc && Array.isArray(doc.scenes)) {
             this.planeWaveMigrated = !!doc.planeWaveMigrated;
-            var migrated = this.convertPlaneWaves(doc.scenes);
+            var migrated = this.convertPlaneWaves(doc.scenes, doc);
             this.setScenes(migrated.scenes);
             this.seededBuiltins = !!doc.seededBuiltins;
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
@@ -169,7 +169,11 @@ class SceneStore {
     // caution engine/migrate takes by leaving the old wave_config key in place.
     // Takes and returns raw (un-normalised) scenes, so the new effect's
     // defaults are applied by setScenes rather than the old effect's.
-    convertPlaneWaves(rawScenes) {
+    // sourceDoc, when present, is the file exactly as it was read — snapshot
+    // that rather than just the scenes, so copying the backup over the scene
+    // file is a complete rollback. A scenes-only snapshot would drop
+    // seededBuiltins and re-seed the built-in scenes as duplicates.
+    convertPlaneWaves(rawScenes, sourceDoc) {
         if (this.planeWaveMigrated) return { scenes: rawScenes, ranNow: false };
         this.planeWaveMigrated = true;
 
@@ -179,7 +183,7 @@ class SceneStore {
         if (this.persistFile) {
             var backup = this.persistFile.replace(/\.json$/, '') + '.pre-planewave.json';
             try {
-                jsonStore.save(backup, { version: 2, scenes: rawScenes });
+                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
                 console.log('Saved pre-conversion scenes to ' + backup);
             } catch (err) {
                 console.error('Failed to snapshot scenes before plane-wave conversion:', err);

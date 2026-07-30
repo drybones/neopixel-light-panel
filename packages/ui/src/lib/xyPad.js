@@ -99,8 +99,9 @@ export function clampHandle(fx, fy) {
   return { fx: cx, fy: cy, clamped: cx !== fx || cy !== fy };
 }
 
-// Direction a distant source sits in, in degrees, matching planewave's
-// convention: 0 is from the right, 90 from the top.
+// Bearing of the source from the panel centre, in degrees: 0 is off to the
+// right, 90 above. This is where the wave comes *from*; planewave's `angle`
+// is the opposite, being the direction of travel.
 export function directionDegrees(x, y) {
   const deg = (Math.atan2(y, x) * 180) / Math.PI;
   return deg < 0 ? deg + 360 : deg;
