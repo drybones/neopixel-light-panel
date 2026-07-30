@@ -1,93 +1,146 @@
 // Geometry for the position pad.
 //
-// The pad shows the panel plus a margin measured in *world units*, equal on all
-// four sides. That equal-margin choice is the whole point: it keeps one
+// The pad is the panel plus zero, one or two rings, each a constant world-unit
+// border on all four sides. Constant width is the point: it keeps one
 // world-units-per-pixel scale on both axes, so the direction you drag is the
-// direction the effect gets. An aspect-matched margin would compress x against
-// 3.625 and y against 0.875 and skew a corner drag by tens of degrees — which
-// matters because a far-off wave source is really a direction.
+// direction the effect gets. A ring scaled to the panel's 4:1 aspect would
+// compress x against 3.625 and y against 0.875 and skew a corner drag by tens
+// of degrees — which matters because a far-off source is really a direction.
 //
-// With `farLimit` set, the pad doubles and its outer half compresses, so the
-// border reaches that distance. Only the radius is warped, never the angle, so
-// direction stays exact out there too. Writing d for the offset from centre
-// normalised to the pad half-extents and t = max(|dx|, |dy|):
+// Because the rings are constant width and the panel is not square, each zoom
+// level has its own aspect ratio, growing squarer as you zoom out:
 //
-//   t <= 0.5   world = d · half                      exactly linear
-//   t >  0.5   world = d · half · m,  m = 0.25 / (t·(1−t))
+//   panel   +-3.625 x +-0.875   aspect 4.14   the panel alone
+//   near    +-5.625 x +-2.875   aspect 1.96   sources just off the panel
+//   far     +-7.625 x +-4.875   aspect 1.56   near, plus a compressed ring
 //
-// m is 1 at t = 0.5 and both one-sided derivatives agree there, so the seam is
-// C¹ and dragging across it has no felt discontinuity. t is capped just short
-// of 1 so the border lands on farLimit rather than an unrepresentable infinity.
+// At `far` the outer ring compresses so its edge reaches `farLimit`. Distance
+// from the panel is measured as a rectangular offset, s = max(|u| - panelX,
+// |v| - panelY), whose contours are exactly the constant-width rings; the ring
+// spans s from `margin` to `2 * margin`. Across it the whole vector is scaled
+// by m, so only the magnitude is warped and the angle is untouched:
+//
+//   tau = (s - margin) / margin        0 at the inner edge, 1 at the outer
+//   m   = L ^ (tau^2)                  L = farLimit / halfX
+//
+// The ramp is exponential rather than a 1/(1-tau) pole so the reach spreads
+// evenly across the ring instead of bunching into its last few pixels — with a
+// pole, four fifths of the ring bought x = 5.6 to 42 and the rest of the range
+// lived in the final 3px. Squaring tau makes m'(0) = 0, so the scale factor
+// leaves the linear zone flat and the seam has no felt discontinuity, and
+// m(1) = L exactly, so the edge lands on farLimit with nothing to clamp.
 //
 // Screen y is inverted throughout: effect y params negate z (dz = pz + y), so
 // positive y is up.
 
-// The linear zone occupies the inner half of a pad that has a far frame, and
-// the whole pad otherwise.
-const LINEAR_T = 0.5;
+const RINGS = { panel: 0, near: 1, far: 2 };
 
-export function padGeometry(entry) {
-  const xMax = entry.xRange[1];
-  const yMax = entry.yRange[1];
+// Which zoom steps an entry supports. `margin` buys the near ring, `farLimit`
+// the compressed one.
+export function zoomLevels(entry) {
+  if (!(entry.margin > 0)) return ['panel'];
+  return entry.farLimit > 0 ? ['panel', 'near', 'far'] : ['panel', 'near'];
+}
+
+export function padGeometry(entry, zoom) {
+  const levels = zoomLevels(entry);
+  const level = levels.indexOf(zoom) >= 0 ? zoom : levels[levels.length - 1];
+
+  const panelX = entry.xRange[1];
+  const panelY = entry.yRange[1];
   const margin = entry.margin || 0;
-  const linearX = xMax + margin;
-  const linearY = yMax + margin;
-  const far = entry.farLimit > 0;
+  const rings = RINGS[level];
+  const far = level === 'far';
 
-  // World units at the pad's edge if the mapping stayed linear all the way out.
-  const halfX = far ? linearX / LINEAR_T : linearX;
-  const halfY = far ? linearY / LINEAR_T : linearY;
+  // The outermost ring is the compressed one, so the linear zone stops one
+  // ring short of the pad edge at `far` and fills the pad otherwise.
+  const linearOffset = margin * (far ? rings - 1 : rings);
+  const halfX = panelX + margin * rings;
+  const halfY = panelY + margin * rings;
 
   return {
+    level,
+    levels,
     far,
+    margin,
+    panelX,
+    panelY,
     halfX,
     halfY,
-    linearX,
-    linearY,
-    panelX: xMax,
-    panelY: yMax,
-    // Cap on t. Solving world = halfX·m(t) for m at the far limit gives
-    // t = 1 − 0.25/q with q = farLimit / halfX.
-    maxT: far ? 1 - 0.25 / (entry.farLimit / halfX) : LINEAR_T,
-    // Pad width / height. Same for both kinds — the far frame doubles both axes.
+    linearOffset,
+    linearX: panelX + linearOffset,
+    linearY: panelY + linearOffset,
     aspect: halfX / halfY,
-    // Where the linear zone sits as a fraction of the pad, for drawing.
-    linearFraction: far ? LINEAR_T : 1,
+    // Total scale across the ring. Along +x the pad edge sits at world
+    // halfX * m, so this is what makes that land on farLimit.
+    farScale: far ? entry.farLimit / halfX : 1,
   };
 }
 
-// World → pad fractions in [0, 1] (0,0 = top-left). May land outside that range
-// when a value exceeds what the pad can show; clampHandle decides what to do.
-export function worldToPad(g, x, y) {
-  const ex = (x / g.halfX) * 0.5;
-  const ey = (-y / g.halfY) * 0.5;
-  if (!g.far) return { fx: ex + 0.5, fy: ey + 0.5 };
-
-  // q is what t would be if the mapping were linear; past the seam the actual
-  // radius is pulled back to t = 1 − 0.25/q, direction untouched.
-  const q = 2 * Math.max(Math.abs(ex), Math.abs(ey));
-  if (q <= LINEAR_T) return { fx: ex + 0.5, fy: ey + 0.5 };
-
-  const t = 1 - 0.25 / q;
-  return { fx: (ex * t) / q + 0.5, fy: (ey * t) / q + 0.5 };
+// Rectangular offset from the panel: 0 on the panel's edge, `margin` on the
+// near ring's edge. Its contours are the constant-width rings the pad draws.
+function rectOffset(g, u, v) {
+  return Math.max(Math.abs(u) - g.panelX, Math.abs(v) - g.panelY);
 }
 
-// Pad fractions in [0, 1] → world. Pointer coordinates are clamped to the pad
+function scaleAt(g, offset) {
+  let tau = (offset - g.linearOffset) / g.margin;
+  if (tau <= 0) return 1;
+  if (tau > 1) tau = 1;
+  return Math.pow(g.farScale, tau * tau);
+}
+
+// World -> pad fractions in [0, 1] (0,0 = top-left). May land outside that
+// range when a value exceeds what the level shows; clampHandle decides what to
+// do about it.
+export function worldToPad(g, x, y) {
+  const k = padScale(g, x, y);
+  return {
+    fx: (x * k) / (2 * g.halfX) + 0.5,
+    fy: -(y * k) / (2 * g.halfY) + 0.5,
+  };
+}
+
+// The factor taking a world point to its screen position — the inverse of the
+// m above. m is defined on the *screen* offset, so this inverts by bisection
+// rather than in closed form. Only the handle ever needs it (panel pixels are
+// always inside the linear zone), so a few dozen iterations costs nothing.
+function padScale(g, x, y) {
+  if (!g.far) return 1;
+  if (rectOffset(g, x, y) <= g.linearOffset) return 1;
+
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    // The scale that this candidate screen position would itself imply.
+    const implied = 1 / scaleAt(g, rectOffset(g, x * mid, y * mid));
+    if (mid < implied) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+// Pad fractions in [0, 1] -> world. Pointer coordinates are clamped to the pad
 // first, so this never returns a value beyond the far limit.
 export function padToWorld(g, fx, fy) {
-  const dx = (Math.min(1, Math.max(0, fx)) - 0.5) * 2;
-  const dy = (Math.min(1, Math.max(0, fy)) - 0.5) * 2;
-  if (!g.far) return { x: dx * g.halfX, y: -dy * g.halfY };
+  const u = (Math.min(1, Math.max(0, fx)) - 0.5) * 2 * g.halfX;
+  const v = -(Math.min(1, Math.max(0, fy)) - 0.5) * 2 * g.halfY;
+  if (!g.far) return { x: u, y: v };
 
-  const t = Math.max(Math.abs(dx), Math.abs(dy));
-  if (t <= LINEAR_T) return { x: dx * g.halfX, y: -dy * g.halfY };
+  const m = scaleAt(g, rectOffset(g, u, v));
+  return { x: u * m, y: v * m };
+}
 
-  // The world rect-radius works out to half · 0.25/(1 − t), so capping t is
-  // what pins the border to farLimit — but the direction vector has to be
-  // pulled back to the capped radius too, hence t rather than capped below.
-  const capped = Math.min(t, g.maxT);
-  const m = 0.25 / (t * (1 - capped));
-  return { x: dx * g.halfX * m, y: -dy * g.halfY * m };
+// Smallest zoom level that can show a value, so opening a layer never starts
+// on a clipped handle.
+export function fitZoom(entry, x, y) {
+  const levels = zoomLevels(entry);
+  for (const level of levels) {
+    const g = padGeometry(entry, level);
+    const { fx, fy } = worldToPad(g, x, y);
+    if (fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1) return level;
+  }
+  return levels[levels.length - 1];
 }
 
 // Keeps a handle inside its container so it stays visible and, crucially, still
@@ -107,8 +160,8 @@ export function directionDegrees(x, y) {
   return deg < 0 ? deg + 360 : deg;
 }
 
-// Past this the source reads as planar and the direction is the useful readout,
-// not the coordinates. Matches the server's conversion threshold.
+// Past this the source reads as planar and the direction is the useful
+// readout, not the coordinates. Matches the server's conversion threshold.
 export function isFarField(g, x, y) {
   return Math.hypot(x, y) > Math.hypot(g.panelX, g.panelY) * 10;
 }

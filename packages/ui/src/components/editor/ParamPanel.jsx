@@ -67,7 +67,10 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
       case 'xy':
         return (
           <XYPad
-            key={`xy-${index}`}
+            // Keyed by layer so the pad re-fits its zoom to whatever the newly
+            // selected layer's position needs, rather than keeping the last
+            // layer's level and showing a clipped handle.
+            key={`xy-${index}-${layer.id}`}
             entry={entry}
             x={layer.params[entry.xKey]}
             y={layer.params[entry.yKey]}

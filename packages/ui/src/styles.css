@@ -508,6 +508,27 @@ input[type="range"]::-moz-range-thumb {
   gap: 4px;
   margin-top: 6px;
 }
+
+.xy-pad-zoom {
+  display: flex;
+  gap: 2px;
+  margin-right: 8px;
+}
+.xy-pad-zoom-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.xy-pad-zoom-btn:hover { border-color: var(--border); }
+.xy-pad-zoom-btn.is-active {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
 .xy-pad-note {
   font-size: 12px;
   color: var(--text-dim);

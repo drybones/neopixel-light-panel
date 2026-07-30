@@ -1,17 +1,20 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import NumField from './NumField';
 import {
-  padGeometry, worldToPad, padToWorld, clampHandle, directionDegrees, isFarField,
+  padGeometry, zoomLevels, fitZoom, worldToPad, padToWorld, clampHandle,
+  directionDegrees, isFarField,
 } from '../../lib/xyPad';
 import { COLS, ROWS, NUM_PIXELS, cellForFrameIndex } from '../../lib/panelGrid';
 
 const CANVAS_W = 600;
 
-// Draggable position pad for schema `xy` entries. The pad shows the panel plus
-// an equal world-unit margin on all four sides, and — where the schema sets
-// farLimit — an outer frame that compresses out to that distance. See
-// lib/xyPad for the mapping and why the margin is equal rather than
-// aspect-matched.
+const ZOOM_LABELS = { panel: 'Panel', near: 'Near', far: 'Far' };
+
+// Draggable position pad for schema `xy` entries, with a zoom step per zone:
+// the panel alone, the panel plus a ring for sources just off it, and — where
+// the schema sets farLimit — a second, compressed ring reaching that distance.
+// Each ring is a constant world-unit border, so every level has its own aspect
+// ratio. See lib/xyPad for the mapping and why constant width matters.
 //
 // The live layer render is drawn through the same mapping, so the LEDs sit
 // where the effect actually is and you drag it around on a picture of itself.
@@ -21,7 +24,12 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
   const draggingRef = useRef(false);
   const frameRef = useRef(null);
 
-  const geo = useMemo(() => padGeometry(entry), [entry]);
+  // Open on the tightest level that can actually show the value, so a layer
+  // parked off-panel never starts on a clipped handle. ParamPanel keys this
+  // component by layer id, so selecting another layer re-fits.
+  const [zoom, setZoom] = useState(() => fitZoom(entry, x, y));
+  const levels = useMemo(() => zoomLevels(entry), [entry]);
+  const geo = useMemo(() => padGeometry(entry, zoom), [entry, zoom]);
   const canvasH = Math.round(CANVAS_W / geo.aspect);
 
   // Pixel positions are fixed by the geometry, so resolve them once rather than
@@ -50,18 +58,29 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
     ctx.fillStyle = '#0d0d0f';
     ctx.fillRect(0, 0, CANVAS_W, canvasH);
 
+    ctx.font = '11px sans-serif';
+
+    // Zone labels sit just inside the top-left of the region they name, so the
+    // ring you are pointing at is always identified.
     if (geo.far) {
-      const f = geo.linearFraction;
-      const w = CANVAS_W * f;
-      const h = canvasH * f;
+      // Boundary between the linear zone and the compressed ring.
+      const tl = worldToPad(geo, -geo.linearX, geo.linearY);
+      const br = worldToPad(geo, geo.linearX, -geo.linearY);
       ctx.setLineDash([3, 4]);
       ctx.strokeStyle = 'rgba(255,255,255,0.14)';
       ctx.lineWidth = 1;
-      ctx.strokeRect((CANVAS_W - w) / 2, (canvasH - h) / 2, w, h);
+      ctx.strokeRect(
+        tl.fx * CANVAS_W, tl.fy * canvasH,
+        (br.fx - tl.fx) * CANVAS_W, (br.fy - tl.fy) * canvasH,
+      );
       ctx.setLineDash([]);
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.font = '11px sans-serif';
       ctx.fillText('far', 6, 14);
+      ctx.fillText('near', tl.fx * CANVAS_W + 5, tl.fy * canvasH + 14);
+    } else if (geo.linearOffset > 0) {
+      // At `near` the ring is the whole pad, so its label goes in the corner.
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillText('near', 6, 14);
     }
 
     const frame = frameRef.current;
@@ -153,6 +172,21 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
           />
         </div>
         <div className="xy-pad-fields">
+          {levels.length > 1 && (
+            <div className="xy-pad-zoom" role="group" aria-label={`${entry.label} zoom`}>
+              {levels.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  className={`xy-pad-zoom-btn${level === geo.level ? ' is-active' : ''}`}
+                  aria-pressed={level === geo.level}
+                  onClick={() => setZoom(level)}
+                >
+                  {ZOOM_LABELS[level]}
+                </button>
+              ))}
+            </div>
+          )}
           <span className="control-value control-value--left">x</span>
           <NumField value={x} label={`${entry.label} x`} width={56}
             onChange={(v) => onChange(v, y)} onCommit={onCommit} />

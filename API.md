@@ -71,10 +71,12 @@ Returns every available effect with its parameter schema and defaults — enough
 
 Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
 
-`xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields shape the editor's pad:
+`xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields add zoom steps to the editor's pad, each adding one ring of constant world-unit width on all four sides:
 
-- `margin` — world units of reach beyond the panel, applied **equally on all four sides**. Equal margins keep one world-units-per-pixel scale on both axes, so the direction you drag is the direction the effect gets; a margin scaled to the panel's 4:1 aspect would skew a corner drag by tens of degrees.
-- `farLimit` — if set, the pad's outer half compresses so its border reaches this distance, for sources far enough away that the wave reads as planar. Omit it and the pad is linear throughout.
+- `margin` — width of a ring, in world units, adding a **near** step for sources just off the panel. Constant width (rather than scaled to the panel's 4:1 aspect) keeps one world-units-per-pixel scale on both axes, so the direction you drag is the direction the effect gets; an aspect-matched ring would skew a corner drag by tens of degrees. Because the rings are constant width and the panel is not square, each step has its own aspect ratio, growing squarer as you zoom out.
+- `farLimit` — if set, adds a **far** step whose outer ring — the same width as the near one — compresses so its edge reaches this distance, for sources far enough away that the wave reads as planar. The compression is exponential in the ring, so reach spreads across the drag rather than bunching into the last few pixels, and only the magnitude is warped so the drag direction stays exact.
+
+With the shipped values (`margin: 2`, `farLimit: 1000`) the steps are ±3.625 × ±0.875, ±5.625 × ±2.875, and ±7.625 × ±4.875, the last reaching x ±1000 / y ±639 at its edge.
 
 Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
 
@@ -169,8 +171,8 @@ The `wavelet` effect renders one sinusoidal wave radiating from a point; stack s
 | `freq`   | number  | Oscillation speed (higher = faster) |
 | `lambda` | number  | Spatial wavelength (higher = wider waves) |
 | `delta`  | number  | Phase offset |
-| `x`      | number  | Wave origin X. The panel spans ±3.625; the editor pad reaches ±1000 |
-| `y`      | number  | Wave origin Y. The panel spans ±0.875; the editor pad reaches ±511 |
+| `x`      | number  | Wave origin X. The panel spans ±3.625; the editor pad reaches ±1000 at full zoom |
+| `y`      | number  | Wave origin Y. The panel spans ±0.875; the editor pad reaches ±639 at full zoom |
 | `min`    | number  | Minimum intensity (UI uses non-linear arctan slider mapping) |
 | `max`    | number  | Maximum intensity |
 
