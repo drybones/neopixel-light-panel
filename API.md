@@ -62,16 +62,21 @@ Returns every available effect with its parameter schema and defaults — enough
     "schema": [
       { "key": "color", "type": "color", "label": "Colour" },
       { "key": "freq", "type": "number", "label": "Speed", "min": 0, "max": 2, "step": 0.01, "scale": "linear", "modulatable": true },
-      { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.6, 3.6], "yRange": [-0.9, 0.9], "draggable": true }
+      { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.625, 3.625], "yRange": [-0.875, 0.875], "margin": 2, "farLimit": 1000, "draggable": true }
     ],
     "defaults": { "color": "#ffffff", "freq": 0.2 }
   }
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
 
-Effect types: `wavelet`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
+`xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields shape the editor's pad:
+
+- `margin` — world units of reach beyond the panel, applied **equally on all four sides**. Equal margins keep one world-units-per-pixel scale on both axes, so the direction you drag is the direction the effect gets; a margin scaled to the panel's 4:1 aspect would skew a corner drag by tens of degrees.
+- `farLimit` — if set, the pad's outer half compresses so its border reaches this distance, for sources far enough away that the wave reads as planar. Omit it and the pad is linear throughout.
+
+Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
 
 ---
 
@@ -164,10 +169,28 @@ The `wavelet` effect renders one sinusoidal wave radiating from a point; stack s
 | `freq`   | number  | Oscillation speed (higher = faster) |
 | `lambda` | number  | Spatial wavelength (higher = wider waves) |
 | `delta`  | number  | Phase offset |
-| `x`      | number  | Wave origin X on the panel (approx -3.6 to 3.6) |
-| `y`      | number  | Wave origin Y on the panel (approx -0.9 to 0.9) |
+| `x`      | number  | Wave origin X. The panel spans ±3.625; the editor pad reaches ±1000 |
+| `y`      | number  | Wave origin Y. The panel spans ±0.875; the editor pad reaches ±511 |
 | `min`    | number  | Minimum intensity (UI uses non-linear arctan slider mapping) |
 | `max`    | number  | Maximum intensity |
+
+Nothing clamps `x`/`y` server-side, and the editor's numeric fields accept values beyond the pad's reach — only the drag handle is bounded.
+
+## Plane wave parameters
+
+The `planewave` effect is the far-field limit of `wavelet`: parallel wavefronts crossing the panel at a chosen direction, with no origin to place. Use it when you want straight stripes at a specific angle, or at short wavelengths where even a very distant `wavelet` source stays measurably curved.
+
+| Field    | Type    | Description |
+|----------|---------|-------------|
+| `color`  | string  | Hex colour |
+| `freq`   | number  | Oscillation speed |
+| `lambda` | number  | Spatial wavelength |
+| `delta`  | number  | Phase offset |
+| `angle`  | number  | Direction the wave arrives from, in degrees. 0 = from the right, 90 = from the top |
+| `min`    | number  | Minimum intensity |
+| `max`    | number  | Maximum intensity |
+
+A `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x)` render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. That identity is what the conversion in `engine/planewave-migrate.js` uses.
 
 ## WebSocket pixel stream
 
@@ -192,3 +215,7 @@ instead of v1 frames. `composite` is pre-brightness like v1; layer frames are ad
 ## Migration from the preset API
 
 The old preset endpoints (`/api/all_presets/`, `/api/current_preset_id/`, `/api/wave_config/`, `/api/all_wave_config/`) were removed. On first boot after upgrading, persisted wavelet presets are automatically converted to scenes (one `wavelet` layer per wavelet, `add` blend) under the same IDs; the old `wave_config` storage key is left in place for rollback. The old fixed presets exist as ordinary editable scenes seeded once ("Embers", "Particle Trail", "Candy Sparkler"); `pastel_spots` was retired.
+
+## Migration to plane waves
+
+Several presets faked a plane wave by putting the source a thousand units off-panel, which the position pad could not represent or recover. On first boot after upgrading, any `wavelet` layer far enough away that its residual wavefront curvature is negligible becomes a `planewave` with the equivalent `angle` and `delta`. Layers with a short `lambda` are left alone, since curvature stays visible for them however distant the source. The pre-conversion document is written to `.node-persist/scenes-v2.pre-planewave.json` for rollback, and a `planeWaveMigrated` flag in the scene document stops it running twice — so a `wavelet` you later drag out to the pad's far edge stays a `wavelet`.

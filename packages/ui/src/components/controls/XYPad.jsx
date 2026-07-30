@@ -1,31 +1,103 @@
-import React, { useEffect, useRef } from 'react';
-import { drawFrame } from '../preview/LedCanvas';
+import React, { useEffect, useMemo, useRef } from 'react';
+import NumField from './NumField';
+import {
+  padGeometry, worldToPad, padToWorld, clampHandle, directionDegrees, isFarField,
+} from '../../lib/xyPad';
 
-// Draggable position pad for schema `xy` entries. The pad has the panel's
-// aspect and, when a frame subscription is provided, shows the live render
-// behind the handle — you drag the effect around on the picture of itself.
+const COLS = 30;
+const ROWS = 8;
+const CANVAS_W = 600;
+
+// Draggable position pad for schema `xy` entries. The pad shows the panel plus
+// an equal world-unit margin on all four sides, and — where the schema sets
+// farLimit — an outer frame that compresses out to that distance. See
+// lib/xyPad for the mapping and why the margin is equal rather than
+// aspect-matched.
 //
-// Coordinate mapping (see layout.json): canvas x left→right = world
-// x −3.625→+3.625; canvas y top→bottom = world z −0.875→+0.875, and
-// effect y params negate z (dz = pz + y), so the handle y is inverted.
+// The live layer render is drawn through the same mapping, so the LEDs sit
+// where the effect actually is and you drag it around on a picture of itself.
 export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommit }) {
   const padRef = useRef(null);
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
+  const frameRef = useRef(null);
 
-  const [xMin, xMax] = entry.xRange;
-  const [yMin, yMax] = entry.yRange;
+  const geo = useMemo(() => padGeometry(entry), [entry]);
+  const canvasH = Math.round(CANVAS_W / geo.aspect);
+
+  // Pixel positions are fixed by the geometry, so resolve them once rather than
+  // per frame — this redraws at the stream rate.
+  const ledPositions = useMemo(() => {
+    const out = [];
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const wx = -geo.panelX + col * (geo.panelX * 2) / (COLS - 1);
+        const wy = geo.panelY - row * (geo.panelY * 2) / (ROWS - 1);
+        const { fx, fy } = worldToPad(geo, wx, wy);
+        out.push([fx * CANVAS_W, fy * canvasH]);
+      }
+    }
+    return out;
+  }, [geo, canvasH]);
+
+  function draw() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0d0d0f';
+    ctx.fillRect(0, 0, CANVAS_W, canvasH);
+
+    if (geo.far) {
+      const f = geo.linearFraction;
+      const w = CANVAS_W * f;
+      const h = canvasH * f;
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect((CANVAS_W - w) / 2, (canvasH - h) / 2, w, h);
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('far', 6, 14);
+    }
+
+    const frame = frameRef.current;
+    const dot = Math.max(1.5, (CANVAS_W / COLS) * geo.panelX / geo.halfX * 0.4);
+    for (let i = 0; i < ledPositions.length; i++) {
+      const px = frame ? frame[i] : null;
+      ctx.fillStyle = px ? `rgb(${px[0]},${px[1]},${px[2]})` : '#1a1a1f';
+      ctx.beginPath();
+      ctx.arc(ledPositions[i][0], ledPositions[i][1], dot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Panel outline, so the margin reads as "outside the panel" rather than
+    // just more pad.
+    const tl = worldToPad(geo, -geo.panelX, geo.panelY);
+    const br = worldToPad(geo, geo.panelX, -geo.panelY);
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      tl.fx * CANVAS_W, tl.fy * canvasH,
+      (br.fx - tl.fx) * CANVAS_W, (br.fy - tl.fy) * canvasH,
+    );
+  }
 
   useEffect(() => {
-    if (!subscribe) return undefined;
-    return subscribe((frame) => drawFrame(canvasRef.current, frame, false));
-  }, [subscribe]);
+    if (!subscribe) { draw(); return undefined; }
+    return subscribe((frame) => { frameRef.current = frame; draw(); });
+  }, [subscribe, geo, canvasH]);
+
+  useEffect(draw, [geo, canvasH]);
 
   function apply(e) {
     const rect = padRef.current.getBoundingClientRect();
-    const fx = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    const fy = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    onChange(xMin + fx * (xMax - xMin), yMax - fy * (yMax - yMin));
+    const world = padToWorld(
+      geo,
+      (e.clientX - rect.left) / rect.width,
+      (e.clientY - rect.top) / rect.height,
+    );
+    onChange(world.x, world.y);
   }
 
   function handlePointerDown(e) {
@@ -34,48 +106,62 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
     apply(e);
   }
 
-  function handlePointerMove(e) {
-    if (draggingRef.current) apply(e);
-  }
+  const raw = worldToPad(geo, x, y);
+  const handle = clampHandle(raw.fx, raw.fy);
+  const far = isFarField(geo, x, y);
 
-  function handlePointerUp() {
-    draggingRef.current = false;
-    if (onCommit) onCommit();
-  }
-
-  const hx = ((x - xMin) / (xMax - xMin)) * 100;
-  const hy = ((yMax - y) / (yMax - yMin)) * 100;
+  // One LED of travel inside the linear zone.
+  const stepX = (geo.linearX * 2) / (COLS - 1);
+  const stepY = (geo.linearY * 2) / (ROWS - 1);
 
   return (
     <div className="control-row control-row--pad">
       <label className="control-label">{entry.label}</label>
-      <div
-        ref={padRef}
-        className="xy-pad"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        role="slider"
-        aria-label={entry.label}
-        aria-valuetext={`x ${x.toFixed(2)}, y ${y.toFixed(2)}`}
-        tabIndex={0}
-        onKeyDown={(e) => {
-          const dx = (xMax - xMin) / 29;
-          const dy = (yMax - yMin) / 7;
-          if (e.key === 'ArrowLeft') onChange(Math.max(xMin, x - dx), y);
-          else if (e.key === 'ArrowRight') onChange(Math.min(xMax, x + dx), y);
-          else if (e.key === 'ArrowUp') onChange(x, Math.min(yMax, y + dy));
-          else if (e.key === 'ArrowDown') onChange(x, Math.max(yMin, y - dy));
-          else return;
-          e.preventDefault();
-          if (onCommit) onCommit();
-        }}
-      >
-        <canvas ref={canvasRef} width={600} height={160} className="xy-pad-canvas" />
+      <div className="xy-pad-wrap">
         <div
-          className="xy-pad-handle"
-          style={{ left: `${hx}%`, top: `${hy}%`, background: color || 'var(--accent)' }}
-        />
+          ref={padRef}
+          className="xy-pad"
+          style={{ aspectRatio: `${geo.aspect}` }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={(e) => { if (draggingRef.current) apply(e); }}
+          onPointerUp={() => { draggingRef.current = false; if (onCommit) onCommit(); }}
+          role="slider"
+          aria-label={entry.label}
+          aria-valuetext={`x ${x.toFixed(2)}, y ${y.toFixed(2)}`}
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') onChange(x - stepX, y);
+            else if (e.key === 'ArrowRight') onChange(x + stepX, y);
+            else if (e.key === 'ArrowUp') onChange(x, y + stepY);
+            else if (e.key === 'ArrowDown') onChange(x, y - stepY);
+            else return;
+            e.preventDefault();
+            if (onCommit) onCommit();
+          }}
+        >
+          <canvas ref={canvasRef} width={CANVAS_W} height={canvasH} className="xy-pad-canvas" />
+          <div
+            className={`xy-pad-handle${handle.clamped ? ' xy-pad-handle--clamped' : ''}`}
+            style={{
+              left: `${handle.fx * 100}%`,
+              top: `${handle.fy * 100}%`,
+              background: color || 'var(--accent)',
+            }}
+          />
+        </div>
+        <div className="xy-pad-fields">
+          <span className="control-value control-value--left">x</span>
+          <NumField value={x} label={`${entry.label} x`} width={56}
+            onChange={(v) => onChange(v, y)} onCommit={onCommit} />
+          <span className="control-value control-value--left">y</span>
+          <NumField value={y} label={`${entry.label} y`} width={56}
+            onChange={(v) => onChange(x, v)} onCommit={onCommit} />
+          {far && (
+            <span className="xy-pad-note">
+              planar · {Math.round(directionDegrees(x, y))}°
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

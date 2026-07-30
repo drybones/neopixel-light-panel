@@ -107,7 +107,11 @@ class Compositor {
         for (var li = 0; li < display.length; li++) {
             var layer = display[li];
             var entry = this.layers.get(layer.id);
-            if (!entry) continue;
+            // A stale entry means some other scene claimed this layer id and
+            // syncScene swapped the instance underneath us. Skipping loses one
+            // layer; rendering would feed the wrong params in and push NaN to
+            // the panel. SceneStore de-duplicates ids so this should not fire.
+            if (!entry || entry.effectType !== layer.effectType) continue;
             entry.instance.render(entry.buffer, millis, layer._prepared);
             blendInto(comp, entry.buffer, layer._blend | 0, layer.opacity, this.numPixels);
         }

@@ -1,30 +1,39 @@
 /*
- * Wavelet effect — one instance is one wavelet (the old multi-wavelet sum
- * is now expressed as multiple layers with the "add" blend mode).
+ * Plane wave — parallel wavefronts crossing the panel at a chosen direction.
  *
- * The inner loop is ported verbatim from shader.js interactive_wave(),
- * including the dz = pz + y sign quirk, so migrated presets render
- * identically. Output is clamped per-layer to [0, 255], matching the old
- * clip:true behaviour that every UI-created wavelet had.
+ * This is the far-field limit of wavelet. For a source at S = (x, -y) a
+ * distance D from the centre, wavelet's r = |P - S| approaches D - P·û with
+ * û = S/D, so its phase
+ *
+ *     theta = wt - r/lambda + delta
+ *
+ * becomes
+ *
+ *     theta = wt + (px·cos a - pz·sin a)/lambda + (delta - D/lambda)
+ *
+ * with a = atan2(y, x). The D/lambda term is *constant*, so it folds into
+ * delta — which is what engine/planewave-migrate exploits to convert the old
+ * "shove the source 1000 units away" presets without changing a pixel.
+ *
+ * Angle convention follows the wavelet dz = pz + y sign quirk: 0 degrees is a
+ * wave arriving from the right, 90 from the top.
+ *
+ * Unlike wavelet this needs no per-pixel sqrt. It is also the exact answer at
+ * short wavelengths, where the wavelet pad's finite far edge (farLimit, 1000
+ * units) still leaves a little measurable curvature.
  */
 
 var color = require('../engine/color');
-var panel = require('../engine/panel');
 
 module.exports = {
-    type: 'wavelet',
-    name: 'Wavelet',
+    type: 'planewave',
+    name: 'Plane Wave',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
         { key: 'freq', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.05, max: 2, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
-        // margin (world units) expands the pad past the panel on all four sides;
-        // farLimit adds a compressed outer frame reaching that distance, where
-        // the wave reads as planar. Both are in world units — see engine/panel.
-        { type: 'xy', label: 'Position', xKey: 'x', yKey: 'y',
-          xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
-          margin: 2, farLimit: 1000, draggable: true },
+        { key: 'angle', type: 'angle', label: 'Direction', min: 0, max: 360, step: 1, modulatable: true },
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
     ],
     defaults: {
@@ -32,21 +41,21 @@ module.exports = {
         freq: 0.2,
         lambda: 0.5,
         delta: 0.0,
-        x: 0,
-        y: 0,
+        angle: 0,
         min: 0.1,
         max: 0.7,
     },
 
     prepare(params) {
         var rgb = color.hexToRgb(params.color);
+        var a = params.angle * Math.PI / 180;
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
             lambda: params.lambda,
             delta: params.delta,
-            x: params.x,
-            y: params.y,
+            ca: Math.cos(a),
+            sa: Math.sin(a),
             min: params.min,
             max: params.max,
         };
@@ -59,12 +68,11 @@ module.exports = {
 
         return {
             render(out, millis, p) {
+                var phase = millis * 0.00628 * p.freq + p.delta;
                 for (var i = 0; i < n; i++) {
-                    var dx = modelX[i] - p.x;
-                    var dz = modelZ[i] + p.y;
-                    var r = Math.sqrt(dx * dx + dz * dz);
-                    var theta = millis * 0.00628 * p.freq - r / p.lambda;
-                    var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta + p.delta) + 1);
+                    var proj = modelX[i] * p.ca - modelZ[i] * p.sa;
+                    var theta = phase + proj / p.lambda;
+                    var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta) + 1);
 
                     var wr = p.r * brightness;
                     var wg = p.g * brightness;

@@ -16,6 +16,7 @@ var crypto = require('crypto');
 var effects = require('../effects');
 var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
+var planewaveMigrate = require('./planewave-migrate');
 
 var SAVE_DEBOUNCE_MS = 2000;
 
@@ -63,6 +64,7 @@ class SceneStore {
         this.scenes = [];
         this.activeSceneId = null;
         this.seededBuiltins = false;
+        this.planeWaveMigrated = false;
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -104,6 +106,7 @@ class SceneStore {
                 version: 2,
                 activeSceneId: this.activeSceneId,
                 seededBuiltins: this.seededBuiltins,
+                planeWaveMigrated: this.planeWaveMigrated,
                 scenes: this.scenes.map(stripRuntime),
             });
         } catch (err) {
@@ -122,23 +125,37 @@ class SceneStore {
         legacy = legacy || {};
 
         if (doc && Array.isArray(doc.scenes)) {
-            this.setScenes(doc.scenes);
+            this.planeWaveMigrated = !!doc.planeWaveMigrated;
+            var migrated = this.convertPlaneWaves(doc.scenes);
+            this.setScenes(migrated.scenes);
             this.seededBuiltins = !!doc.seededBuiltins;
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
+            if (migrated.ranNow) {
+                this._dirty = true;
+                await this.flush();
+            }
             return;
         }
 
         var active = null;
+        var raw = null;
+        var source = '';
         if (legacy.scenes && legacy.scenes.length > 0) {
-            this.setScenes(legacy.scenes);
+            raw = legacy.scenes;
             this.seededBuiltins = !!legacy.seeded;
             active = legacy.activeSceneId;
-            console.log('Recovered ' + this.scenes.length + ' scene(s) from node-persist.');
+            source = 'Recovered {n} scene(s) from node-persist.';
         } else if (legacy.migrated && legacy.migrated.scenes.length > 0) {
-            this.setScenes(legacy.migrated.scenes);
+            raw = legacy.migrated.scenes;
             active = legacy.migrated.activeSceneId;
-            console.log('Migrated ' + this.scenes.length + ' wavelet preset(s) to scenes.');
+            source = 'Migrated {n} wavelet preset(s) to scenes.';
+        }
+
+        if (raw) {
+            this.setScenes(this.convertPlaneWaves(raw).scenes);
+            console.log(source.replace('{n}', this.scenes.length));
         } else {
+            this.planeWaveMigrated = true;
             this.setScenes([this.defaultScene()]);
         }
         this.activeSceneId = (active && this.get(active)) ? active : null;
@@ -146,13 +163,55 @@ class SceneStore {
         await this.flush();
     }
 
+    // Distant wavelets are a hand-rolled plane wave the old UI could not edit;
+    // convert them once so they get a Direction control. The pre-conversion
+    // document is snapshotted alongside the scene file for rollback — the same
+    // caution engine/migrate takes by leaving the old wave_config key in place.
+    // Takes and returns raw (un-normalised) scenes, so the new effect's
+    // defaults are applied by setScenes rather than the old effect's.
+    convertPlaneWaves(rawScenes) {
+        if (this.planeWaveMigrated) return { scenes: rawScenes, ranNow: false };
+        this.planeWaveMigrated = true;
+
+        var result = planewaveMigrate.convertScenes(rawScenes);
+        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
+
+        if (this.persistFile) {
+            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-planewave.json';
+            try {
+                jsonStore.save(backup, { version: 2, scenes: rawScenes });
+                console.log('Saved pre-conversion scenes to ' + backup);
+            } catch (err) {
+                console.error('Failed to snapshot scenes before plane-wave conversion:', err);
+            }
+        }
+        console.log('Converted ' + result.converted + ' distant wavelet layer(s) to plane waves.');
+        return { scenes: result.scenes, ranNow: true };
+    }
+
     setScenes(rawScenes) {
         var self = this;
+        // The compositor caches a render instance per layer id across all
+        // scenes, so an id shared by two scenes makes them fight over one
+        // entry. That was survivable while every legacy preset was a wavelet
+        // — same effectType, so the cached instance still fitted — but two
+        // scenes with different effect types on one id render each other's
+        // params and produce NaN. The old wave_config data does contain a
+        // duplicate, so repair ids here rather than trusting the document.
+        var seen = Object.create(null);
         this.scenes = rawScenes.map(function(s) {
             return {
                 id: s.id || newId(),
                 name: s.name || 'Untitled',
-                layers: (s.layers || []).map(normaliseLayer),
+                layers: (s.layers || []).map(function(l) {
+                    var layer = normaliseLayer(l);
+                    if (seen[layer.id]) {
+                        layer.id = newId();
+                        self._dirty = true;
+                    }
+                    seen[layer.id] = true;
+                    return layer;
+                }),
             };
         });
         this.scenes.forEach(function(s) { self.preprocess(s); });

@@ -4,6 +4,7 @@ import RangeControl from '../controls/RangeControl';
 import EnumSelect from '../controls/EnumSelect';
 import ColorControl from '../controls/ColorControl';
 import XYPad from '../controls/XYPad';
+import AngleDial from '../controls/AngleDial';
 import GradientStopsEditor from '../controls/GradientStopsEditor';
 import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 
@@ -73,6 +74,17 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             color={layer.params.color}
             subscribe={subscribeSelectedLayer}
             onChange={(x, y) => setParams({ [entry.xKey]: x, [entry.yKey]: y })}
+            onCommit={onCommit}
+          />
+        );
+      case 'angle':
+        return (
+          <AngleDial
+            key={entry.key}
+            entry={entry}
+            value={layer.params[entry.key]}
+            color={layer.params.color}
+            onChange={(v) => setParams({ [entry.key]: v })}
             onCommit={onCommit}
           />
         );
