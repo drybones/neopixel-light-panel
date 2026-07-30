@@ -261,12 +261,15 @@ input[type="range"]::-moz-range-thumb {
   margin-left: auto;
 }
 
+/* No max-height: pairing one with aspect-ratio makes the height clamp while
+   the width keeps growing, so past ~900px of content the panel rendered
+   stretched sideways — 19% at the widest, enough to turn the LEDs into ovals.
+   The .app max-width already bounds this to about 285px tall. */
 .preview-stage {
   position: relative;
   border-radius: 8px;
   overflow: hidden;
   aspect-ratio: 30 / 8;
-  max-height: 240px;
   width: 100%;
 }
 
