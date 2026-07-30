@@ -270,19 +270,6 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
 }
 
-.stage-handle {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5);
-  transform: translate(-50%, -50%);
-  cursor: grab;
-  touch-action: none;
-}
-.stage-handle:active { cursor: grabbing; }
-
 .editor-columns {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
@@ -496,8 +483,7 @@ input[type="range"]::-moz-range-thumb {
   pointer-events: none;
 }
 /* Pinned to the edge because the value is beyond what the pad can show. */
-.xy-pad-handle--clamped,
-.stage-handle--clamped {
+.xy-pad-handle--clamped {
   border-style: dashed;
   border-color: rgba(255, 255, 255, 0.55);
 }

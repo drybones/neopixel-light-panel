@@ -48,7 +48,7 @@ module.exports = {
         // thousand units away is just a flat wash, so there's nothing out there
         // worth reaching for.
         { type: 'xy', label: 'Centre', xKey: 'cx', yKey: 'cy',
-          xRange: [-HALF_X, HALF_X], yRange: [-HALF_Z, HALF_Z], margin: 2, draggable: true },
+          xRange: [-HALF_X, HALF_X], yRange: [-HALF_Z, HALF_Z], margin: 2 },
         { key: 'animate', type: 'enum', label: 'Motion', options: [
             { value: 'none', label: 'Still' },
             { value: 'scroll', label: 'Scroll' },

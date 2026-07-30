@@ -62,7 +62,7 @@ Returns every available effect with its parameter schema and defaults — enough
     "schema": [
       { "key": "color", "type": "color", "label": "Colour" },
       { "key": "freq", "type": "number", "label": "Speed", "min": 0, "max": 2, "step": 0.01, "scale": "linear", "modulatable": true },
-      { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.625, 3.625], "yRange": [-0.875, 0.875], "margin": 2, "farLimit": 1000, "draggable": true }
+      { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.625, 3.625], "yRange": [-0.875, 0.875], "margin": 2, "farLimit": 1000 }
     ],
     "defaults": { "color": "#ffffff", "freq": 0.2 }
   }

@@ -24,7 +24,7 @@ module.exports = {
         // the wave reads as planar. Both are in world units — see engine/panel.
         { type: 'xy', label: 'Position', xKey: 'x', yKey: 'y',
           xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
-          margin: 2, farLimit: 1000, draggable: true },
+          margin: 2, farLimit: 1000 },
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
     ],
     defaults: {
