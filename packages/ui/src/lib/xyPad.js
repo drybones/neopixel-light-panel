@@ -7,16 +7,22 @@
 // compress x against 3.625 and y against 0.875 and skew a corner drag by tens
 // of degrees — which matters because a far-off source is really a direction.
 //
+// The panel is framed as the stage frames it: a grid of 30x8 LED *cells*, half
+// a pitch beyond the outermost centres on each side, so the edge LEDs show as
+// whole circles rather than being cut through the middle by the outline. That
+// makes the panel box +-3.75 x +-1.0 — aspect 3.75, the same as the stage —
+// where xRange/yRange describe the centres at +-3.625 x +-0.875.
+//
 // Because the rings are constant width and the panel is not square, each zoom
 // level has its own aspect ratio, growing squarer as you zoom out:
 //
-//   panel   +-3.625 x +-0.875   aspect 4.14   the panel alone
-//   near    +-5.625 x +-2.875   aspect 1.96   sources just off the panel
-//   far     +-7.625 x +-4.875   aspect 1.56   near, plus a compressed ring
+//   panel   +-3.75 x +-1.0    aspect 3.75   the panel alone, matching the stage
+//   near    +-5.75 x +-3.0    aspect 1.92   sources just off the panel
+//   far     +-7.75 x +-5.0    aspect 1.55   near, plus a compressed ring
 //
 // At `far` the outer ring compresses so its edge reaches `farLimit`. Distance
-// from the panel is measured as a rectangular offset, s = max(|u| - panelX,
-// |v| - panelY), whose contours are exactly the constant-width rings; the ring
+// from the panel is measured as a rectangular offset, s = max(|u| - boxX,
+// |v| - boxY), whose contours are exactly the constant-width rings; the ring
 // spans s from `margin` to `2 * margin`. Across it the whole vector is scaled
 // by m, so only the magnitude is warped and the angle is untouched:
 //
@@ -32,6 +38,8 @@
 //
 // Screen y is inverted throughout: effect y params negate z (dz = pz + y), so
 // positive y is up.
+
+import { COLS, ROWS } from './panelGrid';
 
 const RINGS = { panel: 0, near: 1, far: 2 };
 
@@ -52,24 +60,37 @@ export function padGeometry(entry, zoom) {
   const rings = RINGS[level];
   const far = level === 'far';
 
+  // Half an LED pitch, derived from the centre extent and the grid: the
+  // outermost centres sit at panelX with COLS-1 gaps between them, so half a
+  // gap is panelX/(COLS-1). Adding it gives the cell box the stage draws, so
+  // the edge LEDs are whole circles inside the outline instead of bisected.
+  const boxX = panelX + panelX / (COLS - 1);
+  const boxY = panelY + panelY / (ROWS - 1);
+
   // The outermost ring is the compressed one, so the linear zone stops one
   // ring short of the pad edge at `far` and fills the pad otherwise.
   const linearOffset = margin * (far ? rings - 1 : rings);
-  const halfX = panelX + margin * rings;
-  const halfY = panelY + margin * rings;
+  const halfX = boxX + margin * rings;
+  const halfY = boxY + margin * rings;
 
   return {
     level,
     levels,
     far,
     margin,
+    // The LED centres, for placing pixels and for matching the server's
+    // far-field threshold...
     panelX,
     panelY,
+    // ...and the cell box drawn as the panel outline, which the rings and the
+    // offset measure from.
+    boxX,
+    boxY,
     halfX,
     halfY,
     linearOffset,
-    linearX: panelX + linearOffset,
-    linearY: panelY + linearOffset,
+    linearX: boxX + linearOffset,
+    linearY: boxY + linearOffset,
     aspect: halfX / halfY,
     // Total scale across the ring. Along +x the pad edge sits at world
     // halfX * m, so this is what makes that land on farLimit.
@@ -77,10 +98,10 @@ export function padGeometry(entry, zoom) {
   };
 }
 
-// Rectangular offset from the panel: 0 on the panel's edge, `margin` on the
-// near ring's edge. Its contours are the constant-width rings the pad draws.
+// Rectangular offset from the panel box: 0 on the panel outline, `margin` on
+// the near ring's edge. Its contours are the constant-width rings the pad draws.
 function rectOffset(g, u, v) {
-  return Math.max(Math.abs(u) - g.panelX, Math.abs(v) - g.panelY);
+  return Math.max(Math.abs(u) - g.boxX, Math.abs(v) - g.boxY);
 }
 
 function scaleAt(g, offset) {

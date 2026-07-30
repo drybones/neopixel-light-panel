@@ -76,7 +76,7 @@ Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linea
 - `margin` — width of a ring, in world units, adding a **near** step for sources just off the panel. Constant width (rather than scaled to the panel's 4:1 aspect) keeps one world-units-per-pixel scale on both axes, so the direction you drag is the direction the effect gets; an aspect-matched ring would skew a corner drag by tens of degrees. Because the rings are constant width and the panel is not square, each step has its own aspect ratio, growing squarer as you zoom out.
 - `farLimit` — if set, adds a **far** step whose outer ring — the same width as the near one — compresses so its edge reaches this distance, for sources far enough away that the wave reads as planar. The compression is exponential in the ring, so reach spreads across the drag rather than bunching into the last few pixels, and only the magnitude is warped so the drag direction stays exact.
 
-With the shipped values (`margin: 2`, `farLimit: 1000`) the steps are ±3.625 × ±0.875, ±5.625 × ±2.875, and ±7.625 × ±4.875, the last reaching x ±1000 / y ±639 at its edge.
+The rings are measured from the panel's **cell box** — half an LED pitch beyond the outermost centres, ±3.75 × ±1.0 — rather than the centres themselves, so the edge LEDs draw as whole circles inside the outline and the pad frames the panel exactly as the editor's preview does. With the shipped values (`margin: 2`, `farLimit: 1000`) the steps are ±3.75 × ±1.0, ±5.75 × ±3.0, and ±7.75 × ±5.0, the last reaching x ±1000 / y ±645 at its edge.
 
 Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
 

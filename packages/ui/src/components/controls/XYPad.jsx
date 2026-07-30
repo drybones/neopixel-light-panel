@@ -84,7 +84,10 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
     }
 
     const frame = frameRef.current;
-    const dot = Math.max(1.5, (CANVAS_W / COLS) * geo.panelX / geo.halfX * 0.4);
+    // One LED cell in canvas px, then the same 0.375 factor LedCanvas uses, so
+    // the dots read at the same relative size as the stage's.
+    const cellPx = (CANVAS_W * (geo.boxX / geo.halfX)) / COLS;
+    const dot = Math.max(1.5, cellPx * 0.375);
     for (let i = 0; i < ledPositions.length; i++) {
       const px = frame ? frame[i] : null;
       ctx.fillStyle = px ? `rgb(${px[0]},${px[1]},${px[2]})` : '#1a1a1f';
@@ -93,10 +96,11 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
       ctx.fill();
     }
 
-    // Panel outline, so the margin reads as "outside the panel" rather than
-    // just more pad.
-    const tl = worldToPad(geo, -geo.panelX, geo.panelY);
-    const br = worldToPad(geo, geo.panelX, -geo.panelY);
+    // Panel outline, so the rings read as "outside the panel" rather than just
+    // more pad. Drawn on the cell box, not the LED centres, so the edge LEDs
+    // sit wholly inside it exactly as they do on the stage.
+    const tl = worldToPad(geo, -geo.boxX, geo.boxY);
+    const br = worldToPad(geo, geo.boxX, -geo.boxY);
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(

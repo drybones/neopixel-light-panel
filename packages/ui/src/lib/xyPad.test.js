@@ -4,10 +4,14 @@ import {
   directionDegrees, isFarField,
 } from './xyPad';
 
-const HALF_X = 3.625;
+const HALF_X = 3.625;      // outermost LED centres
 const HALF_Z = 0.875;
 const MARGIN = 2;
 const FAR_LIMIT = 1000;
+// The pad frames the panel as the stage does — a grid of 30x8 cells, half a
+// pitch beyond the centres — so the drawn box is wider than xRange/yRange.
+const BOX_X = 3.75;
+const BOX_Z = 1.0;
 
 // Mirrors the schema entries the server ships.
 const waveletEntry = {
@@ -40,16 +44,27 @@ describe('zoom levels', () => {
 
 describe('constant-width rings', () => {
   it('adds the same world-unit border on both axes at every level', () => {
-    expect(panel.halfX - HALF_X).toBeCloseTo(0, 10);
-    expect(panel.halfY - HALF_Z).toBeCloseTo(0, 10);
+    expect(panel.halfX - BOX_X).toBeCloseTo(0, 10);
+    expect(panel.halfY - BOX_Z).toBeCloseTo(0, 10);
 
     // This is the property the whole design rests on: the x and y borders must
     // be equal, or a corner drag points somewhere the value does not.
-    expect(near.halfX - HALF_X).toBeCloseTo(MARGIN, 10);
-    expect(near.halfY - HALF_Z).toBeCloseTo(MARGIN, 10);
+    expect(near.halfX - BOX_X).toBeCloseTo(MARGIN, 10);
+    expect(near.halfY - BOX_Z).toBeCloseTo(MARGIN, 10);
 
-    expect(far.halfX - HALF_X).toBeCloseTo(2 * MARGIN, 10);
-    expect(far.halfY - HALF_Z).toBeCloseTo(2 * MARGIN, 10);
+    expect(far.halfX - BOX_X).toBeCloseTo(2 * MARGIN, 10);
+    expect(far.halfY - BOX_Z).toBeCloseTo(2 * MARGIN, 10);
+  });
+
+  it('frames the panel on the cell box, matching the stage', () => {
+    // Drawn on LED centres, the outline bisected the edge LEDs and the pad was
+    // 4.14 wide against the stage's 3.75. Half a pitch out fixes both.
+    for (const g of [panel, near, far]) {
+      expect(g.boxX).toBeCloseTo(BOX_X, 10);
+      expect(g.boxY).toBeCloseTo(BOX_Z, 10);
+      expect(g.boxX - g.panelX).toBeCloseTo(g.boxY - g.panelY, 10);
+    }
+    expect(panel.aspect).toBeCloseTo(30 / 8, 10);
   });
 
   it('makes the compressed ring exactly as wide as the near ring', () => {
@@ -60,9 +75,9 @@ describe('constant-width rings', () => {
   });
 
   it('gives each level its own aspect, growing squarer as it zooms out', () => {
-    expect(panel.aspect).toBeCloseTo(3.625 / 0.875, 4);
-    expect(near.aspect).toBeCloseTo(5.625 / 2.875, 4);
-    expect(far.aspect).toBeCloseTo(7.625 / 4.875, 4);
+    expect(panel.aspect).toBeCloseTo(3.75 / 1.0, 4);
+    expect(near.aspect).toBeCloseTo(5.75 / 3.0, 4);
+    expect(far.aspect).toBeCloseTo(7.75 / 5.0, 4);
     expect(near.aspect).toBeLessThan(panel.aspect);
     expect(far.aspect).toBeLessThan(near.aspect);
   });
@@ -92,7 +107,7 @@ describe('round trips', () => {
   });
 
   it('leaves the linear zone untouched at far', () => {
-    for (const [x, y] of [[0, 0], [3.625, 0.875], [5.625, 2.875], [-4, -2]]) {
+    for (const [x, y] of [[0, 0], [3.75, 1.0], [5.75, 3.0], [-4, -2]]) {
       const back = roundTrip(far, x, y);
       expect(back.x).toBeCloseTo(x, 9);
       expect(back.y).toBeCloseTo(y, 9);
@@ -134,11 +149,22 @@ describe('the seam at the linear boundary', () => {
 
   it('has no kink in the drag rate across it', () => {
     // The scale factor is flat where it meets the linear zone (m'(0) = 0), so
-    // world-units-per-pad-fraction matches on both sides.
+    // world-units-per-pad-fraction matches on both sides. Testing that with a
+    // fixed tolerance just measures the finite difference's truncation error;
+    // what actually separates a smooth join from a kinked one is that the gap
+    // vanishes with the step. Halve the step, halve the gap => continuous.
+    // A real kink would leave the gap stuck at the size of the jump.
     const seam = 0.5 + (far.linearX / far.halfX) * 0.5;
-    const step = 1e-5;
-    const rate = (f) => (padToWorld(far, f + step, 0.5).x - padToWorld(far, f, 0.5).x) / step;
-    expect(rate(seam - 2 * step)).toBeCloseTo(rate(seam + step), 1);
+    const gapAt = (step) => {
+      const rate = (f) => (padToWorld(far, f + step, 0.5).x - padToWorld(far, f, 0.5).x) / step;
+      const before = rate(seam - 2 * step);
+      return Math.abs(rate(seam + step) - before) / before;
+    };
+
+    const coarse = gapAt(1e-5);
+    const fine = gapAt(1e-6);
+    expect(coarse).toBeLessThan(0.01);
+    expect(fine).toBeLessThan(coarse / 5);
   });
 });
 
