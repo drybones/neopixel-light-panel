@@ -559,9 +559,12 @@ input[type="range"]::-moz-range-thumb {
 
 /* Gradient stops */
 .control-row--stops { align-items: flex-start; }
-.gradient-editor { flex: 1; min-width: 200px; }
+.gradient-editor { position: relative; flex: 1; min-width: 200px; }
 .gradient-strip {
   position: relative;
+  /* Above the picker's backdrop, so a click on another pin switches stops
+     instead of being spent dismissing the one that is open. */
+  z-index: 32;
   height: 28px;
   border-radius: 6px;
   cursor: copy;
@@ -580,8 +583,28 @@ input[type="range"]::-moz-range-thumb {
   touch-action: none;
 }
 .gradient-pin--on { border-color: var(--accent); }
-.gradient-stop-editor { margin-top: 10px; }
-.gradient-stop-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* Floats under the pin being edited, below the end colours so they stay
+   readable; `left` is clamped inline to keep it inside the strip. Width is
+   mirrored in GradientStopsEditor's POPOVER_WIDTH. */
+.gradient-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 33;
+  box-sizing: border-box;
+  /* 200px picker + padding; the panel is what makes the hex field and Remove
+     readable over whatever row the popover happens to cover. */
+  width: 216px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.gradient-popover-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+
+/* The end colours, pinned to the ends of the strip rather than to their pins. */
+.gradient-ends { display: flex; justify-content: space-between; margin-top: 6px; }
+.gradient-ends .control-num:last-child { text-align: right; }
 
 /* Effect picker */
 .effect-picker-backdrop {
