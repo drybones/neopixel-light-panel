@@ -10,6 +10,10 @@
   --accent-dim: #2b4a85;
   --danger: #e24b4a;
   --radius: 10px;
+  /* The value column every slider row ends with: .control-num plus the row's
+     gap. Controls that would otherwise fill the row stop short of it, so the
+     pad and the gradient strip share the sliders' right-hand edge. */
+  --value-col: 66px;
 }
 
 * { box-sizing: border-box; }
@@ -405,7 +409,9 @@ input[type="range"]::-moz-range-thumb {
   width: 88px;
   flex: none;
 }
-.control-row input[type="range"] { flex: 1; min-width: 90px; }
+/* margin: 0 overrides the UA's 2px on a range input, so the column arithmetic
+   above is exact rather than two pixels out, and the same in every browser. */
+.control-row input[type="range"] { flex: 1; min-width: 90px; margin: 0; }
 .control-value {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -460,7 +466,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* XY pad */
 .control-row--pad { align-items: flex-start; }
-.xy-pad-wrap { flex: 1; min-width: 200px; }
+.xy-pad-wrap { flex: 1; min-width: 200px; margin-right: var(--value-col); }
 .xy-pad {
   position: relative;
   width: 100%;
@@ -559,7 +565,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Gradient stops */
 .control-row--stops { align-items: flex-start; }
-.gradient-editor { position: relative; flex: 1; min-width: 200px; }
+.gradient-editor { position: relative; flex: 1; min-width: 200px; margin-right: var(--value-col); }
 .gradient-strip {
   position: relative;
   height: 28px;
