@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import DraftField from './DraftField';
+import { formatHex, parseHex } from '../../lib/colors';
 
 // Gradient stop strip: the strip previews the gradient; stops are pins you
 // drag along it. Click a pin to edit its colour; double-click the strip to
@@ -84,6 +86,15 @@ export default function GradientStopsEditor({ entry, stops, onChange, onCommit }
               onChange={(hex) => setStop(editing, { color: hex })}
             />
             <div className="gradient-stop-actions">
+              <DraftField
+                value={stops[editing].color}
+                label={`Stop ${editing + 1} hex`}
+                format={formatHex}
+                parse={parseHex}
+                onChange={(hex) => setStop(editing, { color: hex })}
+                onCommit={onCommit}
+                width={70}
+              />
               <button className="btn btn-ghost" onClick={() => { setEditing(null); if (onCommit) onCommit(); }}>Done</button>
               {stops.length > (entry.minStops || 2) && (
                 <button className="btn btn-ghost btn-danger" onClick={() => removeStop(editing)}>Remove stop</button>
