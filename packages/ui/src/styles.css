@@ -10,6 +10,10 @@
   --accent-dim: #2b4a85;
   --danger: #e24b4a;
   --radius: 10px;
+  /* The value column every slider row ends with: .control-num plus the row's
+     gap. Controls that would otherwise fill the row stop short of it, so the
+     pad and the gradient strip share the sliders' right-hand edge. */
+  --value-col: 66px;
 }
 
 * { box-sizing: border-box; }
@@ -405,7 +409,9 @@ input[type="range"]::-moz-range-thumb {
   width: 88px;
   flex: none;
 }
-.control-row input[type="range"] { flex: 1; min-width: 90px; }
+/* margin: 0 overrides the UA's 2px on a range input, so the column arithmetic
+   above is exact rather than two pixels out, and the same in every browser. */
+.control-row input[type="range"] { flex: 1; min-width: 90px; margin: 0; }
 .control-value {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -460,7 +466,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* XY pad */
 .control-row--pad { align-items: flex-start; }
-.xy-pad-wrap { flex: 1; min-width: 200px; }
+.xy-pad-wrap { flex: 1; min-width: 200px; margin-right: var(--value-col); }
 .xy-pad {
   position: relative;
   width: 100%;
@@ -524,9 +530,9 @@ input[type="range"]::-moz-range-thumb {
   margin-left: 6px;
 }
 
-/* Numeric entry beside a pad or dial. Reads as a plain value until you reach
-   for it — same idiom as .editor-name, so typing an exact number stays
-   available without competing with the drag control it sits under. */
+/* Numeric entry beside a slider, pad or dial. Reads as a plain value until you
+   reach for it — same idiom as .editor-name, so typing an exact number stays
+   available without competing with the drag control it sits beside. */
 .control-num {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
@@ -559,7 +565,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Gradient stops */
 .control-row--stops { align-items: flex-start; }
-.gradient-editor { flex: 1; min-width: 200px; }
+.gradient-editor { position: relative; flex: 1; min-width: 200px; margin-right: var(--value-col); }
 .gradient-strip {
   position: relative;
   height: 28px;
@@ -568,6 +574,11 @@ input[type="range"]::-moz-range-thumb {
 }
 .gradient-pin {
   position: absolute;
+  /* Above the picker's backdrop, so a click on another pin switches stops
+     instead of being spent dismissing the one that is open. The strip itself
+     stays under the backdrop, so clicking off the pins dismisses the picker
+     rather than dropping a stop where you meant to click away. */
+  z-index: 32;
   top: 50%;
   width: 16px;
   height: 16px;
@@ -580,8 +591,28 @@ input[type="range"]::-moz-range-thumb {
   touch-action: none;
 }
 .gradient-pin--on { border-color: var(--accent); }
-.gradient-stop-editor { margin-top: 10px; }
-.gradient-stop-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* Floats under the pin being edited, below the end colours so they stay
+   readable; `left` is clamped inline to keep it inside the strip. Width is
+   mirrored in GradientStopsEditor's POPOVER_WIDTH. */
+.gradient-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 33;
+  box-sizing: border-box;
+  /* 200px picker + padding; the panel is what makes the hex field and Remove
+     readable over whatever row the popover happens to cover. */
+  width: 216px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.gradient-popover-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+
+/* The end colours, pinned to the ends of the strip rather than to their pins. */
+.gradient-ends { display: flex; justify-content: space-between; margin-top: 6px; }
+.gradient-ends .control-num:last-child { text-align: right; }
 
 /* Effect picker */
 .effect-picker-backdrop {

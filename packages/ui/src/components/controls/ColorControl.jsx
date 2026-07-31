@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import DraftField from './DraftField';
+import { formatHex, parseHex } from '../../lib/colors';
 
 const SWATCHES = ['#ffffff', '#ff5e3a', '#ffd23f', '#2ee6a8', '#3fd0ff', '#4f8bff', '#b44fff', '#ff3fa4'];
 
-// Swatch row + full picker for schema `color` entries.
+// Swatch row + hex field + full picker for schema `color` entries.
 export default function ColorControl({ label, value, onChange, onCommit }) {
   const [open, setOpen] = useState(false);
 
@@ -34,6 +36,15 @@ export default function ColorControl({ label, value, onChange, onCommit }) {
           <span aria-hidden="true">◐</span>
         </button>
       </div>
+      <DraftField
+        value={value}
+        label={`${label} hex`}
+        format={formatHex}
+        parse={parseHex}
+        onChange={onChange}
+        onCommit={onCommit}
+        width={70}
+      />
       {open && (
         <div className="color-popover">
           <div className="color-popover-backdrop" onClick={() => { setOpen(false); if (onCommit) onCommit(); }} />

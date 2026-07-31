@@ -1,8 +1,14 @@
 import React from 'react';
+import NumField from './NumField';
 import { sliderToValue, valueToSlider } from '../../lib/perceptual';
 
-// Slider + numeric readout for a schema `number` entry. scale 'atan' uses
+// Slider + numeric entry for a schema `number` entry. scale 'atan' uses
 // the perceptual mapping (value range unbounded); 'linear' uses min/max.
+//
+// The field is deliberately not clamped to the schema's min/max: preset data
+// carries values well outside what some sliders can express (see lambda), and
+// typing is then the only way to put one back after a stray drag. It shows the
+// value, never the slider position — those differ under the atan scale.
 export default function NumberControl({ entry, value, onChange, onCommit }) {
   const atan = entry.scale === 'atan';
   const sliderProps = atan
@@ -20,7 +26,12 @@ export default function NumberControl({ entry, value, onChange, onCommit }) {
         onKeyUp={(e) => { if (e.key.startsWith('Arrow')) onCommit(); }}
         aria-label={entry.label}
       />
-      <span className="control-value">{Number(value).toFixed(2)}</span>
+      <NumField
+        value={Number(value)}
+        label={`${entry.label} value`}
+        onChange={onChange}
+        onCommit={onCommit}
+      />
     </div>
   );
 }
