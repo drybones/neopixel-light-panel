@@ -524,9 +524,9 @@ input[type="range"]::-moz-range-thumb {
   margin-left: 6px;
 }
 
-/* Numeric entry beside a pad or dial. Reads as a plain value until you reach
-   for it — same idiom as .editor-name, so typing an exact number stays
-   available without competing with the drag control it sits under. */
+/* Numeric entry beside a slider, pad or dial. Reads as a plain value until you
+   reach for it — same idiom as .editor-name, so typing an exact number stays
+   available without competing with the drag control it sits beside. */
 .control-num {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
