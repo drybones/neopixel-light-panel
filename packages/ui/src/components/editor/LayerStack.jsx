@@ -5,9 +5,13 @@ import { subscribeLayer } from '../../api/lightStream';
 // Live animated thumbnail of a single layer, fed by the WS v2 stream.
 // Falls back to colour swatches until the first frame arrives (the
 // canvas starts black, so keep it cheap: render canvas immediately).
+//
+// Flat fill, not the bloom the stage uses: these cells are 4px wide, where a
+// core would be sub-pixel and its glow just a dimmer dot. There are also one
+// of these per layer, so this is the row that multiplies.
 function LayerThumb({ layerId }) {
   const subscribe = useCallback((cb) => subscribeLayer(layerId, cb), [layerId]);
-  return <LedCanvas subscribe={subscribe} width={120} height={32} dots={false} style={{ width: '100%', height: '100%' }} />;
+  return <LedCanvas subscribe={subscribe} width={120} height={32} mode="fill" style={{ width: '100%', height: '100%' }} />;
 }
 
 // Layer list, topmost layer first (Photoshop-style; the scene stores

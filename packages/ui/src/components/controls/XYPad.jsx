@@ -5,6 +5,7 @@ import {
   directionDegrees, isFarField,
 } from '../../lib/xyPad';
 import { COLS, ROWS, NUM_PIXELS, cellForFrameIndex } from '../../lib/panelGrid';
+import { BG, bloomParams, makeScratch, paintBloom } from '../../lib/ledPaint';
 
 const CANVAS_W = 600;
 
@@ -23,6 +24,7 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
   const frameRef = useRef(null);
+  const scratchRef = useRef(null);
 
   // Open on the tightest level that can actually show the value, so a layer
   // parked off-panel never starts on a clipped handle. ParamPanel keys this
@@ -38,15 +40,17 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
   // Indexed by *frame* index, which is strip order rather than grid order —
   // see lib/panelGrid. Getting this wrong puts the render 180 degrees from a
   // correctly-placed handle.
+  // Flattened to [x0, y0, x1, y1, ...], the layout lib/ledPaint paints from.
   const ledPositions = useMemo(() => {
     const n = NUM_PIXELS;
-    const out = new Array(n);
+    const out = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) {
       const { col, row } = cellForFrameIndex(i, n);
       const wx = -geo.panelX + col * (geo.panelX * 2) / (COLS - 1);
       const wy = geo.panelY - row * (geo.panelY * 2) / (ROWS - 1);
       const { fx, fy } = worldToPad(geo, wx, wy);
-      out[i] = [fx * CANVAS_W, fy * canvasH];
+      out[i * 2] = fx * CANVAS_W;
+      out[i * 2 + 1] = fy * canvasH;
     }
     return out;
   }, [geo, canvasH]);
@@ -55,9 +59,35 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#0d0d0f';
-    ctx.fillRect(0, 0, CANVAS_W, canvasH);
+    const frame = frameRef.current;
+    // One LED cell in canvas px — the scale every glow length is a factor of.
+    const cellPx = (CANVAS_W * (geo.boxX / geo.halfX)) / COLS;
 
+    if (frame) {
+      if (!scratchRef.current
+        || scratchRef.current.w !== CANVAS_W || scratchRef.current.h !== canvasH) {
+        scratchRef.current = makeScratch(CANVAS_W, canvasH);
+      }
+      paintBloom(ctx, scratchRef.current, frame, ledPositions, bloomParams(cellPx), BG);
+    } else {
+      // Unlit grid, so the pad reads as a panel before the first frame lands.
+      // Flat: a bloom on dark cells says nothing.
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.filter = 'none';
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, CANVAS_W, canvasH);
+      ctx.fillStyle = '#1a1a1f';
+      const dot = Math.max(1.5, cellPx * 0.375);
+      for (let i = 0; i < NUM_PIXELS; i++) {
+        ctx.beginPath();
+        ctx.arc(ledPositions[i * 2], ledPositions[i * 2 + 1], dot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Everything below is chrome, drawn after the LEDs and outside the additive
+    // pass — under `lighter` the labels and outline would blow out.
     ctx.font = '11px sans-serif';
 
     // Zone labels sit just inside the top-left of the region they name, so the
@@ -81,19 +111,6 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
       // At `near` the ring is the whole pad, so its label goes in the corner.
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.fillText('near', 6, 14);
-    }
-
-    const frame = frameRef.current;
-    // One LED cell in canvas px, then the same 0.375 factor LedCanvas uses, so
-    // the dots read at the same relative size as the stage's.
-    const cellPx = (CANVAS_W * (geo.boxX / geo.halfX)) / COLS;
-    const dot = Math.max(1.5, cellPx * 0.375);
-    for (let i = 0; i < ledPositions.length; i++) {
-      const px = frame ? frame[i] : null;
-      ctx.fillStyle = px ? `rgb(${px[0]},${px[1]},${px[2]})` : '#1a1a1f';
-      ctx.beginPath();
-      ctx.arc(ledPositions[i][0], ledPositions[i][1], dot, 0, Math.PI * 2);
-      ctx.fill();
     }
 
     // Panel outline, so the rings read as "outside the panel" rather than just
