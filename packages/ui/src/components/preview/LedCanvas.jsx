@@ -1,44 +1,65 @@
-import React, { useEffect, useRef } from 'react';
-import { COLS, ROWS, cellForFrameIndex } from '../../lib/panelGrid';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { COLS, ROWS } from '../../lib/panelGrid';
+import {
+  BG, bloomParams, gridPositions, makeScratch, paintBloom, paintFlat,
+} from '../../lib/ledPaint';
 
-// Shared 30×8 LED dot renderer. `subscribe` is a function like
+// Shared 30x8 LED renderer. `subscribe` is a function like
 // lightStream.subscribeComposite — it gets a callback and returns an
-// unsubscribe function. Frames are painted imperatively; nothing here
-// touches React state. Strip-order-to-grid mapping lives in lib/panelGrid so
-// the position pad's backdrop cannot drift from this.
-export function drawFrame(canvas, pixels, dots = true) {
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width;
-  const h = canvas.height;
-  const cw = w / COLS;
-  const ch = h / ROWS;
-  const radius = Math.min(cw, ch) / 2 * 0.75;
-  ctx.fillStyle = '#0d0d0f';
-  ctx.fillRect(0, 0, w, h);
-  const numPixels = pixels.length;
-  for (let i = 0; i < numPixels; i++) {
-    const [r, g, b] = pixels[i];
-    const { col, row } = cellForFrameIndex(i, numPixels);
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    if (dots && radius >= 1.5) {
-      ctx.beginPath();
-      ctx.arc(col * cw + cw / 2, row * ch + ch / 2, radius, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillRect(col * cw, row * ch, cw - 0.5, ch - 0.5);
-    }
-  }
-}
-
-export default function LedCanvas({ subscribe, width = 600, height = 160, dots = true, className, style }) {
+// unsubscribe function. Frames are painted imperatively; nothing here touches
+// React state.
+//
+// `mode` picks how a pixel is drawn:
+//   bloom — core plus multi-scale glow, how the panel actually looks
+//   dots  — flat discs, what shipped before the bloom
+//   fill  — flat cell rectangles, for canvases too small for either
+// Below `minCellPx` the painter falls back to flat on its own, so the
+// thumbnails stay cheap whatever they ask for.
+//
+// The strip-order-to-grid mapping and the drawing both live in lib/ledPaint,
+// so the position pad's backdrop cannot drift from this.
+export default function LedCanvas({
+  subscribe, width = 600, height = 160, mode = 'bloom', className, style,
+}) {
   const canvasRef = useRef(null);
+  const ctxRef = useRef(null);
+  const scratchRef = useRef(null);
+  const frameRef = useRef(null);
+
+  // Resolved once per size rather than per frame — this repaints at the
+  // stream rate, for every layer thumbnail as well as the composite.
+  const positions = useMemo(() => gridPositions(width, height), [width, height]);
+  const params = useMemo(() => bloomParams(width / COLS), [width]);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    // A canvas swap would strand a cached context on a detached node.
+    ctxRef.current = canvas.getContext('2d');
+    scratchRef.current = mode === 'bloom' ? makeScratch(width, height) : null;
+
+    function paint(frame) {
+      const ctx = ctxRef.current;
+      if (!ctx || !frame) return;
+      if (mode === 'bloom') {
+        paintBloom(ctx, scratchRef.current, frame, positions, params, BG);
+      } else {
+        paintFlat(
+          ctx, frame, positions,
+          Math.min(width / COLS, height / ROWS) / 2 * 0.75, BG, mode === 'fill',
+        );
+      }
+    }
+
+    // Repaint whatever we last had, so a size or mode change is visible
+    // without waiting for the next frame.
+    paint(frameRef.current);
     if (!subscribe) return undefined;
-    const unsubscribe = subscribe((frame) => drawFrame(canvasRef.current, frame, dots));
-    return unsubscribe;
-  }, [subscribe, dots]);
+    return subscribe((frame) => {
+      frameRef.current = frame;
+      paint(frame);
+    });
+  }, [subscribe, mode, width, height, positions, params]);
 
   return (
     <canvas
@@ -46,7 +67,7 @@ export default function LedCanvas({ subscribe, width = 600, height = 160, dots =
       width={width}
       height={height}
       className={className}
-      style={{ background: '#0d0d0f', display: 'block', ...style }}
+      style={{ background: BG, display: 'block', ...style }}
     />
   );
 }

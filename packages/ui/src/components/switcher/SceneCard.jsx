@@ -16,7 +16,7 @@ export default function SceneCard({ scene, detail, active, onActivate, onEdit })
     >
       <div className="scene-card-preview">
         {active ? (
-          <LedCanvas subscribe={subscribeComposite} width={300} height={80} dots={false}
+          <LedCanvas subscribe={subscribeComposite} width={300} height={80} mode="bloom"
             style={{ width: '100%', height: '100%', borderRadius: 6 }} />
         ) : (
           <div className="scene-card-swatches">
