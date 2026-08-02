@@ -32,13 +32,16 @@
 
 var color = require('../engine/color');
 
+// See wavelet.js — guards the division by lambda against an unclamped 0.
+var MIN_LAMBDA = 1e-6;
+
 module.exports = {
     type: 'planewave',
     name: 'Plane Wave',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
-        { key: 'freq', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.05, max: 2, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'freq', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.001, max: 50, scale: 'log', modulatable: true },
         { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'angle', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1, modulatable: true },
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
@@ -59,7 +62,9 @@ module.exports = {
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
-            lambda: params.lambda,
+            // Divided into `proj` below — 0 would render the layer as NaN.
+            // The typed field is unclamped, so this can arrive as 0.
+            lambda: params.lambda || MIN_LAMBDA,
             delta: params.delta,
             ca: Math.cos(a),
             sa: Math.sin(a),

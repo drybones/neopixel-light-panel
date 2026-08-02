@@ -12,8 +12,8 @@ module.exports = {
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
         { key: 'density', type: 'number', label: 'Density', min: 0.02, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.1, max: 3, step: 0.05, scale: 'linear', modulatable: true },
-        { key: 'background', type: 'number', label: 'Backglow', min: 0, max: 0.3, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 5, scale: 'log', modulatable: true },
+        { key: 'background', type: 'number', label: 'Backglow', min: 0.01, max: 0.5, scale: 'log', zeroable: true, modulatable: true },
     ],
     defaults: {
         color: '#ffe9c4',

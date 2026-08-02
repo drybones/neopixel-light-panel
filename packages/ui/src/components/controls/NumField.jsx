@@ -1,14 +1,10 @@
 import React from 'react';
 import DraftField from './DraftField';
+import { formatNumber, parseNumber } from '../../lib/numberFormat';
 
 // Numeric flavour of DraftField — the pad's x/y, the dial's degrees and every
-// slider's value. Two decimal places unless the caller formats it itself.
-const formatNumber = (v) => String(Math.round(v * 100) / 100);
-
-function parseNumber(text) {
-  const parsed = parseFloat(text);
-  return Number.isFinite(parsed) ? parsed : null;
-}
+// slider's value. Formatting lives in lib/numberFormat so it can be tested
+// directly; see there for why it isn't a flat two decimal places.
 
 export default function NumField({ value, label, onChange, onCommit, format, width }) {
   return (
