@@ -11,13 +11,18 @@
 var color = require('../engine/color');
 var panel = require('../engine/panel');
 
+// Floor for a lambda of 0, which the unclamped typed field allows. Far below
+// the LED pitch, so it renders as the same per-pixel speckle as any other
+// sub-Nyquist wavelength rather than changing the look.
+var MIN_LAMBDA = 1e-6;
+
 module.exports = {
     type: 'wavelet',
     name: 'Wavelet',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
-        { key: 'freq', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.05, max: 2, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'freq', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.001, max: 50, scale: 'log', modulatable: true },
         { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
         // margin (world units) expands the pad past the panel on all four sides;
         // farLimit adds a compressed outer frame reaching that distance, where
@@ -43,7 +48,10 @@ module.exports = {
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
-            lambda: params.lambda,
+            // The render loop divides by lambda, so 0 would put NaN into the
+            // pixel buffer and out through setPixel. The slider can't reach 0,
+            // but the typed field is deliberately unclamped.
+            lambda: params.lambda || MIN_LAMBDA,
             delta: params.delta,
             x: params.x,
             y: params.y,

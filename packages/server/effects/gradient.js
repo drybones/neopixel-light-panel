@@ -54,7 +54,7 @@ module.exports = {
             { value: 'scroll', label: 'Scroll' },
             { value: 'rotate', label: 'Rotate' },
         ]},
-        { key: 'speed', type: 'number', label: 'Drift', min: 0, max: 0.5, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'speed', type: 'number', label: 'Drift', min: 0.002, max: 2, scale: 'log', zeroable: true, modulatable: true },
     ],
     defaults: {
         stops: [

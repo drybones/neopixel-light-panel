@@ -14,9 +14,9 @@ module.exports = {
     name: 'Particle trail',
     schema: [
         { key: 'count', type: 'number', label: 'Trail length', min: 5, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.1, max: 3, step: 0.05, scale: 'linear', modulatable: true },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 4, scale: 'log', modulatable: true },
         { key: 'saturation', type: 'number', label: 'Colourfulness', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'glow', type: 'number', label: 'Glow', min: 0, max: 0.3, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'glow', type: 'number', label: 'Glow', min: 0.01, max: 0.5, scale: 'log', zeroable: true, modulatable: true },
     ],
     defaults: {
         count: 49,

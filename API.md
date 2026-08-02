@@ -69,7 +69,11 @@ Returns every available effect with its parameter schema and defaults — enough
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+
+`scale: log` spreads `min`/`max` over decades so equal slider travel is equal ratio — for wavelength, the speeds and the ambient glow floors, which span more range than a linear track can usefully hold. It ignores `step` (the track is integer positions). Adding `zeroable: true` reserves the bottom of the track for an exact `0`, which several params store to mean "frozen" or "no floor" and which a log scale cannot otherwise express.
+
+**Schema `min`/`max` are slider hints, not validation.** Nothing clamps params to them — `normaliseLayer` checks only `opacity` — so stored values outside the range render fine and the slider simply pins at its end. Typed entry is deliberately unclamped, which is how a preset value no slider can reach is restored.
 
 `xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields add zoom steps to the editor's pad, each adding one ring of constant world-unit width on all four sides:
 

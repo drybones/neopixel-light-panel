@@ -17,9 +17,9 @@ module.exports = {
     schema: [
         { key: 'c1', type: 'color', label: 'Low colour' },
         { key: 'c2', type: 'color', label: 'High colour' },
-        { key: 'scale', type: 'number', label: 'Scale', min: 0.2, max: 4, step: 0.05, scale: 'linear', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'contrast', type: 'number', label: 'Contrast', min: 0.5, max: 4, step: 0.05, scale: 'linear', modulatable: true },
+        { key: 'scale', type: 'number', label: 'Scale', min: 0.1, max: 8, scale: 'log', modulatable: true },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'contrast', type: 'number', label: 'Contrast', min: 0.25, max: 16, scale: 'log', modulatable: true },
     ],
     defaults: {
         c1: '#0a1030',
