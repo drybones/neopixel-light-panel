@@ -88,17 +88,39 @@ export function bloomParams(cellPx, opts) {
 }
 
 // Canvas `filter` is what makes the blur affordable — one GPU pass over the
-// canvas rather than a gradient per LED. Safari only shipped it in 17, and an
-// engine without it silently ignores the assignment, which would render the
-// two passes as doubled-brightness hard discs. Detected once, then flat.
+// canvas rather than a gradient per LED. There is no second implementation to
+// fall back to: a blur in JS measured 294ms a frame on the phone at card size
+// (31.7s for one filmstrip), and the `drawImage` pyramid that is fast enough
+// cannot reproduce the widest octave — it loses light once its levels are a few
+// px across, and it clamps at the canvas edge where the real blur spills off
+// and is lost. So a missing blur means flat, and the detection has to be right.
+//
+// WebKit does not have it — not iOS specifically, WebKit. It went unimplemented
+// from 2019 until it landed behind an experimental control in 2024 (webkit.org
+// bug 198416), and Safari 27 still ships without it on both iOS *and* macOS,
+// measured on each. Everything around it is current — `ctx.roundRect`,
+// `Object.groupBy`, `Array.fromAsync`, `text-wrap: pretty` — and CSS filters and
+// SVG `feGaussianBlur` both work, so the gap is canvas-specific and is not a
+// legacy story that ages out.
+//
+// Test for the property, and test for it with `in`. The old detection assigned
+// a value and read it back, which fails exactly here: assigning to a property
+// the engine does not implement just creates an expando that reads back as
+// whatever was written, so it reported support on the engines that have none.
+// The bloom then stacked *unblurred* discs at a combined gain of 4.9x and
+// clipped a fifth of the image to white, silently, on every Safari.
+//
+// `in` is enough because WebKit's runtime-enabled features remove the attribute
+// from the prototype rather than leaving it inert, so an unsupported or
+// flagged-off `filter` is always absent — verified on both Safaris (`'filter'
+// in ctx` false, `ctx.filter` undefined). What it cannot catch is an engine
+// that has the property and ignores it for `drawImage`; no such engine is known,
+// and the earlier suspicion that Safari was one was wrong.
 let filterSupport = null;
 
-export function supportsFilter(ctx) {
+export function blurWorks() {
   if (filterSupport === null) {
-    const before = ctx.filter;
-    ctx.filter = 'blur(1px)';
-    filterSupport = ctx.filter !== 'none' && ctx.filter !== undefined;
-    ctx.filter = before || 'none';
+    filterSupport = 'filter' in document.createElement('canvas').getContext('2d');
   }
   return filterSupport;
 }
@@ -181,7 +203,7 @@ function stackOctave(ctx, scratch, src, blurPx, gain) {
 export function paintBloom(ctx, scratch, pixels, positions, params, bg = BG) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
-  if (params.fallback || !supportsFilter(ctx)) {
+  if (params.fallback || !blurWorks()) {
     // Today's radius, not the bloom's core radius — a fallback should look
     // like what shipped before, not like a bloom with its halo removed.
     paintFlat(ctx, pixels, positions, Math.min(w / COLS, h / ROWS) / 2 * 0.75, bg, false);
