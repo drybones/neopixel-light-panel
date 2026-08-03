@@ -155,6 +155,36 @@ Import merges by scene ID: matching IDs are replaced, new IDs appended. Anything
 
 ---
 
+### Scene previews
+
+```
+GET /api/scenes/previews      →  every scene's filmstrip
+GET /api/scenes/:id/preview   →  one scene's filmstrip, same shape
+```
+
+```json
+{
+  "version": 1,
+  "frames": 40,
+  "intervalMs": 100,
+  "previews": [{ "id": "a1b2c3d4", "hash": "…", "data": "<base64>" }]
+}
+```
+
+A **filmstrip** is a short loop of a scene rendered off the hot loop, so the scene selector can show every scene and not just the active one. `data` decodes to `frames × 240 × 3` bytes, frame-major, each frame being one composite in the same **strip order** as the WebSocket frames — the grid mapping is the client's (`ui/src/lib/panelGrid.js`) and is deliberately not repeated in the payload.
+
+Values are pre-brightness, like the WebSocket stream. `hash` covers the scene's content, and the server caches by it: an unedited scene costs nothing to re-request, and an edited one is re-rendered on the next call.
+
+The strip **loops cleanly**: particle effects are warmed for 8 s of simulated time before capture so they start lit rather than empty, and the tail is cross-dissolved into the head so frame `frames` is frame `0`. Play it end to end and repeat — no seam handling is needed client-side. Playing several strips at once, though, is worth offsetting: they are all the same length, so a shared clock puts every one of them at the same point in its loop.
+
+```
+GET /api/effects/previews     →  one filmstrip per effect, at its defaults
+```
+
+Same payload, with `id` holding the effect `type` instead of a scene ID — for an editor's effect picker, which has no layer to render yet. Effect defaults are fixed in code, so these are rendered once and kept.
+
+---
+
 ### Check virtual mode
 
 ```

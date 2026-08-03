@@ -4,12 +4,26 @@
 
 var express = require('express');
 var effects = require('../effects');
+var filmstrip = require('../engine/filmstrip');
 
-function createRouter(store) {
+function createRouter(store, previewCache, effectPreviewCache) {
     var router = express.Router();
 
     router.get('/effects', function(req, res) {
         res.json(effects.catalog());
+    });
+
+    // Each effect at its defaults, so the picker can show what a layer will
+    // look like rather than a swatch of its colours. Same payload shape as
+    // the scene filmstrips, keyed by effect type instead of scene id.
+    router.get('/effects/previews', async function(req, res) {
+        var previews = await effectPreviewCache.all(effects.list());
+        res.json({
+            version: 1,
+            frames: filmstrip.FRAMES,
+            intervalMs: filmstrip.INTERVAL_MS,
+            previews: previews,
+        });
     });
 
     router.get('/scenes', function(req, res) {
@@ -33,6 +47,35 @@ function createRouter(store) {
         }
         store.importMerge(body.scenes);
         res.sendStatus(200);
+    });
+
+    // Filmstrips, before /scenes/:id for the same reason export/import are —
+    // "previews" would otherwise be matched as a scene id.
+    //
+    // The payload carries no grid dimensions on purpose: the client already
+    // owns the strip-order-to-grid mapping (ui/src/lib/panelGrid.js), and a
+    // second copy of it travelling over the wire is how a preview ends up
+    // rendered 180 degrees round.
+    router.get('/scenes/previews', async function(req, res) {
+        var previews = await previewCache.all(store.scenes);
+        res.json({
+            version: 1,
+            frames: filmstrip.FRAMES,
+            intervalMs: filmstrip.INTERVAL_MS,
+            previews: previews,
+        });
+    });
+
+    router.get('/scenes/:id/preview', function(req, res) {
+        var scene = store.get(req.params.id);
+        if (!scene) return res.sendStatus(404);
+        var preview = previewCache.get(scene);
+        res.json({
+            version: 1,
+            frames: filmstrip.FRAMES,
+            intervalMs: filmstrip.INTERVAL_MS,
+            previews: [preview],
+        });
     });
 
     router.get('/scenes/:id', function(req, res) {

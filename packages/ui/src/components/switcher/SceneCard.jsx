@@ -1,11 +1,12 @@
 import React from 'react';
 import LedCanvas from '../preview/LedCanvas';
+import FilmstripCanvas from '../preview/FilmstripCanvas';
 import { subscribeComposite } from '../../api/lightStream';
-import { sceneSwatches } from '../../lib/colors';
 
-export default function SceneCard({ scene, detail, active, onActivate, onEdit }) {
-  const swatches = sceneSwatches(detail);
-
+// The active card streams the real composite, so it stays exactly in step with
+// the panel. Every other card plays its cached filmstrip — the server renders
+// only the active scene, so a live frame for the rest does not exist.
+export default function SceneCard({ scene, preview, frames, active, onActivate, onEdit }) {
   return (
     <div
       className={`scene-card${active ? ' scene-card--active' : ''}`}
@@ -19,11 +20,8 @@ export default function SceneCard({ scene, detail, active, onActivate, onEdit })
           <LedCanvas subscribe={subscribeComposite} width={300} height={80} mode="bloom"
             style={{ width: '100%', height: '100%', borderRadius: 6 }} />
         ) : (
-          <div className="scene-card-swatches">
-            {swatches.length > 0
-              ? swatches.map((c, i) => <span key={i} style={{ background: c }} />)
-              : <span style={{ background: '#222' }} />}
-          </div>
+          <FilmstripCanvas strip={preview} frames={frames} id={scene.id} width={300} height={80}
+            style={{ width: '100%', height: '100%', borderRadius: 6 }} />
         )}
       </div>
       <div className="scene-card-row">

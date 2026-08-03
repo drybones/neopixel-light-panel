@@ -26,10 +26,16 @@ function get(type) {
     return byType[type] || null;
 }
 
+// The modules themselves, in registration order — for callers that need
+// prepare()/createInstance(), which catalog() deliberately leaves out.
+function list() {
+    return modules.slice();
+}
+
 function catalog() {
     return modules.map(function(m) {
         return { type: m.type, name: m.name, schema: m.schema, defaults: m.defaults };
     });
 }
 
-module.exports = { get, catalog, register: function(m) { modules.push(m); byType[m.type] = m; } };
+module.exports = { get, list, catalog, register: function(m) { modules.push(m); byType[m.type] = m; } };

@@ -8,10 +8,17 @@ var model = OPC.loadModel(__dirname + '/layout.json');
 var { Compositor } = require('./engine/compositor');
 var { SceneStore } = require('./engine/scene-store');
 var { Broadcaster } = require('./engine/broadcast');
+var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
+var effects = require('./effects');
 var migrate = require('./engine/migrate');
 var createScenesRouter = require('./routes/scenes');
 
 var compositor = new Compositor(client, model);
+
+// Scene-card filmstrips. Rendered off the hot loop into a throwaway
+// compositor, so this never touches the panel or the live layer instances.
+var previewCache = new PreviewCache(model);
+var effectPreviewCache = new EffectPreviewCache(model);
 
 // Previews stream the compositor's pre-brightness composite, so they stay
 // legible (pre-fader meter) while only the panel dims.
@@ -71,6 +78,15 @@ async function initStorage() {
     } catch (err) {
         console.error('Scene store load failed:', err);
     }
+
+    // Warm the filmstrips in the background so the first load of the switcher
+    // doesn't pay the render burst. all() yields between scenes, so the render
+    // loop keeps its tick throughout.
+    previewCache.all(store.scenes)
+        .then(function(previews) { console.log('Rendered ' + previews.length + ' scene preview(s).'); })
+        .then(function() { return effectPreviewCache.all(effects.list()); })
+        .then(function(previews) { console.log('Rendered ' + previews.length + ' effect preview(s).'); })
+        .catch(function(err) { console.error('Preview warm-up failed:', err); });
 }
 // Recreate the old fixed presets as ordinary editable scenes, once. The
 // flag lives inside the scene document so it can't get out of sync with
@@ -112,7 +128,7 @@ app.put('/api/brightness/:brightness', function(req, res) {
     res.sendStatus(200);
 });
 
-app.use('/api', createScenesRouter(store));
+app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));
 
 app.listen(3000, function () {
     console.log('Lightpanel API server listening on port 3000');

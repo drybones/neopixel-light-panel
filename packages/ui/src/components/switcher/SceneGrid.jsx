@@ -5,11 +5,13 @@ import SceneCard from './SceneCard';
 
 export default function SceneGrid({ onEdit }) {
   const scenes = useStore((s) => s.scenes);
-  const sceneDetails = useStore((s) => s.sceneDetails);
+  const scenePreviews = useStore((s) => s.scenePreviews);
+  const previewFrames = useStore((s) => s.previewFrames);
   const activeSceneId = useStore((s) => s.activeSceneId);
   const activateScene = useStore((s) => s.activateScene);
   const createScene = useStore((s) => s.createScene);
   const loadAllDetails = useStore((s) => s.loadAllDetails);
+  const loadPreviews = useStore((s) => s.loadPreviews);
   const importInputRef = useRef(null);
 
   async function handleNewScene() {
@@ -52,6 +54,7 @@ export default function SceneGrid({ onEdit }) {
       const list = await api.scenes();
       useStore.setState({ scenes: list });
       loadAllDetails();
+      loadPreviews();
     };
     reader.readAsText(file);
   }
@@ -73,7 +76,8 @@ export default function SceneGrid({ onEdit }) {
           <SceneCard
             key={scene.id}
             scene={scene}
-            detail={sceneDetails[scene.id]}
+            preview={scenePreviews[scene.id]}
+            frames={previewFrames}
             active={scene.id === activeSceneId}
             onActivate={() => activateScene(scene.id)}
             onEdit={() => onEdit(scene.id)}
