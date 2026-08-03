@@ -17,6 +17,7 @@ export default function Editor({ sceneId, onClose }) {
   const updateLayer = useStore((s) => s.updateLayer);
   const flushLayer = useStore((s) => s.flushLayer);
   const deleteScene = useStore((s) => s.deleteScene);
+  const refreshPreview = useStore((s) => s.refreshPreview);
 
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [picking, setPicking] = useState(false);
@@ -28,7 +29,12 @@ export default function Editor({ sceneId, onClose }) {
     if (!scene) loadSceneDetail(sceneId).catch(() => onClose());
     if (activeSceneId !== sceneId) activateScene(sceneId);
     setLayerScene(sceneId);
-    return () => setLayerScene(null);
+    // On the way out, re-render just this scene's card. Only one scene can
+    // have changed, so the switcher never refetches the whole library.
+    return () => {
+      setLayerScene(null);
+      refreshPreview(sceneId);
+    };
   }, [sceneId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

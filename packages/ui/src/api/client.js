@@ -19,6 +19,7 @@ async function request(method, path, body) {
 
 export const api = {
   effects: () => request('GET', '/api/effects'),
+  effectPreviews: () => request('GET', '/api/effects/previews'),
   scenes: () => request('GET', '/api/scenes'),
   scene: (id) => request('GET', `/api/scenes/${id}`),
   createScene: (scene) => request('POST', '/api/scenes', scene),
@@ -30,6 +31,8 @@ export const api = {
   brightness: () => request('GET', '/api/brightness/'),
   setBrightness: (value) => request('PUT', `/api/brightness/${value}`),
   virtual: () => request('GET', '/api/virtual'),
+  scenePreviews: () => request('GET', '/api/scenes/previews'),
+  scenePreview: (id) => request('GET', `/api/scenes/${id}/preview`),
   exportScenes: () => request('GET', '/api/scenes/export'),
   importScenes: (payload) => request('POST', '/api/scenes/import', payload),
 };

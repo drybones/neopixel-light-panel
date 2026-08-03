@@ -1,8 +1,20 @@
-import React from 'react';
-import { layerSwatches } from '../../lib/colors';
+import React, { useEffect } from 'react';
+import { useStore } from '../../state/store';
+import FilmstripCanvas from '../preview/FilmstripCanvas';
 
 // Effect chooser shown when adding a layer.
+//
+// Each tile plays the effect rendered at its own defaults — the same cached
+// filmstrips the scene cards use, from GET /api/effects/previews. It replaced a
+// strip of representative colours that had to be hand-picked per effect, and
+// which said nothing about whether the thing moved.
 export default function EffectPicker({ effects, onPick, onClose }) {
+  const previews = useStore((s) => s.effectPreviews);
+  const frames = useStore((s) => s.previewFrames);
+  const loadEffectPreviews = useStore((s) => s.loadEffectPreviews);
+
+  useEffect(() => { loadEffectPreviews(); }, [loadEffectPreviews]);
+
   return (
     <div className="effect-picker">
       <div className="effect-picker-backdrop" onClick={onClose} />
@@ -11,10 +23,15 @@ export default function EffectPicker({ effects, onPick, onClose }) {
         <div className="effect-picker-grid">
           {effects.map((effect) => (
             <button key={effect.type} className="effect-picker-item" onClick={() => onPick(effect.type)}>
-              <span className="effect-picker-swatches" aria-hidden="true">
-                {layerSwatches({ effectType: effect.type, params: effect.defaults }).map((c, i) => (
-                  <span key={i} style={{ background: c }} />
-                ))}
+              <span className="effect-picker-preview" aria-hidden="true">
+                <FilmstripCanvas
+                  strip={previews[effect.type]}
+                  frames={frames}
+                  id={effect.type}
+                  width={300}
+                  height={80}
+                  style={{ width: '100%', height: '100%', borderRadius: 4 }}
+                />
               </span>
               {effect.name}
             </button>
