@@ -91,6 +91,14 @@ body {
 .btn:active { transform: scale(0.98); }
 .btn-ghost { background: transparent; }
 .btn-danger { color: var(--danger); border-color: rgba(226, 75, 74, 0.4); }
+/* The armed half of the two-click delete: filled, so "one more click and it's
+   gone" is obvious at a glance and can't be mistaken for the resting state. */
+.btn-danger-armed {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger-armed:hover { border-color: var(--danger); }
 
 /* ── Scene grid / cards ── */
 
