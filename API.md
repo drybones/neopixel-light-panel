@@ -92,7 +92,7 @@ Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `embers`, `particle_t
 GET /api/scenes
 ```
 
-Returns `[{ "id", "name", "layerCount" }]`.
+Returns `[{ "id", "name", "layerCount" }]`, in the library's own order — see *Reorder scenes*.
 
 ### Create a scene
 
@@ -111,6 +111,16 @@ DELETE /api/scenes/:id
 ```
 
 `PUT` replaces the whole scene (rename, add/remove/reorder layers). It does **not** activate the scene. `DELETE` of the active scene switches the panel off. Unknown IDs return `404`.
+
+### Reorder scenes
+
+```
+PUT /api/scenes/order
+```
+
+Body: `{ "ids": [...] }` — every scene ID exactly once, in the order the library should be listed in. Returns the reordered `GET /api/scenes` payload.
+
+Scene order *is* the array order in the stored document, and nothing else can rewrite it (create appends, `PUT /api/scenes/:id` replaces in place, import replaces by ID or appends). The whole list is sent rather than a move so a stale client cannot drop or duplicate a scene: anything that is not a permutation of the IDs the server holds is rejected whole with `400`, and nothing is applied.
 
 ### Update a single layer
 

@@ -3,17 +3,36 @@ import LedCanvas from '../preview/LedCanvas';
 import FilmstripCanvas from '../preview/FilmstripCanvas';
 import { subscribeComposite } from '../../api/lightStream';
 
+const KEY_HINT = 'Shift+ArrowLeft Shift+ArrowRight Shift+ArrowUp Shift+ArrowDown';
+
 // The active card streams the real composite, so it stays exactly in step with
 // the panel. Every other card plays its cached filmstrip — the server renders
 // only the active scene, so a live frame for the rest does not exist.
-export default function SceneCard({ scene, preview, frames, active, onActivate, onEdit }) {
+//
+// `offset` slides the card to the slot it would occupy if the drag in progress
+// were dropped now; `dragging` is the card being held. Both come from
+// useSceneDrag — but the held card's own transform is written straight to the
+// node by the hook, so nothing here fights it.
+export default function SceneCard({
+  scene, preview, frames, active, offset, dragging, onActivate, onEdit, onPointerDown, onKeyDown,
+}) {
+  const className = `scene-card${active ? ' scene-card--active' : ''}${dragging ? ' scene-card--dragging' : ''}`;
   return (
     <div
-      className={`scene-card${active ? ' scene-card--active' : ''}`}
+      className={className}
+      data-scene-id={scene.id}
       onClick={onActivate}
+      onPointerDown={(e) => onPointerDown(e, scene.id)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onActivate(); }}
+      aria-keyshortcuts={KEY_HINT}
+      aria-describedby="scene-grid-help"
+      aria-grabbed={dragging || undefined}
+      style={offset ? { transform: `translate3d(${offset.x}px, ${offset.y}px, 0)` } : undefined}
+      onKeyDown={(e) => {
+        if (onKeyDown(e, scene.id)) return;
+        if (e.key === 'Enter' || e.key === ' ') onActivate();
+      }}
     >
       <div className="scene-card-preview">
         {active ? (

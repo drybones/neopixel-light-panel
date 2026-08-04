@@ -312,6 +312,27 @@ class SceneStore {
         return true;
     }
 
+    // Scene order is the array order — nothing else in the API can rewrite it
+    // (create appends, replace is in place, importMerge replaces or appends).
+    // Takes the complete id list rather than a move, so a stale client can't
+    // silently drop or duplicate a scene: the set has to match exactly, and a
+    // request that doesn't is rejected whole rather than applied in part.
+    reorder(ids) {
+        if (!Array.isArray(ids) || ids.length !== this.scenes.length) return false;
+        var byId = Object.create(null);
+        this.scenes.forEach(function(s) { byId[s.id] = s; });
+        var ordered = [];
+        for (var i = 0; i < ids.length; i++) {
+            var scene = byId[ids[i]];
+            if (!scene) return false;       // unknown id, or the same id twice
+            delete byId[ids[i]];
+            ordered.push(scene);
+        }
+        this.scenes = ordered;
+        this.markDirty();
+        return true;
+    }
+
     setActive(id) {
         if (id === null) {
             this.activeSceneId = null;
