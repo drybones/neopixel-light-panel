@@ -6,6 +6,7 @@ import LayerStack from './LayerStack';
 import ParamPanel from './ParamPanel';
 import EffectPicker from './EffectPicker';
 import { newId as newLayerId } from '../../lib/id';
+import { downloadJson, slugify } from '../../lib/downloadJson';
 
 export default function Editor({ sceneId, onClose }) {
   const scene = useStore((s) => s.sceneDetails[sceneId]);
@@ -123,6 +124,10 @@ export default function Editor({ sceneId, onClose }) {
     onClose();
   }
 
+  function handleExportScene() {
+    downloadJson({ version: 2, scenes: [scene] }, `lightpanel-scene-${slugify(scene.name)}.json`);
+  }
+
   async function handleDuplicateScene() {
     const copy = {
       name: `${scene.name} copy`,
@@ -145,6 +150,7 @@ export default function Editor({ sceneId, onClose }) {
           aria-label="Scene name"
         />
         <div className="editor-toolbar-right">
+          <button className="btn btn-ghost" onClick={handleExportScene}>Export</button>
           <button className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
           <button
             className={`btn btn-ghost btn-danger${confirmingDelete ? ' btn-danger-armed' : ''}`}

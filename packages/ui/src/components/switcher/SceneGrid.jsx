@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import { api } from '../../api/client';
+import { downloadJson } from '../../lib/downloadJson';
 import SceneCard from './SceneCard';
 import useSceneDrag from './useSceneDrag';
 
@@ -35,14 +36,8 @@ export default function SceneGrid({ onEdit }) {
 
   function handleExport() {
     api.exportScenes().then((data) => {
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      a.href = url;
-      a.download = `lightpanel-scenes-${ts}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadJson(data, `lightpanel-scenes-${ts}.json`);
     });
   }
 
