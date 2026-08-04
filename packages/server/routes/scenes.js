@@ -49,6 +49,17 @@ function createRouter(store, previewCache, effectPreviewCache) {
         res.sendStatus(200);
     });
 
+    // Reorder, before /scenes/:id so "order" isn't matched as a scene id.
+    // The whole id list, not a move — see SceneStore.reorder. The store's
+    // 2s debounce is what makes this safe to call on every drop.
+    router.put('/scenes/order', function(req, res) {
+        var ids = req.body ? req.body.ids : undefined;
+        if (!store.reorder(ids)) {
+            return res.status(400).json({ error: 'Body must be {ids: [...]} listing every scene id exactly once' });
+        }
+        res.json(store.list());
+    });
+
     // Filmstrips, before /scenes/:id for the same reason export/import are —
     // "previews" would otherwise be matched as a scene id.
     //

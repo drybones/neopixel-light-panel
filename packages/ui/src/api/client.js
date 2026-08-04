@@ -25,6 +25,7 @@ export const api = {
   createScene: (scene) => request('POST', '/api/scenes', scene),
   updateScene: (id, scene) => request('PUT', `/api/scenes/${id}`, scene),
   deleteScene: (id) => request('DELETE', `/api/scenes/${id}`),
+  reorderScenes: (ids) => request('PUT', '/api/scenes/order', { ids }),
   updateLayer: (sceneId, layerId, layer) => request('PUT', `/api/scenes/${sceneId}/layers/${layerId}`, layer),
   activeScene: () => request('GET', '/api/active_scene'),
   setActiveScene: (id) => request('PUT', '/api/active_scene', { id }),

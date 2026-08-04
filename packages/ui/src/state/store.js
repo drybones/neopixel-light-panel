@@ -122,6 +122,22 @@ export const useStore = create((set, get) => ({
     await api.deleteScene(id);
   },
 
+  // Scene order — the switcher's drag. Optimistic, then the whole id list to
+  // the server (which rejects anything that isn't a permutation of what it
+  // holds). A rejection means another client changed the library underneath
+  // this one, so take the server's list rather than guessing at a revert.
+  async reorderScenes(ids) {
+    set((s) => {
+      const byId = new Map(s.scenes.map((x) => [x.id, x]));
+      return { scenes: ids.map((id) => byId.get(id)).filter(Boolean) };
+    });
+    try {
+      await api.reorderScenes(ids);
+    } catch {
+      set({ scenes: await api.scenes() });
+    }
+  },
+
   // Structural scene update (rename, add/remove/reorder layers) —
   // optimistic local update + immediate full-scene PUT.
   async updateScene(id, scene) {

@@ -141,3 +141,48 @@ test('a noise layer with no contrast at all just gets the defaults', () => {
     assert.strictEqual(params.min, 0);
     assert.strictEqual(params.max, 1);
 });
+
+// ---- reorder ----
+
+function threeScenes(store) {
+    store.setScenes([
+        { id: 'a', name: 'A', layers: [] },
+        { id: 'b', name: 'B', layers: [] },
+        { id: 'c', name: 'C', layers: [] },
+    ]);
+    return store;
+}
+
+test('reorder permutes the scene list', () => {
+    const store = threeScenes(makeStore());
+    assert.strictEqual(store.reorder(['c', 'a', 'b']), true);
+    assert.deepStrictEqual(store.scenes.map(s => s.id), ['c', 'a', 'b']);
+    assert.deepStrictEqual(store.list().map(s => s.name), ['C', 'A', 'B']);
+});
+
+test('reorder moves the scene objects, not copies', () => {
+    const store = threeScenes(makeStore());
+    const b = store.get('b');
+    store.reorder(['b', 'c', 'a']);
+    // The compositor keys instances off the layers these carry; rebuilding the
+    // scenes here would drop _prepared and re-seed every particle on reorder.
+    assert.strictEqual(store.scenes[0], b);
+    assert.ok(store.scenes.every(s => s._displayLayers));
+});
+
+test('reorder rejects a list that is not a permutation', () => {
+    const store = threeScenes(makeStore());
+    const before = store.scenes.slice();
+    for (const bad of [undefined, null, ['a', 'b'], ['a', 'b', 'c', 'd'], ['a', 'b', 'z'], ['a', 'b', 'b']]) {
+        assert.strictEqual(store.reorder(bad), false, `${JSON.stringify(bad)} should be rejected`);
+        assert.deepStrictEqual(store.scenes, before, 'a rejected reorder must not partly apply');
+    }
+});
+
+test('reorder leaves the active scene active', () => {
+    const store = threeScenes(makeStore());
+    store.setActive('a');
+    store.reorder(['c', 'b', 'a']);
+    assert.strictEqual(store.activeSceneId, 'a');
+    assert.strictEqual(store.activeScene().name, 'A');
+});

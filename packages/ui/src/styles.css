@@ -18,6 +18,21 @@
 
 * { box-sizing: border-box; }
 
+/* For text that only a screen reader should get: keyboard hints for gestures
+   that have no visible affordance, and live-region announcements. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -115,13 +130,36 @@ body {
   border-radius: var(--radius);
   padding: 10px;
   cursor: pointer;
-  transition: border-color 120ms;
+  transition: border-color 120ms, transform 180ms cubic-bezier(0.2, 0, 0, 1);
   user-select: none;
+  /* A drag is entered by holding, so iOS must not answer the hold with the
+     selection callout first. */
+  -webkit-touch-callout: none;
 }
 .scene-card:hover { border-color: var(--border-strong); }
 .scene-card:focus { outline: none; }
 .scene-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
 .scene-card--active { border: 2px solid var(--accent); padding: 9px; }
+
+/* ── Reordering ──
+   Nothing moves in the DOM until the drop; the cards are slid over their
+   measured positions by transform (see useSceneDrag), which is why the
+   transition above is on transform and why the held card has to opt out of
+   it — it follows the pointer and must not lag behind it. */
+.scene-card--dragging {
+  transition: none;
+  z-index: 3;
+  position: relative;
+  cursor: grabbing;
+  border-color: var(--accent);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+  opacity: 0.92;
+}
+
+/* One frame at the drop, while each card's transform falls away at the same
+   instant its layout position becomes what the transform was showing. Left
+   animating, every card would slide back the way it came. */
+.scene-grid--settling .scene-card { transition: none; }
 
 /* Matches the panel's 30x8, like the picker tile and the editor's stage. A
    fixed height here made the box column-width x that height, so the 300x80
