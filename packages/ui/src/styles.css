@@ -123,8 +123,13 @@ body {
 .scene-card:focus-visible { outline: 2px solid var(--accent-dim); outline-offset: 2px; }
 .scene-card--active { border: 2px solid var(--accent); padding: 9px; }
 
+/* Matches the panel's 30x8, like the picker tile and the editor's stage. A
+   fixed height here made the box column-width x that height, so the 300x80
+   canvas scaled non-uniformly and the LEDs came out as ovals — by 26% at a
+   375px phone, and sawtoothing as the column count snapped. */
 .scene-card-preview {
-  height: 64px;
+  width: 100%;
+  aspect-ratio: 30 / 8;
   border-radius: 6px;
   overflow: hidden;
   background: #0d0d0f;
@@ -164,7 +169,12 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 122px;
+  /* A floor, not a match: grid stretch already levels a row, and now that a
+     scene card's height follows its preview's aspect this has to stay under
+     the shortest real card (~103px, in the 2-column band just above 344px) or
+     it pads out the row it sits in. It only does any work when Off and New
+     are alone — an empty library. */
+  min-height: 100px;
   color: var(--text-dim);
 }
 .scene-card--off .scene-card-name,
@@ -673,7 +683,6 @@ input[type="range"]::-moz-range-thumb {
 
 @media (max-width: 640px) {
   .scene-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  .scene-card-preview { height: 52px; }
   .scene-card-edit { display: none; }
   .brightness input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9px; }
 }
