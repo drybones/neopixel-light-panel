@@ -52,7 +52,7 @@
         {
           "id": "d1f00b02",
           "effectType": "noise",
-          "params": { "c1": "#050a1e", "c2": "#12306b", "scale": 0.8, "speed": 0.15, "contrast": 1.8 },
+          "params": { "c1": "#050a1e", "c2": "#12306b", "scale": 0.8, "speed": 0.15, "min": -0.1, "max": 1.1 },
           "blendMode": "normal",
           "opacity": 1,
           "enabled": true,
