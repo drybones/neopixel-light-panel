@@ -22,12 +22,15 @@ export default function Editor({ sceneId, onClose }) {
   const [selectedLayerId, setSelectedLayerId] = useState(null);
   const [picking, setPicking] = useState(false);
   const [name, setName] = useState(scene ? scene.name : '');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Editing implies looking at it: activate the scene so the panel (and
   // the live preview) show what's being edited.
   useEffect(() => {
     if (!scene) loadSceneDetail(sceneId).catch(() => onClose());
     if (activeSceneId !== sceneId) activateScene(sceneId);
+    // Never carry an armed delete across to a different scene.
+    setConfirmingDelete(false);
     setLayerScene(sceneId);
     // On the way out, re-render just this scene's card. Only one scene can
     // have changed, so the switcher never refetches the whole library.
@@ -103,8 +106,19 @@ export default function Editor({ sceneId, onClose }) {
     if (name !== scene.name) updateScene(sceneId, { ...scene, name });
   }
 
+  // Two clicks, in the page. This used to be a window.confirm, which is the
+  // one thing in the app that asked the browser for UI — and a browser is free
+  // to refuse: iOS runs this from the Home Screen (the manifest says
+  // display: standalone) where confirm() can return false without ever
+  // appearing, and Chrome's "prevent additional dialogs" checkbox does the same
+  // on desktop. Either way the button silently did nothing while every other
+  // control kept working, which is exactly how it was reported.
   async function handleDeleteScene() {
-    if (!window.confirm(`Delete scene "${scene.name}"?`)) return;
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      return;
+    }
+    setConfirmingDelete(false);
     await deleteScene(sceneId);
     onClose();
   }
@@ -132,7 +146,15 @@ export default function Editor({ sceneId, onClose }) {
         />
         <div className="editor-toolbar-right">
           <button className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
-          <button className="btn btn-ghost btn-danger" onClick={handleDeleteScene}>Delete scene</button>
+          <button
+            className={`btn btn-ghost btn-danger${confirmingDelete ? ' btn-danger-armed' : ''}`}
+            onClick={handleDeleteScene}
+            onBlur={() => setConfirmingDelete(false)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setConfirmingDelete(false); }}
+            aria-label={confirmingDelete ? `Confirm deleting scene ${scene.name}` : 'Delete scene'}
+          >
+            {confirmingDelete ? 'Really delete?' : 'Delete scene'}
+          </button>
         </div>
       </div>
 
