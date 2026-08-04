@@ -92,6 +92,29 @@ test('importMerge replaces by id and appends new', () => {
     assert.strictEqual(store.scenes.length, 2);
 });
 
+test('importMerge accepts a single-scene export, adding a new id', () => {
+    const store = makeStore();
+    const before = store.scenes.length;
+    store.importMerge([
+        { id: 'aabbccdd', name: 'Imported solo', layers: [{ id: 'x1', effectType: 'solid', params: {} }] },
+    ]);
+    assert.strictEqual(store.scenes.length, before + 1);
+    assert.strictEqual(store.get('aabbccdd').name, 'Imported solo');
+});
+
+test('importMerge accepts a single-scene export, replacing an existing id in place', () => {
+    const store = makeStore();
+    const scene = store.create({ name: 'Old name', layers: [{ effectType: 'solid', params: {} }] });
+    const before = store.scenes.length;
+    store.importMerge([
+        { id: scene.id, name: 'Edited elsewhere', layers: [{ id: 'y1', effectType: 'wavelet', params: {} }] },
+    ]);
+    assert.strictEqual(store.scenes.length, before, 'replace must not add a scene');
+    const updated = store.get(scene.id);
+    assert.strictEqual(updated.name, 'Edited elsewhere');
+    assert.strictEqual(updated.layers[0].effectType, 'wavelet');
+});
+
 test('getPublic strips runtime fields', () => {
     const store = makeStore();
     const scene = store.create({ name: 'X', layers: [{ effectType: 'solid', params: {} }] });
