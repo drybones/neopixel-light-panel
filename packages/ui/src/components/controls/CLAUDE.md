@@ -16,4 +16,4 @@ The two **end** colours (first/last by position, so a stop dragged past an end s
 
 ## `AngleDial.jsx`
 
-Draws the wavefronts, not just a knob. Its arrow points the way the wave **travels**, so the control agrees with the motion — note that is the opposite of where an equivalent wavelet's source sits.
+Draws the wavefronts, not just a knob. Its arrow points the way the wave **travels**, so the control agrees with the motion — note that is the opposite of where an equivalent *outward* wavelet's source sits. Wavelet's own inward/outward toggle carries the same `Travel` label for that reason: both effects label the direction the wave goes, not where it comes from.

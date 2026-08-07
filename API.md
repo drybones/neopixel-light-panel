@@ -207,18 +207,21 @@ Returns `{ "virtual": true }` if the server is running without Fadecandy hardwar
 
 ## Wavelet parameters
 
-The `wavelet` effect renders one sinusoidal wave radiating from a point; stack several with the `add` blend for interference patterns.
+The `wavelet` effect renders one sinusoidal wave radiating from a point — or converging on it; stack several with the `add` blend for interference patterns.
 
-| Field    | Type    | Description |
-|----------|---------|-------------|
-| `color`  | string  | Hex colour, e.g. `"#ff6633"` |
-| `freq`   | number  | Oscillation speed (higher = faster) |
-| `lambda` | number  | Spatial wavelength (higher = wider waves) |
-| `delta`  | number  | Phase offset |
-| `x`      | number  | Wave origin X. The panel spans ±3.625; the editor pad reaches ±1000 at full zoom |
-| `y`      | number  | Wave origin Y. The panel spans ±0.875; the editor pad reaches ±639 at full zoom |
-| `min`    | number  | Minimum intensity (UI uses non-linear arctan slider mapping) |
-| `max`    | number  | Maximum intensity |
+| Field       | Type    | Description |
+|-------------|---------|-------------|
+| `color`     | string  | Hex colour, e.g. `"#ff6633"` |
+| `freq`      | number  | Oscillation speed (higher = faster) |
+| `lambda`    | number  | Spatial wavelength (higher = wider waves) |
+| `delta`     | number  | Phase offset |
+| `x`         | number  | Wave origin X. The panel spans ±3.625; the editor pad reaches ±1000 at full zoom |
+| `y`         | number  | Wave origin Y. The panel spans ±0.875; the editor pad reaches ±639 at full zoom |
+| `direction` | string  | `"outward"` (default) or `"inward"` — whether crests run from the origin or converge on it |
+| `min`       | number  | Minimum intensity (UI uses non-linear arctan slider mapping) |
+| `max`       | number  | Maximum intensity |
+
+`direction` is a toggle rather than a negative `freq` or `lambda` because both of those are log sliders, which cannot express a negative. A layer stored without it renders outward, as it always did.
 
 Nothing clamps `x`/`y` server-side, and the editor's numeric fields accept values beyond the pad's reach — only the drag handle is bounded.
 
@@ -236,7 +239,7 @@ The `planewave` effect is the far-field limit of `wavelet`: parallel wavefronts 
 | `min`    | number  | Minimum intensity |
 | `max`    | number  | Maximum intensity |
 
-A `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. That identity is what the conversion in `engine/planewave-migrate.js` uses.
+An outward `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. An inward one is the same identity with both signs flipped: the angle is the bearing *of* the source, and the dropped distance is a phase lag instead of a lead. That identity is what the conversion in `engine/planewave-migrate.js` uses.
 
 ## WebSocket pixel stream
 
