@@ -4,6 +4,11 @@ A web-controlled LED light panel built from NeoPixel strips and a Fadecandy cont
 
 Video demo: https://youtu.be/4FmCFS33W90
 
+<p>
+  <img src="docs/screenshots/scene-picker.png" alt="Scene picker showing a grid of saved scenes" width="49%">
+  <img src="docs/screenshots/scene-editor.png" alt="Scene editor with layer stack, parameter panel and live preview" width="49%">
+</p>
+
 ## Hardware
 
 The panel is eight half-metre lengths of 60 pixel/m NeoPixel strip (240 LEDs total, arranged as a 30x8 grid). Each strip connects to its own channel on a [Fadecandy](https://github.com/scanlime/fadecandy) board, which is USB-connected to a Raspberry Pi running the server.
