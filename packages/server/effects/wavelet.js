@@ -2,10 +2,17 @@
  * Wavelet effect — one instance is one wavelet (the old multi-wavelet sum
  * is now expressed as multiple layers with the "add" blend mode).
  *
- * The inner loop is ported verbatim from shader.js interactive_wave(),
- * including the dz = pz + y sign quirk, so migrated presets render
- * identically. Output is clamped per-layer to [0, 255], matching the old
- * clip:true behaviour that every UI-created wavelet had.
+ * The inner loop comes from shader.js interactive_wave(), including the
+ * dz = pz + y sign quirk, so migrated presets render identically. Output is
+ * clamped per-layer to [0, 255], matching the old clip:true behaviour that
+ * every UI-created wavelet had.
+ *
+ * `direction` is the whole of the inward/outward toggle: the phase is
+ * theta = wt - r/lambda, and a crest is a point of constant theta, so as t
+ * grows r must grow with it — the crests run away from the source. Negating
+ * the radial term makes r shrink instead and the same wave converges on the
+ * source. It is a toggle rather than a negative freq or lambda because both
+ * of those are log sliders, which cannot express a negative at all.
  */
 
 var color = require('../engine/color');
@@ -30,6 +37,12 @@ module.exports = {
         { type: 'xy', label: 'Position', xKey: 'x', yKey: 'y',
           xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
           margin: 2, farLimit: 1000 },
+        // Labelled to match planewave's `angle`, which is also the direction
+        // the wave travels — the two effects should read the same way.
+        { key: 'direction', type: 'enum', label: 'Travel', options: [
+            { value: 'outward', label: 'Outward' },
+            { value: 'inward', label: 'Inward' },
+        ]},
         { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
     ],
     defaults: {
@@ -39,19 +52,26 @@ module.exports = {
         delta: 0.0,
         x: 0,
         y: 0,
+        direction: 'outward',
         min: 0.1,
         max: 0.7,
     },
 
     prepare(params) {
         var rgb = color.hexToRgb(params.color);
+        // 1/lambda with the travel direction's sign baked in, so the render
+        // loop is a multiply and neither branches nor divides. Anything but
+        // 'inward' reads as outward, which is what gives a layer stored before
+        // the toggle existed its old behaviour.
+        //
+        // A lambda of 0 would divide to Infinity and put NaN in the pixel
+        // buffer and out through setPixel; the slider can't reach 0, but the
+        // typed field is deliberately unclamped.
+        var k = (params.direction === 'inward' ? -1 : 1) / (params.lambda || MIN_LAMBDA);
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
-            // The render loop divides by lambda, so 0 would put NaN into the
-            // pixel buffer and out through setPixel. The slider can't reach 0,
-            // but the typed field is deliberately unclamped.
-            lambda: params.lambda || MIN_LAMBDA,
+            k: k,
             delta: params.delta,
             x: params.x,
             y: params.y,
@@ -67,12 +87,13 @@ module.exports = {
 
         return {
             render(out, millis, p) {
+                var phase = millis * 0.00628 * p.freq + p.delta;
                 for (var i = 0; i < n; i++) {
                     var dx = modelX[i] - p.x;
                     var dz = modelZ[i] + p.y;
                     var r = Math.sqrt(dx * dx + dz * dz);
-                    var theta = millis * 0.00628 * p.freq - r / p.lambda;
-                    var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta + p.delta) + 1);
+                    var theta = phase - r * p.k;
+                    var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta) + 1);
 
                     var wr = p.r * brightness;
                     var wg = p.g * brightness;

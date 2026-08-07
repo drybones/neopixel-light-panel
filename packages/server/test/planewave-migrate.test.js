@@ -133,6 +133,24 @@ test('angle is the direction of travel, opposite the source bearing', () => {
     assert.ok(Math.abs(at(0, -1000) - 90) < 1e-9, 'results wrap into 0-360');
 });
 
+test('an inward wavelet converts to a plane wave travelling the other way', () => {
+    // No stored preset can be inward — the toggle postdates them all — but the
+    // identity the conversion rests on flips with the travel direction, and
+    // waveletToPlanewave is exported for anything that comes later.
+    const base = { color: '#ffffff', freq: 0.2, lambda: 1, delta: 0, x: 1000, y: 500, min: 0.1, max: 0.7 };
+    const outward = planewave.waveletToPlanewave(base);
+    const inward = planewave.waveletToPlanewave({ ...base, direction: 'inward' });
+
+    const apart = Math.abs(((inward.angle - outward.angle) % 360 + 360) % 360 - 180);
+    assert.ok(apart < 1e-9, `angles ${inward.angle} and ${outward.angle} should be 180 apart`);
+
+    // And the converted wave still matches the wavelet it came from.
+    for (const millis of [0, 1234, 60000]) {
+        const worst = renderBoth({ ...base, direction: 'inward' }, millis);
+        assert.ok(worst < 1, `channel error ${worst.toFixed(3)} at millis=${millis}`);
+    }
+});
+
 test('crests advance along the angle, not against it', () => {
     // The bug this guards: the dial pointed one way and the animation ran the
     // other. Track a crest's position over time and check it moves with the

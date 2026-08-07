@@ -50,6 +50,48 @@ test('wavelet render clamps output to [0, 255]', () => {
     assert.ok(out.every(v => v >= 0 && v <= 255));
 });
 
+test('wavelet crests run outward by default and inward when asked', () => {
+    // A row of pixels running away from a source at the origin, so a pixel's
+    // model x is exactly its distance from the source. lambda is wide enough
+    // that under two radians of phase fit across the row, so there is never
+    // more than one crest in view to confuse "which way did it move".
+    const n = 16;
+    const row = { numPixels: n, modelX: new Float32Array(n), modelZ: new Float32Array(n) };
+    for (let i = 0; i < n; i++) row.modelX[i] = 0.25 + i * 0.25;
+
+    const freq = 0.2;
+    const lambda = 2;
+    const instance = wavelet.createInstance(row);
+    const out = new Float32Array(n * 3);
+    // Times are quoted as the wave's own phase (wt), which is what puts the
+    // crest somewhere legible; millis is just the inverse of the render loop's
+    // wt = millis * 0.00628 * freq.
+    const crestAt = (direction, wt) => {
+        instance.render(out, wt / (0.00628 * freq), wavelet.prepare({
+            ...wavelet.defaults, color: '#ffffff', x: 0, y: 0,
+            freq, lambda, delta: 0, min: 0, max: 1, direction,
+        }));
+        let best = -1, bi = -1;
+        for (let i = 0; i < n; i++) if (out[i * 3] > best) { best = out[i * 3]; bi = i; }
+        // An off-the-end "crest" is the row's edge, not the wave's peak, and
+        // would make the comparison below meaningless.
+        assert.ok(bi > 0 && bi < n - 1, `crest sits on the row's edge at wt=${wt}`);
+        return row.modelX[bi];
+    };
+
+    assert.ok(crestAt('outward', 2.6) > crestAt('outward', 1.8),
+        'an outward crest must move away from the source');
+    assert.ok(crestAt('inward', 1.0) < crestAt('inward', 0.2),
+        'an inward crest must converge on the source');
+});
+
+test('a wavelet stored before the direction toggle renders as outward', () => {
+    const stored = { ...wavelet.defaults, color: '#ffffff' };
+    delete stored.direction;
+    assert.strictEqual(wavelet.prepare(stored).k, wavelet.prepare({ ...stored, direction: 'outward' }).k);
+    assert.ok(wavelet.prepare(stored).k > 0, 'outward subtracts the radial term');
+});
+
 test('planewave prepare bakes the direction into cos/sin', () => {
     const p = planewave.prepare({ ...planewave.defaults, angle: 90 });
     assert.ok(Math.abs(p.ca - 0) < 1e-12);

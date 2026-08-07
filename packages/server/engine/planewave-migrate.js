@@ -47,16 +47,22 @@ function wrap(radians) {
 
 function waveletToPlanewave(params) {
     var distance = Math.sqrt(params.x * params.x + params.y * params.y);
-    // planewave's angle is the direction of travel, and a wave moves *away*
-    // from its source — so it is the bearing of the source plus 180.
-    var degrees = Math.atan2(params.y, params.x) * 180 / Math.PI + 180;
+    // An inward wavelet travels the other way, which flips both halves of the
+    // identity: the travel direction becomes the bearing *of* the source, and
+    // the dropped distance is a phase lag rather than a lead. No stored preset
+    // can be inward — the toggle postdates them all — but the conversion is
+    // exported, so keep it true for whatever is handed to it.
+    var inward = params.direction === 'inward';
+    // planewave's angle is the direction of travel, and an outward wave moves
+    // *away* from its source — so it is the bearing of the source plus 180.
+    var degrees = Math.atan2(params.y, params.x) * 180 / Math.PI + (inward ? 0 : 180);
     return {
         color: params.color,
         freq: params.freq,
         lambda: params.lambda,
-        // The source's distance is a fixed phase lead; drop the distance, keep
-        // the phase, and the panel sees exactly the same wave.
-        delta: wrap(params.delta - distance / params.lambda),
+        // The source's distance is a fixed phase offset; drop the distance,
+        // keep the phase, and the panel sees exactly the same wave.
+        delta: wrap(params.delta + (inward ? 1 : -1) * distance / params.lambda),
         angle: ((degrees % 360) + 360) % 360,
         min: params.min,
         max: params.max,
