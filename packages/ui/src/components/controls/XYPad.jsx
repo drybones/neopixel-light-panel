@@ -44,7 +44,9 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
   const decorRef = useRef({ x, y, color, decor });
   decorRef.current = { x, y, color, decor };
 
-  const [zoom, setZoom] = useState(() => fitZoom(entry, x, y));
+  const [zoom, setZoom] = useState(
+    () => fitZoom(entry, x, y, decor ? decor.extX : 0, decor ? decor.extY : 0),
+  );
   const levels = useMemo(() => zoomLevels(entry), [entry]);
   const geo = useMemo(() => padGeometry(entry, zoom), [entry, zoom]);
   const canvasH = Math.round(CANVAS_W / geo.aspect);
@@ -151,13 +153,17 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
       const a = worldToPad(geo, live.x - live.decor.extX / 2, live.y + live.decor.extY / 2);
       const b = worldToPad(geo, live.x + live.decor.extX / 2, live.y - live.decor.extY / 2);
       ctx.setLineDash([4, 3]);
-      ctx.strokeStyle = live.color || 'rgba(255,255,255,0.5)';
-      ctx.globalAlpha = 0.75;
+      // White, not the layer colour: the box sits on top of that layer's own
+      // render, so drawing it in the layer's colour makes it invisible on
+      // exactly the layers that have one — an orange box on an orange field.
+      // Brighter than the panel outline's 0.25 so the two do not read as the
+      // same kind of line.
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1;
       ctx.strokeRect(
         a.fx * CANVAS_W, a.fy * canvasH,
         Math.max((b.fx - a.fx) * CANVAS_W, 2), Math.max((b.fy - a.fy) * canvasH, 2),
       );
-      ctx.globalAlpha = 1;
       ctx.setLineDash([]);
     }
 

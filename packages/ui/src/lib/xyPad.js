@@ -154,12 +154,23 @@ export function padToWorld(g, fx, fy) {
 
 // Smallest zoom level that can show a value, so opening a layer never starts
 // on a clipped handle.
-export function fitZoom(entry, x, y) {
+// `extX`/`extY` are the full width and height of a box drawn around the value —
+// the emitter's emission box. They have to be fitted too, not just the point at
+// their centre: an emitter scattering births across the whole panel has a box
+// wider than the panel itself, so fitting the origin alone opens on `panel`
+// zoom with three of the box's four edges clipped off-canvas and the fourth
+// buried in the LED render, which reads as the box not being drawn at all.
+export function fitZoom(entry, x, y, extX = 0, extY = 0) {
   const levels = zoomLevels(entry);
+  const hx = Math.abs(extX) / 2;
+  const hy = Math.abs(extY) / 2;
   for (const level of levels) {
     const g = padGeometry(entry, level);
-    const { fx, fy } = worldToPad(g, x, y);
-    if (fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1) return level;
+    // Opposite corners are enough: worldToPad is monotonic in each axis.
+    const a = worldToPad(g, x - hx, y + hy);
+    const b = worldToPad(g, x + hx, y - hy);
+    const inside = (p) => p.fx >= 0 && p.fx <= 1 && p.fy >= 0 && p.fy <= 1;
+    if (inside(a) && inside(b)) return level;
   }
   return levels[levels.length - 1];
 }
