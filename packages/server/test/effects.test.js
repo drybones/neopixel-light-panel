@@ -567,3 +567,67 @@ test('no effect is both hidden and reachable from the catalog', () => {
             `${mod.type} disagrees with its hidden flag`);
     }
 });
+
+// The vertical axis inverts between param space (y up, what the pad and the
+// dials draw) and modelZ (+0.875 is the *bottom* row). Origin, travel and
+// gravity all share that negation, so they break together — and a symmetric
+// preset like the sparkler shows nothing, which is how it shipped once.
+//
+// panelCtx() builds modelZ ascending with row, matching layout.json, so
+// "toward the top of the panel" is modelZ negative throughout.
+function verticalCentroid(params, ctx) {
+    const p = emitter.prepare({ ...emitter.defaults, ...params });
+    const inst = emitter.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+    let weighted = 0, total = 0;
+    for (let f = 0; f < 150; f++) {
+        inst.render(out, 4000 + f * 40, p);
+        for (let i = 0; i < ctx.numPixels; i++) {
+            const v = out[i * 3] + out[i * 3 + 1] + out[i * 3 + 2];
+            weighted += ctx.modelZ[i] * v;
+            total += v;
+        }
+    }
+    return total > 0 ? weighted / total : null;
+}
+
+test('a positive y origin sits toward the top of the panel', () => {
+    const ctx = panelCtx();
+    const base = { count: 40, speed: 0, spread: 1, life: 4, grav: 0, extX: 0, extY: 0, size: 0.2 };
+    const top = verticalCentroid({ ...base, y: 0.6 }, ctx);
+    const bottom = verticalCentroid({ ...base, y: -0.6 }, ctx);
+    assert.ok(top < bottom,
+        `y +0.6 should render above y -0.6 (modelZ ${top} vs ${bottom})`);
+    assert.ok(top < 0 && bottom > 0, 'the two should straddle the panel centre');
+});
+
+test('travel at 90 degrees moves up the panel, 270 moves down', () => {
+    const ctx = panelCtx();
+    const base = { count: 40, speed: 1.2, spread: 20, life: 3, grav: 0, y: 0 };
+    const up = verticalCentroid({ ...base, dir: 90 }, ctx);
+    const down = verticalCentroid({ ...base, dir: 270 }, ctx);
+    assert.ok(up < down, `dir 90 should render above dir 270 (modelZ ${up} vs ${down})`);
+});
+
+test('gravity at 270 degrees pulls down the panel, 90 pulls up', () => {
+    const ctx = panelCtx();
+    const base = { count: 40, speed: 0.1, spread: 360, life: 3, grav: 3, y: 0 };
+    const falls = verticalCentroid({ ...base, gravDir: 270 }, ctx);
+    const rises = verticalCentroid({ ...base, gravDir: 90 }, ctx);
+    assert.ok(rises < falls,
+        `gravity up should render above gravity down (modelZ ${rises} vs ${falls})`);
+});
+
+// The effect this replaced was born over modelZ 0..2 with a negative modelZ
+// velocity — it rises from the lower half. Keeping that is the whole point of
+// the preset, and it is the case the cancelling sign errors hid.
+test('the embers preset rises from the lower half, as the old effect did', () => {
+    const ctx = panelCtx();
+    const preset = emitter.presets.find(p => p.id === 'embers');
+    assert.ok(preset.params.y < 0, 'embers are born below centre');
+    assert.ok(preset.params.dir > 0 && preset.params.dir < 180, 'and travel upward');
+
+    const early = verticalCentroid({ ...preset.params, life: 1.2 }, ctx);
+    const late = verticalCentroid({ ...preset.params, life: 5.5 }, ctx);
+    assert.ok(late < early, `embers should climb over their life (${late} vs ${early})`);
+});

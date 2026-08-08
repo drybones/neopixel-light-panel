@@ -16,6 +16,14 @@
  * Gravity is a magnitude and an angle, not an up/down toggle. `dir` is the
  * launch velocity and gravity is a sustained acceleration; no launch angle
  * reproduces a particle that sets off upward and ends up drifting right.
+ *
+ * Every position, angle and acceleration here is in *param* space, where +y is
+ * up and 90 degrees points at the top of the panel — the frame the xy pad and
+ * the angle dials draw. The panel's own modelZ runs the other way (+0.875 is
+ * the bottom row), so the two are reconciled by a single negation on the write
+ * to point[2]. Do not "simplify" that away, and do not add a second one: the
+ * whole vertical axis — origin, travel, gravity — inverts together, and a
+ * symmetric preset like the sparkler will not show it.
  */
 
 var color = require('../engine/color');
@@ -126,10 +134,12 @@ module.exports = {
             color: '#ff0000', hueSpread: 1, size: 0.183, dir: 90, spread: 360,
             speed: 1.75, speedSpread: 0.14, grav: 0, gravDir: 270, count: 49,
             life: 1.5, lifeSpread: 0.33, swell: 0.25, x: 0, y: 0, extX: 0, extY: 0 } },
+        // Embers rise: the effect this replaced was born over modelZ 0..2 —
+        // the panel's lower half and below it — with an upward velocity.
         { id: 'embers', name: 'Embers', params: {
-            color: '#ff3600', hueSpread: 0.11, size: 0.224, dir: 270, spread: 70,
+            color: '#ff3600', hueSpread: 0.11, size: 0.224, dir: 90, spread: 70,
             speed: 0.45, speedSpread: 0.5, grav: 0, gravDir: 270, count: 29,
-            life: 5.5, lifeSpread: 0.6, swell: 0.5, x: 0, y: 1, extX: 8, extY: 2 } },
+            life: 5.5, lifeSpread: 0.6, swell: 0.5, x: 0, y: -1, extX: 8, extY: 2 } },
         { id: 'fountain', name: 'Fountain', params: {
             color: '#1a9bff', hueSpread: 0.12, size: 0.149, dir: 90, spread: 44,
             speed: 2.3, speedSpread: 0.3, grav: 2.8, gravDir: 270, count: 60,
@@ -264,7 +274,12 @@ module.exports = {
 
                     var half = 0.5 * age * age;
                     q.point[0] = q.ox + q.vx * age + p.ax * half;
-                    q.point[2] = q.oz + q.vz * age + p.az * half;
+                    // Everything above is in *param* space, where y is up —
+                    // which is what the pad and the dials show. modelZ runs the
+                    // other way (+0.875 is the bottom row), so negate on the
+                    // write. This is the one place the two frames meet, and it
+                    // is the same convention wavelet spells as dz = modelZ + y.
+                    q.point[2] = -(q.oz + q.vz * age + p.az * half);
                     q.falloff = p.falloff;
                     q.intensity = envelope((millis - q.born) / (q.death - q.born), p.swell);
                 }

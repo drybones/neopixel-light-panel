@@ -52,15 +52,18 @@ var SPARKLER_SWELL = 0.25;
 // Particle falloff 30 -> radius 1/sqrt(30).
 var SPARKLER_SIZE = 1 / Math.sqrt(30);
 
-// embers: origin x over [-4, 4], z over [0, 2] — a box, which is what extX/extY
-// express. The centre of that box is y = 1.
+// embers: origin x over [-4, 4] and *modelZ* over [0, 2] — a box, which is what
+// extX/extY express. Note the emitter's params are in param space, where y is up
+// and modelZ is negated, so that box is centred at y = -1: the panel's lower
+// half and the region below it, not above.
 var EMBERS_EXT_X = 8;
 var EMBERS_EXT_Y = 2;
-var EMBERS_ORIGIN_Y = 1;
-// vx in +/-0.3, vz in [-0.6, -0.2]: mean speed ~0.45, mostly downward.
+var EMBERS_ORIGIN_Y = -1;
+// vx in +/-0.3, modelZ velocity in [-0.6, -0.2] — decreasing modelZ, i.e. toward
+// the top row. Embers rise. Mean speed ~0.45 over a 70-degree upward cone.
 var EMBERS_SPEED = 0.45;
 var EMBERS_SPEED_SPREAD = 0.5;
-var EMBERS_DIR = 270;
+var EMBERS_DIR = 90;
 var EMBERS_SPREAD = 70;
 // death = born + random() * 5000 + 3000 ms.
 var EMBERS_LIFE = 5.5;
