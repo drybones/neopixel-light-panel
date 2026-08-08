@@ -6,6 +6,8 @@ const planewave = require('../effects/planewave');
 const solid = require('../effects/solid');
 const gradient = require('../effects/gradient');
 const noise = require('../effects/noise');
+const emitter = require('../effects/emitter');
+const twinkle = require('../effects/twinkle');
 const effects = require('../effects');
 
 const ctx2 = {
@@ -388,4 +390,180 @@ test('noise keeps the pace value noise had, independent of its strength', () => 
     const pace = (deltaSum / frames) / sd;
     assert.ok(pace > 0.05 && pace < 0.09,
         `field pace ${pace.toFixed(4)} is outside the rate value noise moved at (want ~0.067)`);
+});
+
+// ── Emitter ──
+//
+// The effect candy_sparkler and embers collapsed into. These guard the three
+// things that were easy to get wrong when the constants became params.
+
+test('emitter renders every preset non-black and finite after warm-up', () => {
+    const ctx = panelCtx();
+    for (const preset of emitter.presets) {
+        const params = { ...emitter.defaults, ...preset.params };
+        const p = emitter.prepare(params);
+        const inst = emitter.createInstance(ctx);
+        const out = new Float32Array(ctx.numPixels * 3);
+        // Past the virgin stagger, which spreads first births over one lifetime.
+        let lit = 0;
+        for (let f = 0; f < 200; f++) {
+            inst.render(out, 1000 + f * 40, p);
+            for (let i = 0; i < out.length; i++) if (out[i] > 1) { lit++; break; }
+        }
+        assert.ok(out.every(v => Number.isFinite(v)), `${preset.id} produced non-finite values`);
+        assert.ok(lit > 150, `${preset.id} was lit on only ${lit}/200 frames`);
+    }
+});
+
+// createInstance is recreated only when a layer's effectType changes, so a
+// param edit has to reach the render loop through `p`. Anything captured at
+// construction would silently freeze at the value the layer was created with.
+test('emitter reads params through p, not from construction', () => {
+    const ctx = panelCtx();
+    const inst = emitter.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+
+    const dim = emitter.prepare({ ...emitter.defaults, count: 2, size: 0.08 });
+    const bright = emitter.prepare({ ...emitter.defaults, count: 60, size: 0.5 });
+
+    // Same instance, same time base, different params: only `p` differs.
+    for (let f = 0; f < 120; f++) inst.render(out, 1000 + f * 40, dim);
+    let dimSum = 0;
+    for (let i = 0; i < out.length; i++) dimSum += out[i];
+
+    for (let f = 0; f < 120; f++) inst.render(out, 6000 + f * 40, bright);
+    let brightSum = 0;
+    for (let i = 0; i < out.length; i++) brightSum += out[i];
+
+    assert.ok(brightSum > dimSum * 3,
+        `params did not reach the loop: ${dimSum.toFixed(0)} vs ${brightSum.toFixed(0)}`);
+});
+
+// falloff is 1/size^2, so a size of 0 is Infinity and then
+// intensity / (1 + Infinity * 0) is NaN — straight through setPixel and out to
+// the panel. The slider cannot reach 0 but the typed field is unclamped.
+test('emitter survives a typed size of 0', () => {
+    const ctx = panelCtx();
+    const p = emitter.prepare({ ...emitter.defaults, size: 0 });
+    assert.ok(Number.isFinite(p.falloff), 'falloff must not be Infinity');
+    const inst = emitter.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+    for (let f = 0; f < 60; f++) inst.render(out, 1000 + f * 40, p);
+    assert.ok(out.every(v => Number.isFinite(v)), 'size 0 put non-finite values in the buffer');
+});
+
+// The documented filmstrip trap: embers tested `if (!q.born)`, so a born time
+// of 0 re-seeded every particle every frame and the layer rendered black. The
+// emitter uses an explicit alive flag, which has to hold at t=0 too.
+test('emitter renders at a zero time base', () => {
+    const ctx = panelCtx();
+    const p = emitter.prepare({ ...emitter.defaults, count: 40 });
+    const inst = emitter.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+    for (let f = 0; f < 120; f++) inst.render(out, f * 40, p);
+    let sum = 0;
+    for (let i = 0; i < out.length; i++) sum += out[i];
+    assert.ok(sum > 0, 'renders black from a zero time base');
+});
+
+// Gravity is a vector, which is the whole reason it is a magnitude and an
+// angle rather than a fall/rise toggle: a sideways pull is a look no launch
+// direction reproduces.
+test('emitter gravity pulls sideways, not just down', () => {
+    const ctx = panelCtx();
+    const base = { ...emitter.defaults, count: 40, speed: 0.2, spread: 20, dir: 90, life: 4, grav: 3 };
+
+    function centroidX(gravDir) {
+        const p = emitter.prepare({ ...base, gravDir });
+        const inst = emitter.createInstance(ctx);
+        const out = new Float32Array(ctx.numPixels * 3);
+        let weighted = 0, total = 0;
+        for (let f = 0; f < 150; f++) {
+            inst.render(out, 4000 + f * 40, p);
+            for (let i = 0; i < ctx.numPixels; i++) {
+                const v = out[i * 3] + out[i * 3 + 1] + out[i * 3 + 2];
+                weighted += ctx.modelX[i] * v;
+                total += v;
+            }
+        }
+        return total > 0 ? weighted / total : 0;
+    }
+
+    assert.ok(centroidX(0) > centroidX(180) + 0.5,
+        'gravity at 0 degrees should push the field right of gravity at 180');
+});
+
+test('emitter is the only particle effect in the catalog', () => {
+    const types = effects.catalog().map(e => e.type);
+    assert.ok(types.includes('emitter'));
+    assert.ok(!types.includes('candy_sparkler'), 'superseded effects must not be offered');
+    assert.ok(!types.includes('embers'));
+    // Still registered, so stored and imported layers keep rendering.
+    assert.ok(effects.get('candy_sparkler'), 'candy_sparkler must stay resolvable');
+    assert.ok(effects.get('embers'), 'embers must stay resolvable');
+});
+
+test('every catalog entry with presets renders each of them', () => {
+    for (const entry of effects.catalog()) {
+        if (!entry.presets) continue;
+        const mod = effects.get(entry.type);
+        for (const preset of entry.presets) {
+            const params = { ...mod.defaults, ...preset.params };
+            assert.ok(preset.id && preset.name, `${entry.type} preset missing id or name`);
+            const out = new Float32Array(ctx2.numPixels * 3);
+            mod.createInstance(ctx2).render(out, 12345, mod.prepare(params));
+            assert.ok(out.every(v => Number.isFinite(v)), `${entry.type}:${preset.id} not finite`);
+        }
+    }
+});
+
+// hueSpread 0 is what every stored twinkle layer has, and it must stay on the
+// single-colour path rather than quietly routing through a one-entry palette.
+test('twinkle hue spread widens the palette and 0 keeps the old path', () => {
+    assert.strictEqual(twinkle.prepare(twinkle.defaults).palette, null);
+    const spread = twinkle.prepare({ ...twinkle.defaults, color: '#ff0000', hueSpread: 1 });
+    assert.ok(spread.palette, 'a non-zero spread must build a palette');
+    const hues = new Set();
+    for (let i = 0; i < spread.palette.length / 3; i++) {
+        hues.add([0, 1, 2].map(k => Math.round(spread.palette[i * 3 + k] / 32)).join(','));
+    }
+    assert.ok(hues.size > 8, `expected a spread of hues, got ${hues.size}`);
+});
+
+test('twinkle sharpness changes how much of the cycle is lit', () => {
+    const ctx = panelCtx();
+    function litSum(sharpness) {
+        const p = twinkle.prepare({ ...twinkle.defaults, sharpness, background: 0 });
+        const inst = twinkle.createInstance(ctx);
+        const out = new Float32Array(ctx.numPixels * 3);
+        let sum = 0;
+        for (let f = 0; f < 60; f++) {
+            inst.render(out, f * 100, p);
+            for (let i = 0; i < out.length; i++) sum += out[i];
+        }
+        return sum;
+    }
+    // A higher exponent spends more of the cycle near zero.
+    assert.ok(litSum(1) > litSum(12), 'sharpness must darken the duty cycle');
+});
+
+// app.js seeds the built-in scenes by looking these preset ids up, and only on
+// a *fresh* install — where emitterMigrated is already true, so nothing would
+// ever convert a layer seeded with a hidden type, and a renamed id throws at
+// boot rather than in any test that runs on an existing library.
+test('the preset ids app.js seeds built-ins from still exist', () => {
+    const ids = emitter.presets.map(p => p.id);
+    for (const id of ['embers', 'sparkler']) {
+        assert.ok(ids.includes(id), `seedBuiltins looks up the '${id}' preset`);
+    }
+});
+
+// Whatever a built-in is seeded as has to be something the picker can also
+// create, or the library ships with a layer the user cannot reproduce.
+test('no effect is both hidden and reachable from the catalog', () => {
+    const visible = new Set(effects.catalog().map(e => e.type));
+    for (const mod of effects.list()) {
+        assert.strictEqual(visible.has(mod.type), !mod.hidden,
+            `${mod.type} disagrees with its hidden flag`);
+    }
 });

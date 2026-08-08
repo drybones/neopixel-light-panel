@@ -13,11 +13,13 @@ function createRouter(store, previewCache, effectPreviewCache) {
         res.json(effects.catalog());
     });
 
-    // Each effect at its defaults, so the picker can show what a layer will
-    // look like rather than a swatch of its colours. Same payload shape as
-    // the scene filmstrips, keyed by effect type instead of scene id.
+    // One strip per picker tile, so the picker can show what a layer will look
+    // like rather than a swatch of its colours. Same payload shape as the scene
+    // filmstrips; the id is the effect type, or `type:presetId` for an effect
+    // that ships presets, and each entry carries the effectType and params the
+    // picker needs to actually create the layer.
     router.get('/effects/previews', async function(req, res) {
-        var previews = await effectPreviewCache.all(effects.list());
+        var previews = await effectPreviewCache.all(effects.previewTargets());
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,

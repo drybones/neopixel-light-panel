@@ -44,6 +44,14 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
 
   function renderEntry(entry, index) {
     switch (entry.type) {
+      // A flat separator, not a nested structure: everything that walks a
+      // schema — this, and the /api/effects payload — keeps treating it as a
+      // list, so an effect that wants sections opts in by dropping these
+      // between its params and every other effect is untouched.
+      case 'group':
+        return (
+          <h4 key={`group-${index}`} className="param-group">{entry.label}</h4>
+        );
       case 'color':
         return (
           <ColorControl
@@ -75,6 +83,15 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             x={layer.params[entry.xKey]}
             y={layer.params[entry.yKey]}
             color={layer.params.color}
+            // Read-only chrome the pad draws when the schema names the keys —
+            // the emitter's emission box and gravity vector. An entry that
+            // names none of them gets a plain pad, as every other effect does.
+            decor={entry.extXKey || entry.gravKey ? {
+              extX: layer.params[entry.extXKey] || 0,
+              extY: layer.params[entry.extYKey] || 0,
+              grav: layer.params[entry.gravKey] || 0,
+              gravDir: layer.params[entry.gravDirKey] || 0,
+            } : null}
             subscribe={subscribeSelectedLayer}
             onChange={(x, y) => setParams({ [entry.xKey]: x, [entry.yKey]: y })}
             onCommit={onCommit}
@@ -87,6 +104,9 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             entry={entry}
             value={layer.params[entry.key]}
             color={layer.params.color}
+            // Only the cone variant uses this; it draws the arc the emitter
+            // actually scatters over rather than a bare bearing.
+            spread={entry.spreadKey ? layer.params[entry.spreadKey] : null}
             onChange={(v) => setParams({ [entry.key]: v })}
             onCommit={onCommit}
           />

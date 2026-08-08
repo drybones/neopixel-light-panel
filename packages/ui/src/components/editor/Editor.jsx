@@ -62,12 +62,15 @@ export default function Editor({ sceneId, onClose }) {
     if (layer) flushLayer(sceneId, layer.id);
   }
 
-  function addLayer(effectType) {
+  // `presetParams` is the picked tile's preset, if it had one — it states only
+  // what the preset changes, so it layers over the effect's defaults rather
+  // than replacing them.
+  function addLayer(effectType, presetParams) {
     const def = effects.find((e) => e.type === effectType);
     const newLayer = {
       id: newLayerId(),
       effectType,
-      params: { ...def.defaults },
+      params: { ...def.defaults, ...(presetParams || {}) },
       blendMode: scene.layers.length === 0 ? 'normal' : 'add',
       opacity: 1,
       enabled: true,

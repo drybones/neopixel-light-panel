@@ -66,35 +66,52 @@ class PreviewCache {
     }
 }
 
-// The same thing for the effect picker, keyed by effect type. Effect defaults
-// are code, not data, so there is nothing to invalidate against — rendered
-// once on first request and kept. Deliberately a separate map from the scene
-// cache, whose prune() would otherwise throw these away as unknown scene ids.
+// The same thing for the effect picker. Effect defaults and presets are code,
+// not data, so there is nothing to invalidate against — rendered once on first
+// request and kept. Deliberately a separate map from the scene cache, whose
+// prune() would otherwise throw these away as unknown scene ids.
+//
+// Keyed by `type` for an effect with no presets and `type:presetId` for one
+// with them, because emitter alone puts eight tiles in the picker and a key of
+// just the type would give them all the same strip.
 class EffectPreviewCache {
     constructor(model) {
         this.model = model;
-        this.entries = new Map(); // effect type → { hash, data }
+        this.entries = new Map(); // effect type[:presetId] → { hash, data }
     }
 
-    get(effect) {
-        var entry = this.entries.get(effect.type);
+    get(effect, preset) {
+        var id = effect.type + (preset ? ':' + preset.id : '');
+        var entry = this.entries.get(id);
         if (!entry) {
-            var bytes = filmstrip.renderEffectFilmstrip(effect, this.model);
+            var bytes = filmstrip.renderEffectFilmstrip(effect, this.model, preset);
             entry = {
                 hash: crypto.createHash('sha1')
-                    .update(JSON.stringify({ type: effect.type, defaults: effect.defaults }))
+                    .update(JSON.stringify({
+                        type: effect.type,
+                        defaults: effect.defaults,
+                        preset: preset ? preset.params : null,
+                    }))
                     .digest('hex'),
                 data: Buffer.from(bytes).toString('base64'),
             };
-            this.entries.set(effect.type, entry);
+            this.entries.set(id, entry);
         }
-        return { id: effect.type, hash: entry.hash, data: entry.data };
+        return {
+            id: id,
+            effectType: effect.type,
+            name: preset ? preset.name : effect.name,
+            params: preset ? preset.params : null,
+            hash: entry.hash,
+            data: entry.data,
+        };
     }
 
-    async all(effectModules) {
+    // `targets` is the flattened (effect, preset) list from effects.previewTargets().
+    async all(targets) {
         var out = [];
-        for (var i = 0; i < effectModules.length; i++) {
-            out.push(this.get(effectModules[i]));
+        for (var i = 0; i < targets.length; i++) {
+            out.push(this.get(targets[i].effect, targets[i].preset));
             await new Promise(function(resolve) { setImmediate(resolve); });
         }
         return out;

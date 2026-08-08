@@ -84,7 +84,7 @@ async function initStorage() {
     // loop keeps its tick throughout.
     previewCache.all(store.scenes)
         .then(function(previews) { console.log('Rendered ' + previews.length + ' scene preview(s).'); })
-        .then(function() { return effectPreviewCache.all(effects.list()); })
+        .then(function() { return effectPreviewCache.all(effects.previewTargets()); })
         .then(function(previews) { console.log('Rendered ' + previews.length + ' effect preview(s).'); })
         .catch(function(err) { console.error('Preview warm-up failed:', err); });
 }
@@ -93,12 +93,22 @@ async function initStorage() {
 // the scene list.
 async function seedBuiltins() {
     if (store.seededBuiltins) return;
+    // Embers and Candy Sparkler are emitter presets now, not effect types of
+    // their own. Seeding the old types here would hand a *fresh* install two
+    // hidden-effect layers that no migration will ever reach — the emitter
+    // migration marks itself done on a first boot, before this runs — and that
+    // the picker cannot recreate.
+    var emitter = effects.get('emitter');
+    function preset(id) {
+        var match = emitter.presets.filter(function(p) { return p.id === id; })[0];
+        return Object.assign({}, emitter.defaults, match.params);
+    }
     [
-        { name: 'Embers', effectType: 'embers' },
+        { name: 'Embers', effectType: 'emitter', params: preset('embers') },
         { name: 'Particle Trail', effectType: 'particle_trail' },
-        { name: 'Candy Sparkler', effectType: 'candy_sparkler' },
+        { name: 'Candy Sparkler', effectType: 'emitter', params: preset('sparkler') },
     ].forEach(function(b) {
-        store.create({ name: b.name, layers: [{ effectType: b.effectType }] });
+        store.create({ name: b.name, layers: [{ effectType: b.effectType, params: b.params }] });
     });
     store.seededBuiltins = true;
     store.markDirty();

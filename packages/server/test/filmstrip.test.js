@@ -146,14 +146,46 @@ test('every registered effect renders a lit filmstrip from its defaults', () => 
     }
 });
 
-test('effect previews are keyed by type and rendered once', async () => {
+test('effect previews are keyed by type, or type:preset, and rendered once', async () => {
     const cache = new EffectPreviewCache(MODEL);
-    const all = await cache.all(effects.list());
-    assert.deepStrictEqual(all.map((p) => p.id), effects.list().map((e) => e.type));
+    const targets = effects.previewTargets();
+    const all = await cache.all(targets);
+    assert.deepStrictEqual(
+        all.map((p) => p.id),
+        targets.map((t) => t.effect.type + (t.preset ? ':' + t.preset.id : '')),
+    );
 
     const solid = effects.get('solid');
     assert.strictEqual(cache.get(solid).data, cache.get(solid).data);
-    assert.strictEqual(cache.entries.size, effects.list().length);
+    assert.strictEqual(cache.entries.size, targets.length);
+});
+
+// One tile per preset, each its own strip. Sharing a key across an effect's
+// presets would give all eight emitter tiles the same animation, which is the
+// whole reason the picker can offer them at all.
+test('an effect with presets gets one distinct preview per preset', async () => {
+    const cache = new EffectPreviewCache(MODEL);
+    const targets = effects.previewTargets().filter((t) => t.effect.type === 'emitter');
+    assert.ok(targets.length > 1, 'emitter should contribute several tiles');
+
+    const rendered = await cache.all(targets);
+    assert.strictEqual(new Set(rendered.map((p) => p.id)).size, rendered.length);
+    assert.strictEqual(new Set(rendered.map((p) => p.hash)).size, rendered.length);
+    assert.strictEqual(new Set(rendered.map((p) => p.data)).size, rendered.length);
+    for (const p of rendered) {
+        assert.strictEqual(p.effectType, 'emitter');
+        assert.ok(p.name, 'a tile needs a label');
+        assert.ok(p.params, 'a preset tile must carry the params that create the layer');
+    }
+});
+
+// The superseded effects still render, so a layer that predates the migration
+// is never blank — but nothing should offer them as a new layer.
+test('hidden effects are absent from preview targets but still resolvable', () => {
+    const types = effects.previewTargets().map((t) => t.effect.type);
+    assert.ok(!types.includes('candy_sparkler'));
+    assert.ok(!types.includes('embers'));
+    assert.ok(effects.get('embers'));
 });
 
 test('the cache forgets scenes that no longer exist', async () => {

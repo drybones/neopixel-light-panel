@@ -1,13 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import NumField from './NumField';
 
-// Direction control for schema `angle` entries. The dial draws the wavefronts
-// themselves — parallel lines perpendicular to the direction — which is what
-// makes the stripe orientation legible at a glance; a bare rotary knob would
-// not say which way they run.
+// Direction control for schema `angle` entries. What it draws inside the dial
+// depends on what the angle *means*, set by `entry.render`:
 //
-// The arrow points the way the wave *travels*, matching what you see moving on
-// the panel: 0 degrees is rightwards, 90 upwards, increasing anticlockwise.
+//   'wavefronts' (default) — parallel lines perpendicular to the direction,
+//       which is what makes stripe orientation legible at a glance for wavelet
+//       and planewave; a bare rotary knob would not say which way they run.
+//   'cone' — an arrow and the arc it scatters over, for an emitter's Travel.
+//       An emitter has no wavefronts, and the spread is the thing you are
+//       actually judging.
+//   'arrow' — an arrow alone, for a force. The emitter has two angle dials on
+//       one panel and they must not look like the same control: gravity is a
+//       field over the panel, Travel is where particles are launched.
+//
+// In every variant the arrow points the way the thing *goes*, matching what you
+// see moving on the panel: 0 degrees is rightwards, 90 upwards, increasing
+// anticlockwise.
 const SIZE = 128;
 
 function normalise(deg) {
@@ -15,7 +24,7 @@ function normalise(deg) {
   return d < 0 ? d + 360 : d;
 }
 
-export default function AngleDial({ entry, value, color, onChange, onCommit }) {
+export default function AngleDial({ entry, value, color, spread, onChange, onCommit }) {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
 
@@ -35,23 +44,39 @@ export default function AngleDial({ entry, value, color, onChange, onCommit }) {
     ctx.arc(c, c, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wavefronts: perpendicular to the direction, so they show the stripes.
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(c, c, radius, 0, Math.PI * 2);
-    ctx.clip();
-    for (let k = -4; k <= 4; k += 1) {
-      const ox = dirY * k * 13;
-      const oy = -dirX * k * 13;
+    const variant = entry.render || 'wavefronts';
+
+    if (variant === 'wavefronts') {
+      // Perpendicular to the direction, so they show the stripes.
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(c + ox - dirX * radius, c + oy - dirY * radius);
-      ctx.lineTo(c + ox + dirX * radius, c + oy + dirY * radius);
-      ctx.strokeStyle = color || '#7aa2ff';
-      ctx.globalAlpha = Math.max(0.08, 0.5 - Math.abs(k) * 0.1);
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      ctx.arc(c, c, radius, 0, Math.PI * 2);
+      ctx.clip();
+      for (let k = -4; k <= 4; k += 1) {
+        const ox = dirY * k * 13;
+        const oy = -dirX * k * 13;
+        ctx.beginPath();
+        ctx.moveTo(c + ox - dirX * radius, c + oy - dirY * radius);
+        ctx.lineTo(c + ox + dirX * radius, c + oy + dirY * radius);
+        ctx.strokeStyle = color || '#7aa2ff';
+        ctx.globalAlpha = Math.max(0.08, 0.5 - Math.abs(k) * 0.1);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (variant === 'cone' && spread > 0) {
+      // Canvas angles run clockwise and the schema's run anticlockwise, hence
+      // the negated bounds. A full 360 draws as a filled disc, which is exactly
+      // what "omnidirectional" should look like.
+      const half = (Math.min(spread, 360) * Math.PI) / 360;
+      ctx.beginPath();
+      ctx.moveTo(c, c);
+      ctx.arc(c, c, radius, -rad - half, -rad + half);
+      ctx.closePath();
+      ctx.fillStyle = color || '#7aa2ff';
+      ctx.globalAlpha = 0.22;
+      ctx.fill();
     }
-    ctx.restore();
     ctx.globalAlpha = 1;
 
     ctx.beginPath();
@@ -60,18 +85,33 @@ export default function AngleDial({ entry, value, color, onChange, onCommit }) {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Pointer towards the source.
+    // Pointer, the way the thing goes.
     ctx.beginPath();
     ctx.moveTo(c, c);
     ctx.lineTo(c + dirX * radius, c + dirY * radius);
     ctx.strokeStyle = color || '#7aa2ff';
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(c + dirX * radius, c + dirY * radius, 5, 0, Math.PI * 2);
-    ctx.fillStyle = color || '#7aa2ff';
-    ctx.fill();
-  }, [value, color]);
+
+    if (variant === 'arrow') {
+      // A head rather than the other variants' dot: a force is a vector, and
+      // this dial sits next to one that is not.
+      const tipX = c + dirX * radius;
+      const tipY = c + dirY * radius;
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY);
+      ctx.lineTo(tipX - Math.cos(rad - 0.45) * 11, tipY + Math.sin(rad - 0.45) * 11);
+      ctx.lineTo(tipX - Math.cos(rad + 0.45) * 11, tipY + Math.sin(rad + 0.45) * 11);
+      ctx.closePath();
+      ctx.fillStyle = color || '#7aa2ff';
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.arc(c + dirX * radius, c + dirY * radius, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color || '#7aa2ff';
+      ctx.fill();
+    }
+  }, [value, color, spread, entry.render]);
 
   function apply(e) {
     const rect = canvasRef.current.getBoundingClientRect();

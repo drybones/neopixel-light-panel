@@ -118,19 +118,28 @@ function renderFilmstrip(scene, model) {
 // picker offers you when you add a layer. Built here rather than through
 // SceneStore because preprocess() would sync the layer into the *live*
 // compositor, and this scene is never going to be rendered by the panel.
-function renderEffectFilmstrip(effect, model) {
+// `preset` is optional: without one the effect renders at its defaults, which
+// is what every picker tile was before emitter arrived. With one, the preset's
+// params are merged over the defaults so a preset only has to state what it
+// changes. The layer id carries the preset so two tiles for the same effect
+// never share one — the compositor caches a render instance per layer id.
+function renderEffectFilmstrip(effect, model, preset) {
+    var params = preset
+        ? Object.assign({}, effect.defaults, preset.params)
+        : effect.defaults;
+    var id = 'effect-preview-' + effect.type + (preset ? ':' + preset.id : '');
     var layer = {
-        id: 'effect-preview-' + effect.type,
+        id: id,
         effectType: effect.type,
-        params: effect.defaults,
+        params: params,
         blendMode: 'normal',
         opacity: 1,
         enabled: true,
         solo: false,
-        _prepared: effect.prepare(effect.defaults),
+        _prepared: effect.prepare(params),
         _blend: 0,
     };
-    var scene = { id: layer.id, name: effect.name, layers: [layer] };
+    var scene = { id: layer.id, name: preset ? preset.name : effect.name, layers: [layer] };
     scene._displayLayers = scene.layers;
     return renderFilmstrip(scene, model);
 }

@@ -446,6 +446,22 @@ input[type="range"]::-moz-range-thumb {
 .param-panel-title { font-size: 15px; font-weight: 600; }
 .param-panel-actions { display: flex; gap: 6px; }
 
+/* Section heading for schema `group` entries. Only the emitter uses these so
+   far — sixteen params in one scroll is where a flat list stops scanning. Not
+   collapsible: that needs state and a scope decision (per effect? per layer?
+   does it survive selecting another layer?) for little more than this buys. */
+.param-group {
+  margin: 16px 0 2px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.param-group:first-of-type { margin-top: 8px; }
+
 .control-row {
   display: flex;
   align-items: center;
