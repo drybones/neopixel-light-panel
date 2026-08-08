@@ -86,7 +86,7 @@ An `angle` entry may set `render` to pick what the dial draws inside itself: `wa
 
 The rings are measured from the panel's **cell box** — half an LED pitch beyond the outermost centres, ±3.75 × ±1.0 — rather than the centres themselves, so the edge LEDs draw as whole circles inside the outline and the pad frames the panel exactly as the editor's preview does. With the shipped values (`margin: 2`, `farLimit: 1000`) the steps are ±3.75 × ±1.0, ±5.75 × ±3.0, and ±7.75 × ±5.0, the last reaching x ±1000 / y ±645 at its edge.
 
-An effect may also carry `presets`: an array of `{ id, name, params }` where `params` states only what the preset changes, merged over `defaults`. These drive the picker's tiles — see *Scene previews* below for the payload — so a look does not need its own effect type to stay one click away.
+An effect may also carry `presets`: an array of `{ id, name, params }`. These are **starting points, not catalog entries** — the editor renders one button per preset at the top of that layer's panel, and clicking it lays the preset's `params` over the effect's `defaults` to replace the whole look. They deliberately do not appear in the picker, which stays one tile per effect. `emitter` ships four, which is how the two effects it absorbed stay one click away.
 
 An `xy` entry may name extra keys the pad draws as **read-only** chrome: `extXKey`/`extYKey` (an emission box around the handle) and `gravKey`/`gravDirKey` (a force vector). They are edited by their own controls; the pad only shows them, because pressing anywhere on it places the handle and a second grab target would break that.
 
@@ -196,19 +196,12 @@ Values are pre-brightness, like the WebSocket stream. `hash` covers the scene's 
 The strip **loops cleanly**: particle effects are warmed for 8 s of simulated time before capture so they start lit rather than empty, and the tail is cross-dissolved into the head so frame `frames` is frame `0`. Play it end to end and repeat — no seam handling is needed client-side. Playing several strips at once, though, is worth offsetting: they are all the same length, so a shared clock puts every one of them at the same point in its loop.
 
 ```
-GET /api/effects/previews     →  one filmstrip per picker tile
+GET /api/effects/previews     →  one filmstrip per effect, at its defaults
 ```
 
-Same payload, for an editor's effect picker, which has no layer to render yet. Effect defaults and presets are fixed in code, so these are rendered once and kept.
+Same payload, with `id` holding the effect `type` instead of a scene ID — for an editor's effect picker, which has no layer to render yet. Effect defaults are fixed in code, so these are rendered once and kept.
 
-A tile is not the same thing as an effect: an effect that declares `presets` contributes one tile per preset rather than one at its defaults. Each entry therefore carries what the picker needs to create the layer:
-
-| Field        | Description |
-|--------------|-------------|
-| `id`         | `type`, or `type:presetId` for a preset tile |
-| `effectType` | the `type` to create the layer with |
-| `name`       | the preset's name, or the effect's |
-| `params`     | the preset's params, or `null` — merge over the effect's `defaults` |
+One strip per effect, never one per preset: an effect's `presets` are starting points offered inside its layer editor, not separate things to add. Hidden effects get no strip.
 
 ---
 

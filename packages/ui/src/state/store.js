@@ -21,8 +21,7 @@ export const useStore = create((set, get) => ({
   scenes: [],
   sceneDetails: {},   // sceneId → full scene (layers included)
   scenePreviews: {},  // sceneId → { hash, pixels } filmstrip for the card
-  effectPreviews: {}, // tile id → { hash, pixels } filmstrip for the picker
-  effectTiles: [],    // what the picker lists: one per effect, or per preset
+  effectPreviews: {}, // effectType → { hash, pixels } filmstrip for the picker
   previewFrames: 0,
   effects: [],
   activeSceneId: null,
@@ -76,9 +75,9 @@ export const useStore = create((set, get) => ({
   // layer at all.
   async loadEffectPreviews() {
     if (Object.keys(get().effectPreviews).length > 0) return;
-    const { frames, intervalMs, strips, tiles } = decodePreviews(await api.effectPreviews());
+    const { frames, intervalMs, strips } = decodePreviews(await api.effectPreviews());
     setTiming(frames, intervalMs);
-    set({ effectPreviews: strips, effectTiles: tiles, previewFrames: frames });
+    set({ effectPreviews: strips, previewFrames: frames });
   },
 
   async loadSceneDetail(id) {

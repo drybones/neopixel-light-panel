@@ -11,21 +11,14 @@
 
 import { NUM_PIXELS } from './panelGrid';
 
-// One payload (bulk or single-scene) → { frames, intervalMs, strips, tiles },
-// where strips maps id to { hash, pixels: Uint8Array }.
-//
-// `tiles` keeps the rest of each entry in payload order. The scene payload has
-// nothing else to carry, so it comes back as bare ids there; the effect payload
-// carries the effectType, display name and preset params, which is what lets
-// the picker offer several tiles for one effect without a second request.
+// One payload (bulk or single-scene) → { frames, intervalMs, strips }, where
+// strips maps sceneId to { hash, pixels: Uint8Array }.
 export function decodePreviews(payload) {
   const strips = {};
-  const tiles = [];
   for (const p of payload.previews || []) {
     strips[p.id] = { hash: p.hash, pixels: decodeBase64(p.data) };
-    tiles.push({ id: p.id, effectType: p.effectType, name: p.name, params: p.params });
   }
-  return { frames: payload.frames, intervalMs: payload.intervalMs, strips, tiles };
+  return { frames: payload.frames, intervalMs: payload.intervalMs, strips };
 }
 
 export function decodeBase64(data) {

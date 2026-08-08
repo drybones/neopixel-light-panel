@@ -146,43 +146,36 @@ test('every registered effect renders a lit filmstrip from its defaults', () => 
     }
 });
 
-test('effect previews are keyed by type, or type:preset, and rendered once', async () => {
+test('effect previews are keyed by type and rendered once', async () => {
     const cache = new EffectPreviewCache(MODEL);
-    const targets = effects.previewTargets();
-    const all = await cache.all(targets);
-    assert.deepStrictEqual(
-        all.map((p) => p.id),
-        targets.map((t) => t.effect.type + (t.preset ? ':' + t.preset.id : '')),
-    );
+    const visible = effects.visible();
+    const all = await cache.all(visible);
+    assert.deepStrictEqual(all.map((p) => p.id), visible.map((e) => e.type));
 
     const solid = effects.get('solid');
     assert.strictEqual(cache.get(solid).data, cache.get(solid).data);
-    assert.strictEqual(cache.entries.size, targets.length);
+    assert.strictEqual(cache.entries.size, visible.length);
 });
 
-// One tile per preset, each its own strip. Sharing a key across an effect's
-// presets would give all eight emitter tiles the same animation, which is the
-// whole reason the picker can offer them at all.
-test('an effect with presets gets one distinct preview per preset', async () => {
-    const cache = new EffectPreviewCache(MODEL);
-    const targets = effects.previewTargets().filter((t) => t.effect.type === 'emitter');
-    assert.ok(targets.length > 1, 'emitter should contribute several tiles');
+// An effect's presets are starting points inside its layer editor, not extra
+// things to add, so they must not multiply the picker's tiles.
+test('presets do not add picker tiles', async () => {
+    const emitter = effects.get('emitter');
+    assert.ok(emitter.presets.length > 1, 'emitter should ship several presets');
 
-    const rendered = await cache.all(targets);
-    assert.strictEqual(new Set(rendered.map((p) => p.id)).size, rendered.length);
-    assert.strictEqual(new Set(rendered.map((p) => p.hash)).size, rendered.length);
-    assert.strictEqual(new Set(rendered.map((p) => p.data)).size, rendered.length);
-    for (const p of rendered) {
-        assert.strictEqual(p.effectType, 'emitter');
-        assert.ok(p.name, 'a tile needs a label');
-        assert.ok(p.params, 'a preset tile must carry the params that create the layer');
-    }
+    const types = effects.visible().map((e) => e.type);
+    assert.strictEqual(types.filter((t) => t === 'emitter').length, 1);
+    assert.strictEqual(new Set(types).size, types.length, 'one tile per effect');
+
+    const cache = new EffectPreviewCache(MODEL);
+    await cache.all(effects.visible());
+    assert.strictEqual(cache.entries.size, effects.visible().length);
 });
 
 // The superseded effects still render, so a layer that predates the migration
 // is never blank — but nothing should offer them as a new layer.
-test('hidden effects are absent from preview targets but still resolvable', () => {
-    const types = effects.previewTargets().map((t) => t.effect.type);
+test('hidden effects are absent from the picker but still resolvable', () => {
+    const types = effects.visible().map((e) => e.type);
     assert.ok(!types.includes('candy_sparkler'));
     assert.ok(!types.includes('embers'));
     assert.ok(effects.get('embers'));

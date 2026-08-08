@@ -126,9 +126,11 @@ module.exports = {
         extY: 0,
     },
 
-    // The two effects this replaced, plus the looks that were unreachable
-    // before. The picker renders one filmstrip per preset, so these are how a
-    // sparkler stays one click away now that it is not its own effect type.
+    // Starting points, offered as buttons at the top of the layer editor —
+    // deliberately a handful, not a catalogue. The picker shows one Emitter
+    // tile; these are how the two effects this replaced stay one click away
+    // once you are in the panel, and each one sets the whole param set rather
+    // than patching it.
     presets: [
         { id: 'sparkler', name: 'Candy sparkler', params: {
             color: '#ff0000', hueSpread: 1, size: 0.183, dir: 90, spread: 360,
@@ -140,30 +142,14 @@ module.exports = {
             color: '#ff3600', hueSpread: 0.11, size: 0.224, dir: 90, spread: 70,
             speed: 0.45, speedSpread: 0.5, grav: 0, gravDir: 270, count: 29,
             life: 5.5, lifeSpread: 0.6, swell: 0.5, x: 0, y: -1, extX: 8, extY: 2 } },
-        { id: 'fountain', name: 'Fountain', params: {
-            color: '#1a9bff', hueSpread: 0.12, size: 0.149, dir: 90, spread: 44,
-            speed: 2.3, speedSpread: 0.3, grav: 2.8, gravDir: 270, count: 60,
-            life: 2.2, lifeSpread: 0.25, swell: 0.04, x: 0, y: -0.9, extX: 0.4, extY: 0 } },
-        { id: 'rain', name: 'Wind-blown rain', params: {
-            color: '#5ba8e8', hueSpread: 0.05, size: 0.129, dir: 250, spread: 10,
-            speed: 1.6, speedSpread: 0.2, grav: 2.2, gravDir: 315, count: 48,
-            life: 1.6, lifeSpread: 0.2, swell: 0.02, x: -1, y: 1.3, extX: 9, extY: 0 } },
         { id: 'snow', name: 'Drifting snow', params: {
             color: '#dbe9ff', hueSpread: 0.03, size: 0.2, dir: 270, spread: 60,
             speed: 0.3, speedSpread: 0.6, grav: 0.22, gravDir: 340, count: 34,
             life: 6, lifeSpread: 0.5, swell: 0.35, x: 0, y: 1.2, extX: 9, extY: 1 } },
-        { id: 'draught', name: 'Sparks in a draught', params: {
-            color: '#ffb01f', hueSpread: 0.14, size: 0.16, dir: 100, spread: 90,
-            speed: 1.2, speedSpread: 0.5, grav: 1.4, gravDir: 20, count: 44,
-            life: 2.6, lifeSpread: 0.5, swell: 0.15, x: -2.8, y: -0.7, extX: 0.5, extY: 0.3 } },
         { id: 'fireflies', name: 'Fireflies', params: {
             color: '#ffd426', hueSpread: 0.06, size: 0.169, dir: 0, spread: 360,
             speed: 0.1, speedSpread: 0.8, grav: 0, gravDir: 270, count: 18,
             life: 6, lifeSpread: 0.7, swell: 0.5, x: 0, y: 0, extX: 7.5, extY: 1.8 } },
-        { id: 'plume', name: 'Rising plume', params: {
-            color: '#9d7ac4', hueSpread: 0.18, size: 0.25, dir: 90, spread: 34,
-            speed: 0.5, speedSpread: 0.45, grav: 0.35, gravDir: 75, count: 52,
-            life: 4, lifeSpread: 0.4, swell: 0.45, x: -2.4, y: -0.9, extX: 0.3, extY: 0 } },
     ],
 
     prepare(params) {

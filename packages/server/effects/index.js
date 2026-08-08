@@ -40,8 +40,8 @@ function list() {
 
 // What the UI offers when adding a layer. Hidden effects are deliberately
 // absent: they still render for stored and imported layers, but nothing should
-// create a new one. `presets` is optional — an effect without it gets a single
-// picker tile from its defaults, as every effect did before emitter.
+// create a new one. `presets` is optional and does not affect the picker — it
+// is the set of starting points the layer editor offers as buttons.
 function catalog() {
     return modules.filter(function(m) { return !m.hidden; }).map(function(m) {
         return {
@@ -54,27 +54,18 @@ function catalog() {
     });
 }
 
-// One entry per picker tile: an effect with presets contributes one per preset,
-// an effect without contributes a single entry at its defaults. Hidden effects
-// contribute nothing. This is what the preview cache renders strips for, so it
-// and the picker have to agree on the list.
-function previewTargets() {
-    var out = [];
-    modules.forEach(function(m) {
-        if (m.hidden) return;
-        if (m.presets && m.presets.length) {
-            m.presets.forEach(function(p) { out.push({ effect: m, preset: p }); });
-        } else {
-            out.push({ effect: m, preset: null });
-        }
-    });
-    return out;
+// The modules the picker offers, in registration order — one tile each, at its
+// defaults. An effect's `presets` are *not* expanded here: they are starting
+// points inside the layer editor, not separate things to add, so the picker
+// stays one row per effect.
+function visible() {
+    return modules.filter(function(m) { return !m.hidden; });
 }
 
 module.exports = {
     get: get,
     list: list,
     catalog: catalog,
-    previewTargets: previewTargets,
+    visible: visible,
     register: function(m) { modules.push(m); byType[m.type] = m; },
 };
