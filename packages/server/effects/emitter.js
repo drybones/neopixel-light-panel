@@ -59,17 +59,40 @@ function smoothstep(t) {
 module.exports = {
     type: 'emitter',
     name: 'Emitter',
+    // Ordered as the thing is built: what colour it is, where it comes from,
+    // how much of it there is, then how it moves. Colour leads and sits in the
+    // unnamed section above the first heading, alongside blend and opacity —
+    // every other effect opens on its colour too, and it is the one control
+    // that never needs a section to explain it.
     schema: [
-        { type: 'group', label: 'Appearance' },
         { key: 'color', type: 'color', label: 'Colour' },
         // 1 is a fully random hue per particle, which is candy sparkler's
         // rainbow. The swatch's saturation and brightness still apply there —
         // only its hue is overridden — so a pale swatch gives pastel sparks.
         { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        // A radius in world units. The LED pitch is 0.25, so 0.25 is one LED
-        // across. Log because 1/size^2 means this is two decades of the
-        // quantity that actually reaches the pixels.
+
+        { type: 'group', label: 'Source' },
+        { type: 'xy', label: 'Origin', xKey: 'x', yKey: 'y',
+          xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
+          margin: 2, extXKey: 'extX', extYKey: 'extY', gravKey: 'grav', gravDirKey: 'gravDir' },
+        // Full width and height of the box births scatter across, not half-
+        // extents. Both 0 is a point source.
+        { key: 'extX', type: 'number', label: 'Width', min: 0, max: MAX_EXT_X, step: 0.05, scale: 'linear', modulatable: true },
+        { key: 'extY', type: 'number', label: 'Height', min: 0, max: MAX_EXT_Y, step: 0.05, scale: 'linear', modulatable: true },
+
+        { type: 'group', label: 'Emission' },
+        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
+        // How many and how big sit together: they are the two knobs you trade
+        // against each other to fill the panel. A radius in world units — the
+        // LED pitch is 0.25, so 0.25 is one LED across. Log because 1/size^2
+        // means this is two decades of the quantity that reaches the pixels.
         { key: 'size', type: 'number', label: 'Size', min: 0.06, max: 0.6, scale: 'log', modulatable: true },
+        { key: 'life', type: 'number', label: 'Lifetime', min: 0.2, max: 10, scale: 'log', modulatable: true },
+        { key: 'lifeSpread', type: 'number', label: 'Life spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
+        // The fraction of a particle's life spent brightening; the rest is the
+        // fade. Not called "attack" — this codebase says Colourfulness, not
+        // saturation, and Levels, not contrast.
+        { key: 'swell', type: 'number', label: 'Swell', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true, modulatable: true },
 
         { type: 'group', label: 'Motion' },
         // Labelled to match wavelet and planewave, which both use Travel for
@@ -86,24 +109,6 @@ module.exports = {
         // Plain arrow rather than the wavefront stripes: this is not a wave,
         // and it must not look like the Travel dial three rows above it.
         { key: 'gravDir', type: 'angle', label: 'Gravity angle', min: 0, max: 360, step: 1, render: 'arrow', modulatable: true },
-
-        { type: 'group', label: 'Emission' },
-        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
-        { key: 'life', type: 'number', label: 'Lifetime', min: 0.2, max: 10, scale: 'log', modulatable: true },
-        { key: 'lifeSpread', type: 'number', label: 'Life spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        // The fraction of a particle's life spent brightening; the rest is the
-        // fade. Not called "attack" — this codebase says Colourfulness, not
-        // saturation, and Levels, not contrast.
-        { key: 'swell', type: 'number', label: 'Swell', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true, modulatable: true },
-
-        { type: 'group', label: 'Place' },
-        { type: 'xy', label: 'Origin', xKey: 'x', yKey: 'y',
-          xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
-          margin: 2, extXKey: 'extX', extYKey: 'extY', gravKey: 'grav', gravDirKey: 'gravDir' },
-        // Full width and height of the box births scatter across, not half-
-        // extents. Both 0 is a point source.
-        { key: 'extX', type: 'number', label: 'Width', min: 0, max: MAX_EXT_X, step: 0.05, scale: 'linear', modulatable: true },
-        { key: 'extY', type: 'number', label: 'Height', min: 0, max: MAX_EXT_Y, step: 0.05, scale: 'linear', modulatable: true },
     ],
 
     defaults: {

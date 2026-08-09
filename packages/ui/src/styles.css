@@ -467,16 +467,18 @@ input[type="range"]::-moz-range-thumb {
    collapsible: that needs state and a scope decision (per effect? per layer?
    does it survive selecting another layer?) for little more than this buys. */
 .param-group {
-  margin: 16px 0 2px;
+  margin: 18px 0 6px;
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-dim);
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 4px;
+  /* The rule goes *above* the title, not below it. Underlined, the line binds
+     to the heading and reads as decoration on the label; above, it closes the
+     preceding section and the heading then sits with the controls it names. */
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
 }
-.param-group:first-of-type { margin-top: 8px; }
 
 .control-row {
   display: flex;

@@ -71,7 +71,7 @@ Returns every available effect with its parameter schema and defaults — enough
 
 Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
 
-A `group` entry carries only a `label` and no `key`: it is a **flat separator**, not a container, so the schema stays a list and an effect opts into sections simply by dropping one between its params. Only `emitter` uses them so far — sixteen params in one panel is where a flat list stops scanning.
+A `group` entry carries only a `label` and no `key`: it is a **flat separator**, not a container, so the schema stays a list and an effect opts into sections simply by dropping one between its params. Only `emitter` uses them so far — sixteen params in one panel is where a flat list stops scanning. Params before the first `group` render in an unnamed section at the top of the panel, alongside blend and opacity.
 
 An `angle` entry may set `render` to pick what the dial draws inside itself: `wavefronts` (the default — parallel lines perpendicular to the direction, for waves), `cone` (an arrow plus the arc named by `spreadKey`, for an emitter's launch direction), or `arrow` (an arrow alone, for a force). An effect with two angle dials needs them to look different, or they read as the same control twice.
 
