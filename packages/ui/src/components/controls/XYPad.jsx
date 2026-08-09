@@ -20,11 +20,11 @@ const ZOOM_LABELS = { panel: 'Panel', near: 'Near', far: 'Far' };
 // The live layer render is drawn through the same mapping, so the LEDs sit
 // where the effect actually is and you drag it around on a picture of itself.
 // `decor` is read-only chrome for effects whose position means more than a
-// point. The emitter passes its emission box and its gravity vector, so the
-// pad shows where particles are actually born and which way they are pulled;
-// both are edited by their own controls, and nothing here is draggable but the
-// origin. Pressing anywhere on the pad places the handle — adding a second grab
-// target would break that, so the box deliberately has no corner handle.
+// point. The emitter passes its emission box, so the pad shows where particles
+// are actually born rather than just where the origin sits; it is edited by its
+// own Width/Height controls, and nothing here is draggable but the origin.
+// Pressing anywhere on the pad places the handle — adding a second grab target
+// would break that, so the box deliberately has no corner handle.
 export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, onCommit }) {
   const padRef = useRef(null);
   const canvasRef = useRef(null);
@@ -166,33 +166,6 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
       );
       ctx.setLineDash([]);
     }
-
-    // Gravity, as a short arrow in the corner rather than at the handle: it is
-    // a field over the whole panel, not something emanating from the origin,
-    // and at the handle it would be mistaken for the launch direction.
-    if (live.decor.grav > 0) {
-      const rad = (live.decor.gravDir || 0) * Math.PI / 180;
-      const cx = CANVAS_W - 34;
-      const cy = canvasH - 26;
-      const len = 9 + Math.min(16, live.decor.grav * 5);
-      const ex = cx + Math.cos(rad) * len;
-      const ey = cy - Math.sin(rad) * len;
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-      ctx.fillStyle = 'rgba(255,255,255,0.55)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(ex, ey);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(ex, ey);
-      ctx.lineTo(ex - Math.cos(rad - 0.4) * 6, ey + Math.sin(rad - 0.4) * 6);
-      ctx.lineTo(ex - Math.cos(rad + 0.4) * 6, ey + Math.sin(rad + 0.4) * 6);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText('gravity', CANVAS_W - 58, canvasH - 6);
-    }
   }
 
   useEffect(() => {
@@ -207,7 +180,6 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
   useEffect(draw, [
     geo, canvasH, x, y, color,
     decor && decor.extX, decor && decor.extY,
-    decor && decor.grav, decor && decor.gravDir,
   ]);
 
   function apply(e) {

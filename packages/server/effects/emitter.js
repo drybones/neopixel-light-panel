@@ -74,7 +74,7 @@ module.exports = {
         { type: 'group', label: 'Source' },
         { type: 'xy', label: 'Origin', xKey: 'x', yKey: 'y',
           xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z],
-          margin: 2, extXKey: 'extX', extYKey: 'extY', gravKey: 'grav', gravDirKey: 'gravDir' },
+          margin: 2, extXKey: 'extX', extYKey: 'extY' },
         // Full width and height of the box births scatter across, not half-
         // extents. Both 0 is a point source.
         { key: 'extX', type: 'number', label: 'Width', min: 0, max: MAX_EXT_X, step: 0.05, scale: 'linear', modulatable: true },

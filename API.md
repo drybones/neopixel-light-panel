@@ -88,7 +88,7 @@ The rings are measured from the panel's **cell box** — half an LED pitch beyon
 
 An effect may also carry `presets`: an array of `{ id, name, params }`. These are **starting points, not catalog entries** — the editor renders one button per preset at the top of that layer's panel, and clicking it lays the preset's `params` over the effect's `defaults` to replace the whole look. They deliberately do not appear in the picker, which stays one tile per effect. `emitter` ships four, which is how the two effects it absorbed stay one click away.
 
-An `xy` entry may name extra keys the pad draws as **read-only** chrome: `extXKey`/`extYKey` (an emission box around the handle) and `gravKey`/`gravDirKey` (a force vector). They are edited by their own controls; the pad only shows them, because pressing anywhere on it places the handle and a second grab target would break that.
+An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only** chrome — a dashed box around the handle, for an emitter whose particles are born over an area rather than at a point. It is edited by its own Width/Height controls; the pad only shows it, because pressing anywhere on the pad places the handle and a second grab target would break that.
 
 Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `emitter`, `particle_trail`, `noise`, `twinkle`. `embers` and `candy_sparkler` were absorbed into `emitter` and are **hidden**: still rendered for stored and imported layers, absent from this catalog, and not offered as a new layer.
 

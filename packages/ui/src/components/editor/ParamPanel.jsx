@@ -93,13 +93,11 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             y={layer.params[entry.yKey]}
             color={layer.params.color}
             // Read-only chrome the pad draws when the schema names the keys —
-            // the emitter's emission box and gravity vector. An entry that
-            // names none of them gets a plain pad, as every other effect does.
-            decor={entry.extXKey || entry.gravKey ? {
+            // the emitter's emission box. An entry that names none of them gets
+            // a plain pad, as every other effect does.
+            decor={entry.extXKey ? {
               extX: layer.params[entry.extXKey] || 0,
               extY: layer.params[entry.extYKey] || 0,
-              grav: layer.params[entry.gravKey] || 0,
-              gravDir: layer.params[entry.gravDirKey] || 0,
             } : null}
             subscribe={subscribeSelectedLayer}
             onChange={(x, y) => setParams({ [entry.xKey]: x, [entry.yKey]: y })}
