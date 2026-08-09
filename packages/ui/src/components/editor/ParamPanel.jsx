@@ -42,8 +42,25 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
     onUpdate({ ...layer, params: { ...layer.params, ...patch } });
   }
 
+  // A preset is a whole look, not a patch: it lands over the effect's defaults
+  // rather than over the current params, so picking one twice from different
+  // starting points gives the same layer both times. Commits immediately —
+  // there is no drag to end, so nothing else would flush the store's throttle.
+  function applyPreset(preset) {
+    onUpdate({ ...layer, params: { ...effect.defaults, ...preset.params } });
+    onCommit();
+  }
+
   function renderEntry(entry, index) {
     switch (entry.type) {
+      // A flat separator, not a nested structure: everything that walks a
+      // schema — this, and the /api/effects payload — keeps treating it as a
+      // list, so an effect that wants sections opts in by dropping these
+      // between its params and every other effect is untouched.
+      case 'group':
+        return (
+          <h4 key={`group-${index}`} className="param-group">{entry.label}</h4>
+        );
       case 'color':
         return (
           <ColorControl
@@ -75,6 +92,13 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             x={layer.params[entry.xKey]}
             y={layer.params[entry.yKey]}
             color={layer.params.color}
+            // Read-only chrome the pad draws when the schema names the keys —
+            // the emitter's emission box. An entry that names none of them gets
+            // a plain pad, as every other effect does.
+            decor={entry.extXKey ? {
+              extX: layer.params[entry.extXKey] || 0,
+              extY: layer.params[entry.extYKey] || 0,
+            } : null}
             subscribe={subscribeSelectedLayer}
             onChange={(x, y) => setParams({ [entry.xKey]: x, [entry.yKey]: y })}
             onCommit={onCommit}
@@ -87,6 +111,9 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             entry={entry}
             value={layer.params[entry.key]}
             color={layer.params.color}
+            // Only the cone variant uses this; it draws the arc the emitter
+            // actually scatters over rather than a bare bearing.
+            spread={entry.spreadKey ? layer.params[entry.spreadKey] : null}
             onChange={(v) => setParams({ [entry.key]: v })}
             onCommit={onCommit}
           />
@@ -136,6 +163,23 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
           <button className="btn btn-ghost btn-danger" onClick={onDelete}>Delete</button>
         </div>
       </div>
+      {effect && effect.presets && effect.presets.length > 0 && (
+        <div className="param-presets">
+          <span className="control-label">Start from</span>
+          <div className="param-preset-buttons">
+            {effect.presets.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className="btn btn-ghost param-preset-btn"
+                onClick={() => applyPreset(preset)}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <EnumSelect
         label="Blend"
         options={BLEND_OPTIONS}

@@ -12,6 +12,9 @@ var MAX_PARTICLES = 60;
 module.exports = {
     type: 'embers',
     name: 'Embers',
+    // Superseded by `emitter`, whose "Embers" preset is this. Kept registered
+    // so stored and imported layers still render — see effects/index.
+    hidden: true,
     schema: [
         { key: 'hue', type: 'number', label: 'Hue', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 0.5, step: 0.01, scale: 'linear', modulatable: true },

@@ -19,7 +19,13 @@ const ZOOM_LABELS = { panel: 'Panel', near: 'Near', far: 'Far' };
 //
 // The live layer render is drawn through the same mapping, so the LEDs sit
 // where the effect actually is and you drag it around on a picture of itself.
-export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommit }) {
+// `decor` is read-only chrome for effects whose position means more than a
+// point. The emitter passes its emission box, so the pad shows where particles
+// are actually born rather than just where the origin sits; it is edited by its
+// own Width/Height controls, and nothing here is draggable but the origin.
+// Pressing anywhere on the pad places the handle — adding a second grab target
+// would break that, so the box deliberately has no corner handle.
+export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, onCommit }) {
   const padRef = useRef(null);
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
@@ -29,7 +35,18 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
   // Open on the tightest level that can actually show the value, so a layer
   // parked off-panel never starts on a clipped handle. ParamPanel keys this
   // component by layer id, so selecting another layer re-fits.
-  const [zoom, setZoom] = useState(() => fitZoom(entry, x, y));
+  // The frame subscription is created once per geometry and its callback holds
+  // whatever draw() closed over then — so anything draw() reads that changes on
+  // a param edit has to come through a ref, or the ~30fps stream repaints with
+  // the values this component mounted with and wipes the up-to-date frame. Only
+  // the decor needs this: the handle is a DOM element, not canvas, and the rest
+  // of the chrome is a function of geo alone.
+  const decorRef = useRef({ x, y, color, decor });
+  decorRef.current = { x, y, color, decor };
+
+  const [zoom, setZoom] = useState(
+    () => fitZoom(entry, x, y, decor ? decor.extX : 0, decor ? decor.extY : 0),
+  );
   const levels = useMemo(() => zoomLevels(entry), [entry]);
   const geo = useMemo(() => padGeometry(entry, zoom), [entry, zoom]);
   const canvasH = Math.round(CANVAS_W / geo.aspect);
@@ -124,6 +141,31 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
       tl.fx * CANVAS_W, tl.fy * canvasH,
       (br.fx - tl.fx) * CANVAS_W, (br.fy - tl.fy) * canvasH,
     );
+
+    const live = decorRef.current;
+    if (!live.decor) return;
+
+    // The emission box, centred on the handle. extX/extY are full width and
+    // height, so the corners are half of each away from the origin. Drawn
+    // through worldToPad like everything else, so it compresses with the far
+    // ring exactly as the LEDs do.
+    if (live.decor.extX > 0 || live.decor.extY > 0) {
+      const a = worldToPad(geo, live.x - live.decor.extX / 2, live.y + live.decor.extY / 2);
+      const b = worldToPad(geo, live.x + live.decor.extX / 2, live.y - live.decor.extY / 2);
+      ctx.setLineDash([4, 3]);
+      // White, not the layer colour: the box sits on top of that layer's own
+      // render, so drawing it in the layer's colour makes it invisible on
+      // exactly the layers that have one — an orange box on an orange field.
+      // Brighter than the panel outline's 0.25 so the two do not read as the
+      // same kind of line.
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        a.fx * CANVAS_W, a.fy * canvasH,
+        Math.max((b.fx - a.fx) * CANVAS_W, 2), Math.max((b.fy - a.fy) * canvasH, 2),
+      );
+      ctx.setLineDash([]);
+    }
   }
 
   useEffect(() => {
@@ -131,7 +173,14 @@ export default function XYPad({ entry, x, y, color, subscribe, onChange, onCommi
     return subscribe((frame) => { frameRef.current = frame; draw(); });
   }, [subscribe, geo, canvasH]);
 
-  useEffect(draw, [geo, canvasH]);
+  // The decor deps are spelled out as primitives rather than passing `decor`,
+  // which is a fresh object every render and would redraw on every keystroke
+  // anywhere in the panel. A subscribed pad repaints at the stream rate anyway;
+  // this is what keeps an unsubscribed one current.
+  useEffect(draw, [
+    geo, canvasH, x, y, color,
+    decor && decor.extX, decor && decor.extY,
+  ]);
 
   function apply(e) {
     const rect = padRef.current.getBoundingClientRect();

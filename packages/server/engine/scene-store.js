@@ -17,6 +17,7 @@ var effects = require('../effects');
 var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
 var planewaveMigrate = require('./planewave-migrate');
+var emitterMigrate = require('./emitter-migrate');
 
 var SAVE_DEBOUNCE_MS = 2000;
 
@@ -72,6 +73,7 @@ class SceneStore {
         this.activeSceneId = null;
         this.seededBuiltins = false;
         this.planeWaveMigrated = false;
+        this.emitterMigrated = false;
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -114,6 +116,7 @@ class SceneStore {
                 activeSceneId: this.activeSceneId,
                 seededBuiltins: this.seededBuiltins,
                 planeWaveMigrated: this.planeWaveMigrated,
+                emitterMigrated: this.emitterMigrated,
                 scenes: this.scenes.map(stripRuntime),
             });
         } catch (err) {
@@ -133,11 +136,13 @@ class SceneStore {
 
         if (doc && Array.isArray(doc.scenes)) {
             this.planeWaveMigrated = !!doc.planeWaveMigrated;
+            this.emitterMigrated = !!doc.emitterMigrated;
             var migrated = this.convertPlaneWaves(doc.scenes, doc);
-            this.setScenes(migrated.scenes);
+            var emitters = this.convertEmitters(migrated.scenes, doc);
+            this.setScenes(emitters.scenes);
             this.seededBuiltins = !!doc.seededBuiltins;
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
-            if (migrated.ranNow) {
+            if (migrated.ranNow || emitters.ranNow) {
                 this._dirty = true;
                 await this.flush();
             }
@@ -159,10 +164,11 @@ class SceneStore {
         }
 
         if (raw) {
-            this.setScenes(this.convertPlaneWaves(raw).scenes);
+            this.setScenes(this.convertEmitters(this.convertPlaneWaves(raw).scenes).scenes);
             console.log(source.replace('{n}', this.scenes.length));
         } else {
             this.planeWaveMigrated = true;
+            this.emitterMigrated = true;
             this.setScenes([this.defaultScene()]);
         }
         this.activeSceneId = (active && this.get(active)) ? active : null;
@@ -197,6 +203,35 @@ class SceneStore {
             }
         }
         console.log('Converted ' + result.converted + ' distant wavelet layer(s) to plane waves.');
+        return { scenes: result.scenes, ranNow: true };
+    }
+
+    // candy_sparkler and embers were one engine with different constants baked
+    // in; convert them once so their knobs become editable. Same shape as
+    // convertPlaneWaves — raw scenes in and out, its own snapshot, its own flag
+    // — because the two run in sequence on the same load and either can be the
+    // one that has already happened.
+    //
+    // The old effects stay registered (hidden) rather than being deleted: this
+    // runs once against the stored document, and an export taken beforehand can
+    // be imported long afterwards through a path that does not re-migrate.
+    convertEmitters(rawScenes, sourceDoc) {
+        if (this.emitterMigrated) return { scenes: rawScenes, ranNow: false };
+        this.emitterMigrated = true;
+
+        var result = emitterMigrate.convertScenes(rawScenes);
+        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
+
+        if (this.persistFile) {
+            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-emitter.json';
+            try {
+                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
+                console.log('Saved pre-conversion scenes to ' + backup);
+            } catch (err) {
+                console.error('Failed to snapshot scenes before emitter conversion:', err);
+            }
+        }
+        console.log('Converted ' + result.converted + ' particle layer(s) to emitters.');
         return { scenes: result.scenes, ranNow: true };
     }
 

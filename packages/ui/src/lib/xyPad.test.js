@@ -242,6 +242,26 @@ describe('fitZoom', () => {
     expect(fitZoom(waveletEntry, 1e6, 0)).toBe('far');
     expect(fitZoom(gradientEntry, 1e6, 0)).toBe('near');
   });
+
+  // The emitter draws a box around its origin, and the box is what has to fit.
+  // Its embers preset is born over an 8 x 2 area centred at y -1: the origin
+  // alone sits inside `panel`, but the box runs from x -4 to +4 against a pad
+  // half-width of 3.75, so three of its four edges land off-canvas.
+  it('fits the whole extent box, not just its centre', () => {
+    expect(fitZoom(gradientEntry, 0, -1)).toBe('panel');
+    expect(fitZoom(gradientEntry, 0, -1, 8, 2)).toBe('near');
+  });
+
+  it('is unchanged by a zero extent', () => {
+    for (const [x, y] of [[0, 0], [3, 0.8], [-1.4, -2.5], [1000, 500]]) {
+      expect(fitZoom(waveletEntry, x, y, 0, 0)).toBe(fitZoom(waveletEntry, x, y));
+    }
+  });
+
+  // A point source is the emitter's default, and it must not widen the pad.
+  it('keeps a point source on the tightest level', () => {
+    expect(fitZoom(gradientEntry, 0, 0, 0, 0)).toBe('panel');
+  });
 });
 
 describe('clampHandle', () => {

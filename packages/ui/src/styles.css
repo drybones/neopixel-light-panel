@@ -446,6 +446,40 @@ input[type="range"]::-moz-range-thumb {
 .param-panel-title { font-size: 15px; font-weight: 600; }
 .param-panel-actions { display: flex; gap: 6px; }
 
+/* Starting points for effects that declare `presets` — currently just the
+   emitter, which absorbed candy sparkler and embers. They sit above Blend
+   because they set the whole param set below, so reading top to bottom is
+   "pick a look, then adjust it". Deliberately buttons rather than a select:
+   these are one-shot actions that overwrite the panel, not a stored mode the
+   layer is in, and a select would keep showing a value that stops being true
+   the moment anything is dragged. */
+.param-presets {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.param-preset-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.param-preset-btn { font-size: 12px; padding: 4px 10px; }
+
+/* Section heading for schema `group` entries. Only the emitter uses these so
+   far — sixteen params in one scroll is where a flat list stops scanning. Not
+   collapsible: that needs state and a scope decision (per effect? per layer?
+   does it survive selecting another layer?) for little more than this buys. */
+.param-group {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  /* The rule goes *above* the title, not below it. Underlined, the line binds
+     to the heading and reads as decoration on the label; above, it closes the
+     preceding section and the heading then sits with the controls it names. */
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 .control-row {
   display: flex;
   align-items: center;

@@ -11,6 +11,9 @@ var MAX_PARTICLES = 80;
 module.exports = {
     type: 'candy_sparkler',
     name: 'Candy sparkler',
+    // Superseded by `emitter`, whose "Candy sparkler" preset is this. Kept
+    // registered so stored and imported layers still render — see effects/index.
+    hidden: true,
     schema: [
         { key: 'count', type: 'number', label: 'Density', min: 5, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
         { key: 'speed', type: 'number', label: 'Speed', min: 0.1, max: 4, scale: 'log', modulatable: true },

@@ -69,7 +69,11 @@ Returns every available effect with its parameter schema and defaults — enough
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
+
+A `group` entry carries only a `label` and no `key`: it is a **flat separator**, not a container, so the schema stays a list and an effect opts into sections simply by dropping one between its params. Only `emitter` uses them so far — sixteen params in one panel is where a flat list stops scanning. Params before the first `group` render in an unnamed section at the top of the panel, alongside blend and opacity.
+
+An `angle` entry may set `render` to pick what the dial draws inside itself: `wavefronts` (the default — parallel lines perpendicular to the direction, for waves), `cone` (an arrow plus the arc named by `spreadKey`, for an emitter's launch direction), or `arrow` (an arrow alone, for a force). An effect with two angle dials needs them to look different, or they read as the same control twice.
 
 `scale: log` spreads `min`/`max` over decades so equal slider travel is equal ratio — for wavelength, the speeds and the ambient glow floors, which span more range than a linear track can usefully hold. It ignores `step` (the track is integer positions). Adding `zeroable: true` reserves the bottom of the track for an exact `0`, which several params store to mean "frozen" or "no floor" and which a log scale cannot otherwise express.
 
@@ -82,7 +86,11 @@ Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linea
 
 The rings are measured from the panel's **cell box** — half an LED pitch beyond the outermost centres, ±3.75 × ±1.0 — rather than the centres themselves, so the edge LEDs draw as whole circles inside the outline and the pad frames the panel exactly as the editor's preview does. With the shipped values (`margin: 2`, `farLimit: 1000`) the steps are ±3.75 × ±1.0, ±5.75 × ±3.0, and ±7.75 × ±5.0, the last reaching x ±1000 / y ±645 at its edge.
 
-Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `embers`, `particle_trail`, `candy_sparkler`, `noise`, `twinkle`.
+An effect may also carry `presets`: an array of `{ id, name, params }`. These are **starting points, not catalog entries** — the editor renders one button per preset at the top of that layer's panel, and clicking it lays the preset's `params` over the effect's `defaults` to replace the whole look. They deliberately do not appear in the picker, which stays one tile per effect. `emitter` ships four, which is how the two effects it absorbed stay one click away.
+
+An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only** chrome — a dashed box around the handle, for an emitter whose particles are born over an area rather than at a point. It is edited by its own Width/Height controls; the pad only shows it, because pressing anywhere on the pad places the handle and a second grab target would break that.
+
+Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `emitter`, `particle_trail`, `noise`, `twinkle`. `embers` and `candy_sparkler` were absorbed into `emitter` and are **hidden**: still rendered for stored and imported layers, absent from this catalog, and not offered as a new layer.
 
 ---
 
@@ -193,6 +201,8 @@ GET /api/effects/previews     →  one filmstrip per effect, at its defaults
 
 Same payload, with `id` holding the effect `type` instead of a scene ID — for an editor's effect picker, which has no layer to render yet. Effect defaults are fixed in code, so these are rendered once and kept.
 
+One strip per effect, never one per preset: an effect's `presets` are starting points offered inside its layer editor, not separate things to add. Hidden effects get no strip.
+
 ---
 
 ### Check virtual mode
@@ -268,3 +278,16 @@ The old preset endpoints (`/api/all_presets/`, `/api/current_preset_id/`, `/api/
 ## Migration to plane waves
 
 Several presets faked a plane wave by putting the source a thousand units off-panel, which the position pad could not represent or recover. On first boot after upgrading, any `wavelet` layer far enough away that its residual wavefront curvature is negligible becomes a `planewave` with the equivalent `angle` and `delta`. Layers with a short `lambda` are left alone, since curvature stays visible for them however distant the source. The pre-conversion document is written to `.node-persist/scenes-v2.pre-planewave.json` for rollback, and a `planeWaveMigrated` flag in the scene document stops it running twice — so a `wavelet` you later drag out to the pad's far edge stays a `wavelet`.
+
+## Migration to the emitter
+
+`candy_sparkler` and `embers` were the same particle engine with different constants compiled into it — emission origin, direction, spread, speed, lifetime, colour source and the intensity envelope were all literals, which is why each had one look and candy sparkler had no colour control at all. Both are now presets of a single `emitter` effect that exposes them.
+
+On first boot after upgrading, every `candy_sparkler` and `embers` layer becomes an `emitter`. The pre-conversion document is written to `.node-persist/scenes-v2.pre-emitter.json` for rollback, and an `emitterMigrated` flag in the scene document stops it running twice. The old effect types stay registered but **hidden**: they still render, so an export taken before the migration and imported long afterwards is never blank, but nothing offers them as a new layer.
+
+The conversion is **not bit-exact**, deliberately. The old effects drew per-particle velocity from distributions that do not map onto a direction/spread pair term for term — candy sparkler drew a radial speed over a full 2π, embers drew independent x and z components, a rectangular distribution. The drift is the same; particle for particle it is not. Two specific corrections are applied:
+
+- Embers' envelope peaked at **0.7** where the sparkler's peaked at 1.0, so the factor is folded into the layer's `opacity`.
+- Embers' hue jitter was **asymmetric** (`hue + hueSpread * (random() - 0.15)`, biased up by `0.35 × hueSpread`); the emitter's is symmetric, so the converted swatch is shifted by that bias.
+
+Both effects also carried an ambient backglow particle that the emitter does not have, so migrated layers read flatter. Restoring the wash means adding a `solid` layer beneath **on `add` blend** — under `normal` at opacity 1 it would be composited and then entirely overwritten, dark pixels included.

@@ -8,6 +8,10 @@ import FilmstripCanvas from '../preview/FilmstripCanvas';
 // filmstrips the scene cards use, from GET /api/effects/previews. It replaced a
 // strip of representative colours that had to be hand-picked per effect, and
 // which said nothing about whether the thing moved.
+//
+// One tile per effect, never one per preset: an effect's presets are starting
+// points offered inside its layer editor, so this stays a list of the things
+// you can add rather than a list of looks.
 export default function EffectPicker({ effects, onPick, onClose }) {
   const previews = useStore((s) => s.effectPreviews);
   const frames = useStore((s) => s.previewFrames);

@@ -17,7 +17,7 @@ function createRouter(store, previewCache, effectPreviewCache) {
     // look like rather than a swatch of its colours. Same payload shape as
     // the scene filmstrips, keyed by effect type instead of scene id.
     router.get('/effects/previews', async function(req, res) {
-        var previews = await effectPreviewCache.all(effects.list());
+        var previews = await effectPreviewCache.all(effects.visible());
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,

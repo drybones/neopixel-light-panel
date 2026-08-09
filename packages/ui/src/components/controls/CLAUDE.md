@@ -17,3 +17,15 @@ The two **end** colours (first/last by position, so a stop dragged past an end s
 ## `AngleDial.jsx`
 
 Draws the wavefronts, not just a knob. Its arrow points the way the wave **travels**, so the control agrees with the motion — note that is the opposite of where an equivalent *outward* wavelet's source sits. Wavelet's own inward/outward toggle carries the same `Travel` label for that reason: both effects label the direction the wave goes, not where it comes from.
+
+`entry.render` picks what fills the dial, because not every angle is a wave. `cone` draws the arc named by `spreadKey` instead of stripes — an emitter has no wavefronts, and the spread is the thing you are judging; at 360° it fills the disc, which is what omnidirectional should look like. `arrow` draws a bare arrow with a head rather than the usual dot. That variant exists for one reason: the emitter puts **two** dials on one panel — where particles are launched, and which way a force pulls — and rendered identically they read as the same control twice.
+
+## `XYPad.jsx`
+
+`decor` is read-only chrome for effects whose position means more than a point: the emitter passes its emission box, drawn as a dashed rect around the handle, so the pad shows where particles are actually born. It is edited by its own Width/Height controls. The box is stroked **white, not the layer colour** — it sits on top of that layer's own render, so taking its colour makes it invisible on exactly the layers that have one.
+
+It carried a gravity arrow too, in the bottom corner. That came out: a static arrow duplicating a dial two rows up earned less than the space and the ink it cost.
+
+There is deliberately **no resize handle on the box.** `handlePointerDown` calls `apply()` unconditionally — pressing anywhere places the handle, with no hit-testing anywhere in the component — so a second grab target means fingertip-sized slop that breaks tap-to-place near the corner, a second `role="slider"` aria contract, `fitZoom` accounting for the box, and special-casing the drag out of `padToWorld`, whose far-ring compression is a mapping for *positions* and makes nonsense of a size. That is a new gesture model to duplicate two sliders that already exist.
+
+The chrome reads `decorRef`, not props. The frame subscription is created per geometry and its callback holds whatever `draw()` closed over then, so a prop the chrome reads is frozen at mount and the stream repaints over every correct frame — see the root [CLAUDE.md](../../../../../CLAUDE.md).

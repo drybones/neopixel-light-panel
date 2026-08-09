@@ -35,4 +35,39 @@ function hsv(h, s, v) {
     return [r * 255, g * 255, b * 255];
 }
 
-module.exports = { hexToRgb, hsv };
+/*
+ * The inverse of hsv(), for effects whose params carry a hex swatch but whose
+ * render works in hue: the emitter jitters hue per particle around the chosen
+ * colour, and twinkle spreads a band of hues across its stars. Both need the
+ * swatch decomposed once in prepare() so the hot loop only ever calls hsv().
+ *
+ * RGB in [0, 255], h/s/v out in [0, 1]. Grey has no hue, so h is 0 there —
+ * arbitrary, but it keeps a hue jitter around a white swatch producing whites
+ * rather than swinging through a ramp the user never asked for.
+ */
+function rgbToHsv(r, g, b) {
+    var rn = r / 255, gn = g / 255, bn = b / 255;
+    var max = Math.max(rn, gn, bn);
+    var min = Math.min(rn, gn, bn);
+    var d = max - min;
+
+    var h = 0;
+    if (d > 0) {
+        if (max === rn) {
+            h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
+        } else if (max === gn) {
+            h = ((bn - rn) / d + 2) / 6;
+        } else {
+            h = ((rn - gn) / d + 4) / 6;
+        }
+    }
+
+    return { h: h, s: max > 0 ? d / max : 0, v: max };
+}
+
+function hexToHsv(hex) {
+    var rgb = hexToRgb(hex);
+    return rgbToHsv(rgb.r, rgb.g, rgb.b);
+}
+
+module.exports = { hexToRgb, hsv, rgbToHsv, hexToHsv };

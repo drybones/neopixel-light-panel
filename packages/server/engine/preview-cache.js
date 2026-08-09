@@ -70,6 +70,9 @@ class PreviewCache {
 // are code, not data, so there is nothing to invalidate against — rendered
 // once on first request and kept. Deliberately a separate map from the scene
 // cache, whose prune() would otherwise throw these away as unknown scene ids.
+//
+// One strip per effect, never per preset: an effect's presets are starting
+// points inside the layer editor, not separate entries in the picker.
 class EffectPreviewCache {
     constructor(model) {
         this.model = model;

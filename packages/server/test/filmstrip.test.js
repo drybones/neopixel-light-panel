@@ -148,12 +148,37 @@ test('every registered effect renders a lit filmstrip from its defaults', () => 
 
 test('effect previews are keyed by type and rendered once', async () => {
     const cache = new EffectPreviewCache(MODEL);
-    const all = await cache.all(effects.list());
-    assert.deepStrictEqual(all.map((p) => p.id), effects.list().map((e) => e.type));
+    const visible = effects.visible();
+    const all = await cache.all(visible);
+    assert.deepStrictEqual(all.map((p) => p.id), visible.map((e) => e.type));
 
     const solid = effects.get('solid');
     assert.strictEqual(cache.get(solid).data, cache.get(solid).data);
-    assert.strictEqual(cache.entries.size, effects.list().length);
+    assert.strictEqual(cache.entries.size, visible.length);
+});
+
+// An effect's presets are starting points inside its layer editor, not extra
+// things to add, so they must not multiply the picker's tiles.
+test('presets do not add picker tiles', async () => {
+    const emitter = effects.get('emitter');
+    assert.ok(emitter.presets.length > 1, 'emitter should ship several presets');
+
+    const types = effects.visible().map((e) => e.type);
+    assert.strictEqual(types.filter((t) => t === 'emitter').length, 1);
+    assert.strictEqual(new Set(types).size, types.length, 'one tile per effect');
+
+    const cache = new EffectPreviewCache(MODEL);
+    await cache.all(effects.visible());
+    assert.strictEqual(cache.entries.size, effects.visible().length);
+});
+
+// The superseded effects still render, so a layer that predates the migration
+// is never blank — but nothing should offer them as a new layer.
+test('hidden effects are absent from the picker but still resolvable', () => {
+    const types = effects.visible().map((e) => e.type);
+    assert.ok(!types.includes('candy_sparkler'));
+    assert.ok(!types.includes('embers'));
+    assert.ok(effects.get('embers'));
 });
 
 test('the cache forgets scenes that no longer exist', async () => {
