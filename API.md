@@ -215,6 +215,46 @@ Returns `{ "virtual": true }` if the server is running without Fadecandy hardwar
 
 ---
 
+### Frame-rate tracker
+
+```
+GET /api/fps
+PUT /api/fps                  body: { "enabled": true }
+```
+
+Instrumentation for the render loop, **off by default**. Both verbs return the same snapshot; the toggle persists across restarts.
+
+```json
+{
+  "enabled": true,
+  "targetFps": 100,
+  "idle": false,
+  "fps": 91.6,
+  "frameMs": 10.92,
+  "renderMs": 0.02,
+  "tickMs": 0.08,
+  "worstFrameMs": 11.53,
+  "worstRenderMs": 0.05,
+  "overruns": 0,
+  "frames": 1841,
+  "uptimeMs": 20114.7,
+  "virtual": false
+}
+```
+
+`fps`, `frameMs`, `renderMs` and `tickMs` are averages over a rolling ~1 s window; `worst*`, `overruns` and `frames` are cumulative since the tracker was switched on. `renderMs` is the compositor plus the write to the pixel sink, `tickMs` the whole tick including the WebSocket broadcast — the pair says whether a shortfall is our own work or the timer.
+
+Four things the numbers do *not* mean:
+
+- **`targetFps` is nominal, not a goal that gets hit.** The loop is a 10 ms `setInterval`, which clamps: a perfectly healthy loop reports around 91 FPS. Judge it on `frameMs` against the 10 ms target and on `overruns`, not on equality with `targetFps`.
+- **`overruns` counts tick gaps of ≥2× the target** — `setInterval` coalescing, or something blocking past the interval. A gap over 500 ms is treated as the loop having been idle instead, and is neither sampled nor counted.
+- **`idle: true` means nothing is rendering**, normally because no scene is active — the loop renders one black frame and then fast-exits, which is correct behaviour, not 0 FPS. The other fields hold the last figures taken.
+- **This is the panel's frame rate, not the preview stream's**, which is separately throttled to ~30 FPS (~15 for layer frames).
+
+`virtual` is echoed because the reading means different things per mode: the loop and the compositor are identical under `VIRTUAL=1`, so the render figures are real, but there is no hardware write and a dev machine is not a Pi. Clients should label it.
+
+---
+
 ## Wavelet parameters
 
 The `wavelet` effect renders one sinusoidal wave radiating from a point — or converging on it; stack several with the `add` blend for interference patterns.

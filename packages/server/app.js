@@ -9,6 +9,7 @@ var { Compositor } = require('./engine/compositor');
 var { SceneStore } = require('./engine/scene-store');
 var { Broadcaster } = require('./engine/broadcast');
 var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
+var { FrameStats } = require('./engine/frame-stats');
 var effects = require('./effects');
 var migrate = require('./engine/migrate');
 var createScenesRouter = require('./routes/scenes');
@@ -43,6 +44,13 @@ var store = new SceneStore(compositor, SCENES_FILE);
 const GLOBAL_BRIGHTNESS_CONFIG_KEY = 'global_brightness';
 var global_brightness = 1.0;
 
+// Render-loop instrumentation. Off by default and costed for the hot loop;
+// the toggle persists alongside brightness so a soak survives a restart of
+// lightpanel.service.
+const FRAME_STATS_CONFIG_KEY = 'frame_stats_enabled';
+var TICK_MS = 10;
+var frameStats = new FrameStats({ targetMs: TICK_MS });
+
 async function initStorage() {
     // Collect legacy/auxiliary state from node-persist first; any failure
     // here must not stop the scene file from loading.
@@ -67,6 +75,8 @@ async function initStorage() {
             global_brightness = parseFloat(brightnessValue);
             client.brightness = global_brightness;
         }
+
+        frameStats.setEnabled(await storage.getItem(FRAME_STATS_CONFIG_KEY));
     } catch (err) {
         console.error('node-persist initialization failed (continuing with scene file only):', err);
     }
@@ -138,6 +148,28 @@ app.put('/api/brightness/:brightness', function(req, res) {
     res.sendStatus(200);
 });
 
+// Frame-rate tracker. The snapshot carries `virtual` because the numbers
+// mean different things per mode: the loop and the compositor are identical,
+// but virtual-opc does no hardware write, so a dev-machine rate is not
+// comparable to the Pi's and the UI has to label it as such.
+function frameStatsSnapshot() {
+    var snap = frameStats.snapshot();
+    snap.virtual = !!process.env.VIRTUAL;
+    return snap;
+}
+app.get('/api/fps', function(req, res) {
+    res.json(frameStatsSnapshot());
+});
+app.put('/api/fps', function(req, res) {
+    if (!req.body || typeof req.body.enabled !== 'boolean') {
+        return res.status(400).json({ error: 'expected {enabled: boolean}' });
+    }
+    frameStats.setEnabled(req.body.enabled);
+    storage.setItem(FRAME_STATS_CONFIG_KEY, frameStats.enabled)
+        .catch(err => console.error('Failed to save frame-stats toggle:', err));
+    res.json(frameStatsSnapshot());
+});
+
 app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));
 
 app.listen(3000, function () {
@@ -151,15 +183,24 @@ var offRendered = false;
 function tick() {
     var scene = store.activeScene();
     if (scene) {
+        // begin() returns 0 while the tracker is off, which makes every
+        // other call here an early return — the instrumentation costs a
+        // boolean test on the path that matters.
+        var t0 = frameStats.begin();
         compositor.renderFrame(scene, Date.now());
+        frameStats.endRender(t0);
         broadcaster.tick();
         broadcaster.tickLayers(scene);
+        frameStats.end(t0);
         offRendered = false;
     } else if (!offRendered) {
+        // "Off" is one black frame and then an idle loop. Deliberately not
+        // sampled: it is not a stalled render, and counting those ticks
+        // would report 0 FPS for a panel that is behaving correctly.
         compositor.renderBlack();
         broadcaster.tick(true);
         offRendered = true;
     }
 }
 
-setInterval(tick, 10);
+setInterval(tick, TICK_MS);
