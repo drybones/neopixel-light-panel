@@ -27,15 +27,17 @@ export const useStore = create((set, get) => ({
   activeSceneId: null,
   brightness: 1.0,
   isVirtual: null,
+  fps: null, // last /api/fps snapshot; null until the first read succeeds
   loaded: false,
 
   async init() {
-    const [scenes, active, brightness, effects, virtual] = await Promise.all([
+    const [scenes, active, brightness, effects, virtual, fps] = await Promise.all([
       api.scenes(),
       api.activeScene(),
       api.brightness(),
       api.effects(),
       api.virtual().catch(() => ({ virtual: null })),
+      api.fps().catch(() => null),
     ]);
     set({
       scenes,
@@ -43,6 +45,7 @@ export const useStore = create((set, get) => ({
       brightness: parseFloat(brightness),
       effects,
       isVirtual: virtual.virtual,
+      fps,
       loaded: true,
     });
     get().loadAllDetails();
@@ -94,6 +97,27 @@ export const useStore = create((set, get) => ({
   setBrightness(value) {
     set({ brightness: value });
     layerThrottle.schedule('brightness', () => api.setBrightness(value));
+  },
+
+  // Frame-rate tracker. The server owns the toggle (it persists it), so the
+  // enabled flag always comes back from the response rather than being
+  // assumed here — a rejected PUT must not leave the pill lit.
+  async setFpsEnabled(enabled) {
+    set((s) => ({ fps: { ...(s.fps || {}), enabled, idle: true, fps: null, frames: 0, overruns: 0 } }));
+    try {
+      set({ fps: await api.setFps(enabled) });
+    } catch {
+      set({ fps: await api.fps().catch(() => null) });
+    }
+  },
+
+  // Polled while the tracker is on. A failed poll keeps the last reading
+  // rather than blanking the readout — the panel dropping off the network
+  // for one second is not a frame-rate result.
+  async pollFps() {
+    try {
+      set({ fps: await api.fps() });
+    } catch { /* keep the last snapshot */ }
   },
 
   async createScene(scene) {
