@@ -11,18 +11,21 @@ var modules = [
     require('./wavelet'),
     require('./planewave'),
     require('./solid'),
-    require('./gradient'),
+    require('./gradient_linear'),
+    require('./gradient_radial'),
     require('./emitter'),
     require('./particle-trail'),
     require('./noise'),
     require('./twinkle'),
-    // Superseded by emitter, kept registered so they still render. The one-time
-    // engine/emitter-migrate converts stored layers, but an *export* taken
-    // before the migration can be imported long afterwards and importMerge does
-    // not re-run migrations — so these have to keep working indefinitely.
-    // `hidden` keeps them out of the catalog, and therefore out of the picker.
+    // Superseded, kept registered so they still render. The one-time
+    // engine/emitter-migrate and engine/gradient-migrate convert stored layers,
+    // but an *export* taken before a migration can be imported long afterwards
+    // and importMerge does not re-run migrations — so these have to keep
+    // working indefinitely. `hidden` keeps them out of the catalog, and
+    // therefore out of the picker.
     require('./embers'),
     require('./candy-sparkler'),
+    require('./gradient'),
 ];
 
 var byType = {};
