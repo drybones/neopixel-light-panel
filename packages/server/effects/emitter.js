@@ -24,6 +24,15 @@
  * to point[2]. Do not "simplify" that away, and do not add a second one: the
  * whole vertical axis — origin, travel, gravity — inverts together, and a
  * symmetric preset like the sparkler will not show it.
+ *
+ * An emitter starting from an empty field fills at count/life births per
+ * second — the ramp, see createInstance(). That covers a fresh instance and
+ * equally a scene switched away from and back, which is the same start-up seen
+ * far more often. Starting empty is the look; the alternative of pre-rolling
+ * to a settled field before it is shown was considered and turned down.
+ * Nothing else in here integrates state, so a filmstrip can still jump to any
+ * absolute millis it likes — it just has to sit through the ramp first, which
+ * is what warmupMs() below is for.
  */
 
 var color = require('../engine/color');
@@ -39,6 +48,18 @@ var MAX_PARTICLES = 80;
 // the same way on screen. Migrated embers drift about 1.5x wider horizontally
 // than they used to as a result.
 var X_STRETCH = 1.5;
+
+// A gap this long between renders means this layer was not being rendered —
+// the loop only ever runs the active scene, and it fast-exits entirely when
+// nothing is active. It is not a slow frame: the tick is 10ms, so 500ms is 50
+// of them, and engine/frame-stats draws the line at the same place for the
+// same reason. It has to stay clear of the filmstrip's 200ms warm-up step,
+// which is a real gap between renders and must not read as a discontinuity —
+// which is the whole reason this is a threshold and not zero. A gap under it
+// still hands back whatever died during it in one tick; at half a second that
+// is a tenth of the field ringing at 1.18x rather than a 2x burst, and it
+// needs a scene flipped away from and back inside half a second to see.
+var RESUME_MS = 500;
 
 // falloff is 1/size^2, so a size of 0 divides to Infinity and then
 // intensity / (1 + Infinity * 0) is NaN, straight into the layer buffer and
@@ -186,6 +207,18 @@ module.exports = {
         };
     },
 
+    // How long a filmstrip has to run this layer before it is settled enough
+    // to capture. The ramp takes about one and a half lifetimes to fill (a
+    // birth budget of count/life has to cover the replacements as well as the
+    // first cohort), and the first cohort's phases wash out over a couple
+    // more — so two of the longest life this layer can produce. The extra
+    // second only matters at the bottom of the slider, where two lifetimes is
+    // under half a second and the whole cost of being generous is a few
+    // discarded frames.
+    warmupMs(p) {
+        return p.life * (1 + p.lifeSpread) * 2 + 1000;
+    },
+
     createInstance(ctx) {
         var pool = new Array(MAX_PARTICLES);
         for (var i = 0; i < MAX_PARTICLES; i++) {
@@ -203,13 +236,47 @@ module.exports = {
                 alive: false,
                 born: 0,
                 death: 0,
-                // Only the first birth is staggered. Without it every particle
-                // is born on the same tick and the layer pulses in lockstep for
-                // its first cycle — the filmstrip's warm-up hides that, the
-                // live panel does not.
+                // Set until this slot has been born *since the field was last
+                // empty*. It is what tells the ramp below that the emitter is
+                // still filling — true for every slot of a fresh instance,
+                // true again for the slots Density adds to a running one, and
+                // set back on the slots that a scene switch emptied.
                 virgin: true,
             };
         }
+
+        // The ramp. A fresh emitter fills from empty at count/life births per
+        // second instead of seeding a whole field at once, so the layer arrives
+        // gradually and then holds; `nextBirth` is the gate every birth waits
+        // at while `filling` is set.
+        //
+        // Gating only the *first* birth of each slot is not enough, and a
+        // staggered first birth (a random offset over one lifetime, which is
+        // what this replaces) is not either. Slots that opened early start
+        // dying while the last ones are still opening, and a replacement is a
+        // birth too: let those through ungated and the field fills at
+        // count/life *plus* the death rate, reaching full a good deal younger
+        // than a settled emitter ever is. Since the intensity envelope peaks
+        // early in a particle's life, "full but young" is brighter than
+        // steady state — that is the surge, and it is why the gate counts
+        // every birth rather than only the first ones.
+        //
+        // A scene switched away from and back is the other half of this. The
+        // compositor keeps one layer instance per layer id for *every* scene,
+        // not just the active one, so coming back is this instance resumed
+        // with the whole field long dead — and reborn ungated, all of it lands
+        // on a single tick in perfect lockstep, a 2x surge worse than the
+        // start-up this ramps. It is also the commonest way to see an emitter
+        // start. So a gap in rendering sends every slot that has nothing alive
+        // in it back to virgin, and they ramp in again; whatever did survive
+        // the gap keeps going, which is what makes this safe at any gap length
+        // rather than only at ones long enough to guarantee an empty field.
+        var filling = false;
+        var nextBirth = 0;
+        var lastMillis = 0;
+        // millis is absolute and 0 is a legitimate value, so "have we rendered
+        // before" is a flag, not a comparison against lastMillis.
+        var rendered = false;
 
         function spawn(q, millis, p) {
             var speed = p.speed * (1 + (Math.random() - 0.5) * 2 * p.speedSpread);
@@ -225,9 +292,8 @@ module.exports = {
                 : p.h + p.hueSpread * (Math.random() - 0.5);
             q.color = color.hsv(hue, p.s, p.v);
 
-            var delay = q.virgin ? Math.random() * p.life : 0;
             q.virgin = false;
-            q.born = millis + delay;
+            q.born = millis;
             q.death = q.born + p.life * (1 + (Math.random() - 0.5) * 2 * p.lifeSpread);
             q.alive = true;
         }
@@ -245,9 +311,63 @@ module.exports = {
         return {
             render(out, millis, p) {
                 var active = p.count;
+                // count births per life, i.e. one every life/count ms.
+                var cadence = p.life / active;
+
+                // Resumed rather than ticked: this layer has not been rendered
+                // for a while, so anything whose time ran out in the meantime
+                // is gone rather than merely due for replacement. A backwards
+                // jump is the same thing — a different time base, so nothing
+                // on screen belongs to it.
+                var gap = millis - lastMillis;
+                lastMillis = millis;
+                if (!rendered) {
+                    rendered = true;
+                } else if (gap < 0 || gap > RESUME_MS) {
+                    for (var r = 0; r < active; r++) {
+                        var slot = pool[r];
+                        if (!slot.alive || millis > slot.death) slot.virgin = true;
+                    }
+                }
+
+                // Whether the emitter is still filling has to be known before
+                // the first slot is considered, not worked out as the pass
+                // goes: deciding it at the end lets a whole new cohort through
+                // ungated on the frame it appears, which is the surge again
+                // with an extra frame of delay. Breaking on the first virgin
+                // makes this O(1) while filling and one pass of comparisons
+                // when settled.
+                var virgins = false;
+                for (var v = 0; v < active; v++) {
+                    if (pool[v].virgin) { virgins = true; break; }
+                }
+                // Arm on the transition, which covers all three ways a fill
+                // starts: a fresh instance, whose every slot is virgin on its
+                // first render — millis is absolute and 0 is a legitimate
+                // value for it, so the gate is never armed off nextBirth being
+                // falsy — the resume just above, and Density adding slots to a
+                // settled emitter. The last two share the hazard: nextBirth
+                // has been sitting in the past since the last fill ended, and
+                // an unarmed gate is no gate at all.
+                if (virgins && !filling) nextBirth = millis;
+                filling = virgins;
+
                 for (var i = 0; i < active; i++) {
                     var q = pool[i];
-                    if (!q.alive) spawn(q, millis, p);
+
+                    if (!q.alive) {
+                        if (filling && millis < nextBirth) {
+                            q.intensity = 0;
+                            continue;
+                        }
+                        spawn(q, millis, p);
+                        // One cadence on from the last grant, not from now:
+                        // the filmstrip warms up in 200ms steps, and a gate
+                        // that reset to `millis` would hand out one birth per
+                        // frame there and pace the ramp by the frame rate
+                        // instead of by count/life.
+                        if (filling) nextBirth += cadence;
+                    }
 
                     if (millis > q.death) {
                         q.intensity = 0;
@@ -255,13 +375,10 @@ module.exports = {
                         continue;
                     }
 
+                    // A particle is born now, never on a schedule, so its age
+                    // cannot be negative: the gate holds a slot dead until its
+                    // turn rather than handing it a birth in the future.
                     var age = (millis - q.born) / 1000;
-                    // Still inside its birth delay: nothing to draw yet, and
-                    // integrating a negative age would fling it backwards.
-                    if (age < 0) {
-                        q.intensity = 0;
-                        continue;
-                    }
 
                     var half = 0.5 * age * age;
                     q.point[0] = q.ox + q.vx * age + p.ax * half;
