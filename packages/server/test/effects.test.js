@@ -4,7 +4,8 @@ const assert = require('node:assert');
 const wavelet = require('../effects/wavelet');
 const planewave = require('../effects/planewave');
 const solid = require('../effects/solid');
-const gradient = require('../effects/gradient');
+const gradientLinear = require('../effects/gradient_linear');
+const gradientRadial = require('../effects/gradient_radial');
 const noise = require('../effects/noise');
 const emitter = require('../effects/emitter');
 const twinkle = require('../effects/twinkle');
@@ -133,15 +134,13 @@ test('solid scales by level', () => {
     assert.strictEqual(p.b, 64);
 });
 
+const RAMP = [
+    { position: 0, color: '#000000' },
+    { position: 1, color: '#ff0000' },
+];
+
 test('gradient LUT interpolates stops', () => {
-    const p = gradient.prepare({
-        ...gradient.defaults,
-        stops: [
-            { position: 0, color: '#000000' },
-            { position: 1, color: '#ff0000' },
-        ],
-        mode: 'linear', angle: 0, animate: 'none',
-    });
+    const p = gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP });
     assert.strictEqual(p.lut[0], 0);
     assert.strictEqual(p.lut[255 * 3], 255);
     const mid = p.lut[128 * 3];
@@ -149,34 +148,82 @@ test('gradient LUT interpolates stops', () => {
 });
 
 test('linear gradient maps panel extremes to stop colours', () => {
-    const p = gradient.prepare({
-        ...gradient.defaults,
-        stops: [
-            { position: 0, color: '#000000' },
-            { position: 1, color: '#ff0000' },
-        ],
-        mode: 'linear', angle: 0, animate: 'none',
-    });
+    const p = gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 0 });
     const ctx = {
         numPixels: 3,
         modelX: new Float32Array([-3.625, 0, 3.625]),
         modelZ: new Float32Array([0, 0, 0]),
     };
     const out = new Float32Array(9);
-    gradient.createInstance(ctx).render(out, 0, p);
+    gradientLinear.createInstance(ctx).render(out, 0, p);
     assert.ok(out[0] < 3, 'left edge should be near black, got ' + out[0]);
     assert.ok(Math.abs(out[3] - 127.5) < 3, 'centre should be mid-red, got ' + out[3]);
     assert.ok(out[6] > 252, 'right edge should be full red, got ' + out[6]);
 });
 
+// The vertical axis inverts between param space (the dial draws 90 degrees as
+// up) and modelZ, whose +0.875 is the *bottom* row. The effect this replaced was
+// missing the negation and ran its ramp downward at 90; it went unseen because
+// the control was a slider with no picture, and because the x axis on its own
+// looks perfectly correct. Pin the axis the dial disagreed with.
+test('linear gradient at 90 degrees puts its last stop at the top', () => {
+    const p = gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 90 });
+    const ctx = {
+        numPixels: 2,
+        modelX: new Float32Array([0, 0]),
+        // Strip order: modelZ -0.875 is the top row, +0.875 the bottom.
+        modelZ: new Float32Array([-0.875, 0.875]),
+    };
+    const out = new Float32Array(6);
+    gradientLinear.createInstance(ctx).render(out, 0, p);
+    assert.ok(out[0] > out[3], `top row must be the brighter end, got ${out[0]} vs ${out[3]}`);
+});
+
+// Repeats scales the ramp about the panel's centre, so at 2 the stop list runs
+// black-to-red over the middle half and the mirror tiling folds both edges back
+// to the same mid-ramp colour — which is what keeps it seamless.
+test('linear gradient repeats traverse the stop list more than once', () => {
+    const ctx = {
+        numPixels: 5,
+        modelX: new Float32Array([-3.625, -1.8125, 0, 1.8125, 3.625]),
+        modelZ: new Float32Array([0, 0, 0, 0, 0]),
+    };
+    const out = new Float32Array(15);
+    gradientLinear.createInstance(ctx).render(out, 0,
+        gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 0, repeats: 2 }));
+    assert.ok(out[3] < 3, 'the first stop should land a quarter in, got ' + out[3]);
+    assert.ok(out[9] > 252, 'the last stop should land three quarters in, got ' + out[9]);
+    assert.ok(Math.abs(out[0] - 127.5) < 3, 'left edge should fold to mid-ramp, got ' + out[0]);
+    assert.ok(Math.abs(out[12] - 127.5) < 3, 'right edge should fold to mid-ramp, got ' + out[12]);
+});
+
+test('gradient tiling decides what happens past the ends', () => {
+    const ctx = {
+        // Off the right of the panel, at u = 1.25 — the mirror fold and the
+        // sawtooth agree at exactly 1.5, so a sample there would prove nothing.
+        numPixels: 1,
+        modelX: new Float32Array([5.4375]),
+        modelZ: new Float32Array([0]),
+    };
+    function edge(tiling) {
+        const out = new Float32Array(3);
+        gradientLinear.createInstance(ctx).render(out, 0,
+            gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 0, tiling }));
+        return out[0];
+    }
+    assert.ok(edge('hold') > 252, 'hold should sit on the last stop, got ' + edge('hold'));
+    assert.ok(Math.abs(edge('repeat') - 63.75) < 3, 'repeat should sawtooth to 0.25, got ' + edge('repeat'));
+    assert.ok(Math.abs(edge('mirror') - 191.25) < 3, 'mirror should fold to 0.75, got ' + edge('mirror'));
+});
+
 test('radial gradient is symmetric around the centre', () => {
-    const p = gradient.prepare({
-        ...gradient.defaults,
+    const p = gradientRadial.prepare({
+        ...gradientRadial.defaults,
         stops: [
             { position: 0, color: '#ffffff' },
             { position: 1, color: '#000000' },
         ],
-        mode: 'radial', cx: 0, cy: 0, animate: 'none',
+        cx: 0, cy: 0,
     });
     const ctx = {
         numPixels: 3,
@@ -184,9 +231,50 @@ test('radial gradient is symmetric around the centre', () => {
         modelZ: new Float32Array([0, 0, 0]),
     };
     const out = new Float32Array(9);
-    gradient.createInstance(ctx).render(out, 0, p);
+    gradientRadial.createInstance(ctx).render(out, 0, p);
     assert.strictEqual(out[0], out[6]);
     assert.ok(out[3] > out[0], 'centre should be brightest');
+});
+
+// A circle on a 30x8 panel is clipped hard at the left and right edges; aspect
+// stretches it in x, which is the whole reason the control exists.
+test('radial aspect stretches the falloff horizontally, not vertically', () => {
+    const ctx = {
+        numPixels: 2,
+        modelX: new Float32Array([2, 0]),
+        modelZ: new Float32Array([0, 0.5]),
+    };
+    function render(aspect) {
+        const out = new Float32Array(6);
+        gradientRadial.createInstance(ctx).render(out, 0, gradientRadial.prepare({
+            ...gradientRadial.defaults, cx: 0, cy: 0, aspect,
+            stops: [{ position: 0, color: '#ffffff' }, { position: 1, color: '#000000' }],
+        }));
+        return { x: out[0], z: out[3] };
+    }
+    const circle = render(1);
+    const wide = render(4);
+    assert.ok(wide.x > circle.x, 'a wider aspect must keep the x pixel brighter for longer');
+    assert.strictEqual(wide.z, circle.z, 'and must not touch the vertical falloff');
+});
+
+// Scroll is a log slider and cannot go negative; unlike the linear gradient
+// there is no dial here to turn the picture round, so the direction is a toggle
+// — wavelet's reason, and wavelet's label.
+test('radial travel reverses the scroll', () => {
+    const ctx = { numPixels: 1, modelX: new Float32Array([1]), modelZ: new Float32Array([0]) };
+    function at(travel, millis) {
+        const out = new Float32Array(3);
+        gradientRadial.createInstance(ctx).render(out, millis, gradientRadial.prepare({
+            ...gradientRadial.defaults, stops: RAMP, cx: 0, cy: 0, scroll: 0.1, travel,
+        }));
+        return out[0];
+    }
+    assert.strictEqual(at('outward', 0), at('inward', 0), 'they only differ once time passes');
+    assert.ok(Math.abs(at('outward', 1000) - at('inward', 1000)) > 1,
+        'a second in, the two directions must have parted');
+    // Symmetric about t = 0: one is the other run backwards.
+    assert.ok(Math.abs(at('outward', 1000) - at('inward', -1000)) < 1e-3);
 });
 
 // ---- noise: levels replaced contrast (#13) ----

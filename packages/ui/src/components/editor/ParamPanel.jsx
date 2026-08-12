@@ -114,6 +114,9 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             // Only the cone variant uses this; it draws the arc the emitter
             // actually scatters over rather than a bare bearing.
             spread={entry.spreadKey ? layer.params[entry.spreadKey] : null}
+            // Only the bands variant uses this; it fills the dial with the
+            // gradient's own ramp instead of the wavefront stripes.
+            stops={entry.stopsKey ? layer.params[entry.stopsKey] : null}
             onChange={(v) => setParams({ [entry.key]: v })}
             onCommit={onCommit}
           />

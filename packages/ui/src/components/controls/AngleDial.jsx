@@ -13,6 +13,10 @@ import NumField from './NumField';
 //   'arrow' — an arrow alone, for a force. The emitter has two angle dials on
 //       one panel and they must not look like the same control: gravity is a
 //       field over the panel, Travel is where particles are launched.
+//   'bands' — the layer's own colour stops, ramped along the direction, for a
+//       linear gradient. Its angle is not a wave direction, so the wavefront
+//       stripes would say the wrong thing; the ramp's own colours say exactly
+//       the right one, and show what the layer is made of at the same time.
 //
 // In every variant the arrow points the way the thing *goes*, matching what you
 // see moving on the panel: 0 degrees is rightwards, 90 upwards, increasing
@@ -24,7 +28,7 @@ function normalise(deg) {
   return d < 0 ? d + 360 : d;
 }
 
-export default function AngleDial({ entry, value, color, spread, onChange, onCommit }) {
+export default function AngleDial({ entry, value, color, spread, stops, onChange, onCommit }) {
   const canvasRef = useRef(null);
   const draggingRef = useRef(false);
 
@@ -63,6 +67,29 @@ export default function AngleDial({ entry, value, color, spread, onChange, onCom
         ctx.lineWidth = 2;
         ctx.stroke();
       }
+      ctx.restore();
+    } else if (variant === 'bands' && stops && stops.length > 0) {
+      // One ramp across the disc, running the way the arrow points — not
+      // `repeats` of them. The dial answers "which way, and out of what
+      // colours"; how many times the ramp tiles is the slider below it.
+      const grad = ctx.createLinearGradient(
+        c - dirX * radius, c - dirY * radius,
+        c + dirX * radius, c + dirY * radius,
+      );
+      // addColorStop throws on an out-of-order or out-of-range offset, and the
+      // stops arrive in whatever order the editor left them in.
+      [...stops]
+        .sort((a, b) => a.position - b.position)
+        .forEach((stop) => {
+          grad.addColorStop(Math.min(1, Math.max(0, stop.position)), stop.color);
+        });
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(c, c, radius, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, SIZE, SIZE);
       ctx.restore();
     } else if (variant === 'cone' && spread > 0) {
       // Canvas angles run clockwise and the schema's run anticlockwise, hence
@@ -111,7 +138,7 @@ export default function AngleDial({ entry, value, color, spread, onChange, onCom
       ctx.fillStyle = color || '#7aa2ff';
       ctx.fill();
     }
-  }, [value, color, spread, entry.render]);
+  }, [value, color, spread, stops, entry.render]);
 
   function apply(e) {
     const rect = canvasRef.current.getBoundingClientRect();

@@ -18,6 +18,7 @@ var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
 var planewaveMigrate = require('./planewave-migrate');
 var emitterMigrate = require('./emitter-migrate');
+var gradientMigrate = require('./gradient-migrate');
 
 var SAVE_DEBOUNCE_MS = 2000;
 
@@ -74,6 +75,7 @@ class SceneStore {
         this.seededBuiltins = false;
         this.planeWaveMigrated = false;
         this.emitterMigrated = false;
+        this.gradientMigrated = false;
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -117,6 +119,7 @@ class SceneStore {
                 seededBuiltins: this.seededBuiltins,
                 planeWaveMigrated: this.planeWaveMigrated,
                 emitterMigrated: this.emitterMigrated,
+                gradientMigrated: this.gradientMigrated,
                 scenes: this.scenes.map(stripRuntime),
             });
         } catch (err) {
@@ -137,12 +140,14 @@ class SceneStore {
         if (doc && Array.isArray(doc.scenes)) {
             this.planeWaveMigrated = !!doc.planeWaveMigrated;
             this.emitterMigrated = !!doc.emitterMigrated;
+            this.gradientMigrated = !!doc.gradientMigrated;
             var migrated = this.convertPlaneWaves(doc.scenes, doc);
             var emitters = this.convertEmitters(migrated.scenes, doc);
-            this.setScenes(emitters.scenes);
+            var gradients = this.convertGradients(emitters.scenes, doc);
+            this.setScenes(gradients.scenes);
             this.seededBuiltins = !!doc.seededBuiltins;
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
-            if (migrated.ranNow || emitters.ranNow) {
+            if (migrated.ranNow || emitters.ranNow || gradients.ranNow) {
                 this._dirty = true;
                 await this.flush();
             }
@@ -164,11 +169,14 @@ class SceneStore {
         }
 
         if (raw) {
-            this.setScenes(this.convertEmitters(this.convertPlaneWaves(raw).scenes).scenes);
+            var legacyScenes = this.convertPlaneWaves(raw).scenes;
+            legacyScenes = this.convertEmitters(legacyScenes).scenes;
+            this.setScenes(this.convertGradients(legacyScenes).scenes);
             console.log(source.replace('{n}', this.scenes.length));
         } else {
             this.planeWaveMigrated = true;
             this.emitterMigrated = true;
+            this.gradientMigrated = true;
             this.setScenes([this.defaultScene()]);
         }
         this.activeSceneId = (active && this.get(active)) ? active : null;
@@ -232,6 +240,32 @@ class SceneStore {
             }
         }
         console.log('Converted ' + result.converted + ' particle layer(s) to emitters.');
+        return { scenes: result.scenes, ranNow: true };
+    }
+
+    // The gradient's `mode` enum decided what its other controls meant, leaving
+    // the centre pad, the angle and one whole Motion option inert depending on
+    // where it was set; convert once so each shape shows only its own controls.
+    // Same shape as the two above — raw scenes in and out, its own snapshot,
+    // its own flag — because all three now run in sequence on the same load and
+    // any one of them can be the one that has already happened.
+    convertGradients(rawScenes, sourceDoc) {
+        if (this.gradientMigrated) return { scenes: rawScenes, ranNow: false };
+        this.gradientMigrated = true;
+
+        var result = gradientMigrate.convertScenes(rawScenes);
+        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
+
+        if (this.persistFile) {
+            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-gradient.json';
+            try {
+                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
+                console.log('Saved pre-conversion scenes to ' + backup);
+            } catch (err) {
+                console.error('Failed to snapshot scenes before gradient conversion:', err);
+            }
+        }
+        console.log('Converted ' + result.converted + ' gradient layer(s) to linear/radial gradients.');
         return { scenes: result.scenes, ranNow: true };
     }
 

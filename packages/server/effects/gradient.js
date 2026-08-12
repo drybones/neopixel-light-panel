@@ -2,40 +2,43 @@
  * Gradient effect — linear or radial multi-stop gradient with optional
  * slow animation (scroll along the gradient axis, or rotation for linear).
  *
+ * SUPERSEDED by gradient_linear and gradient_radial, and hidden: its `mode`
+ * enum decided what its other controls meant, leaving the Centre pad inert for
+ * linear, the Angle inert for radial, and Motion 'rotate' inert for radial
+ * outright — the radial branch below never reads `angle`.
+ *
+ * Kept registered so it still renders, exactly as embers and candy_sparkler
+ * are. The one-time engine/gradient-migrate converts stored layers, but an
+ * *export* taken before the migration can be imported long afterwards and
+ * importMerge does not re-run migrations, so this has to keep working
+ * indefinitely. The migration's exactness test renders it against the new
+ * effects, which is another reason it cannot be deleted.
+ *
+ * Note the projection below is `+ modelZ * sa`, missing the negation every
+ * other effect applies (see the root CLAUDE.md): at 90 degrees its ramp runs
+ * *downward* while a dial would draw the arrow up. That is preserved here, bug
+ * and all, because this module's only remaining job is to render old layers the
+ * way they always rendered; gradient_linear fixes it, and the migration mirrors
+ * the stored angle so the picture does not move.
+ *
  * prepare() bakes the colour stops into a 256-entry LUT so the render loop
  * is a projection + table lookup per pixel.
  */
 
-var color = require('../engine/color');
 var panel = require('../engine/panel');
+var gradientLut = require('../engine/gradient-lut');
 
-var LUT_SIZE = 256;
+var LUT_SIZE = gradientLut.LUT_SIZE;
+var buildLut = gradientLut.buildLut;
 
 var HALF_X = panel.HALF_X;
 var HALF_Z = panel.HALF_Z;
 var MAX_RADIUS = panel.RADIUS;
 
-function buildLut(stops) {
-    var sorted = stops.slice().sort(function(a, b) { return a.position - b.position; });
-    var lut = new Float32Array(LUT_SIZE * 3);
-    var si = 0;
-    for (var i = 0; i < LUT_SIZE; i++) {
-        var u = i / (LUT_SIZE - 1);
-        while (si < sorted.length - 2 && u > sorted[si + 1].position) si++;
-        var a = sorted[si], b = sorted[Math.min(si + 1, sorted.length - 1)];
-        var span = b.position - a.position;
-        var f = span > 0 ? Math.min(1, Math.max(0, (u - a.position) / span)) : 0;
-        var ca = color.hexToRgb(a.color), cb = color.hexToRgb(b.color);
-        lut[i * 3] = ca.r + (cb.r - ca.r) * f;
-        lut[i * 3 + 1] = ca.g + (cb.g - ca.g) * f;
-        lut[i * 3 + 2] = ca.b + (cb.b - ca.b) * f;
-    }
-    return lut;
-}
-
 module.exports = {
     type: 'gradient',
     name: 'Gradient',
+    hidden: true,
     schema: [
         { key: 'stops', type: 'gradientStops', label: 'Colours', minStops: 2 },
         { key: 'mode', type: 'enum', label: 'Shape', options: [

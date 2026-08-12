@@ -7,18 +7,18 @@
       "layers": [
         {
           "id": "d1f00a02",
-          "effectType": "gradient",
+          "effectType": "gradient_linear",
           "params": {
             "stops": [
               { "position": 0, "color": "#241040" },
               { "position": 1, "color": "#e04f1f" }
             ],
-            "mode": "linear",
             "angle": 0,
-            "cx": 0,
-            "cy": 0,
-            "animate": "scroll",
-            "speed": 0.02
+            "repeats": 1,
+            "tiling": "mirror",
+            "phase": 0,
+            "scroll": 0.02,
+            "spin": 0
           },
           "blendMode": "normal",
           "opacity": 1,

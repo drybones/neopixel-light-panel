@@ -22,8 +22,8 @@ The panel plays one **scene** at a time. A scene is an ordered stack of **layers
   "layers": [
     {
       "id": "9f31ab02",
-      "effectType": "gradient",
-      "params": { "stops": [ { "position": 0, "color": "#241040" }, { "position": 1, "color": "#e04f1f" } ], "mode": "linear", "angle": 0, "cx": 0, "cy": 0, "animate": "scroll", "speed": 0.05 },
+      "effectType": "gradient_linear",
+      "params": { "stops": [ { "position": 0, "color": "#241040" }, { "position": 1, "color": "#e04f1f" } ], "angle": 0, "repeats": 1, "tiling": "mirror", "phase": 0, "scroll": 0.05, "spin": 0 },
       "blendMode": "normal",
       "opacity": 1,
       "enabled": true,
@@ -73,7 +73,7 @@ Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linea
 
 A `group` entry carries only a `label` and no `key`: it is a **flat separator**, not a container, so the schema stays a list and an effect opts into sections simply by dropping one between its params. Only `emitter` uses them so far — sixteen params in one panel is where a flat list stops scanning. Params before the first `group` render in an unnamed section at the top of the panel, alongside blend and opacity.
 
-An `angle` entry may set `render` to pick what the dial draws inside itself: `wavefronts` (the default — parallel lines perpendicular to the direction, for waves), `cone` (an arrow plus the arc named by `spreadKey`, for an emitter's launch direction), or `arrow` (an arrow alone, for a force). An effect with two angle dials needs them to look different, or they read as the same control twice.
+An `angle` entry may set `render` to pick what the dial draws inside itself: `wavefronts` (the default — parallel lines perpendicular to the direction, for waves), `cone` (an arrow plus the arc named by `spreadKey`, for an emitter's launch direction), `arrow` (an arrow alone, for a force), or `bands` (the stop list named by `stopsKey`, ramped along the direction, for a linear gradient). An effect with two angle dials needs them to look different, or they read as the same control twice.
 
 `scale: log` spreads `min`/`max` over decades so equal slider travel is equal ratio — for wavelength, the speeds and the ambient glow floors, which span more range than a linear track can usefully hold. It ignores `step` (the track is integer positions). Adding `zeroable: true` reserves the bottom of the track for an exact `0`, which several params store to mean "frozen" or "no floor" and which a log scale cannot otherwise express.
 
@@ -90,7 +90,7 @@ An effect may also carry `presets`: an array of `{ id, name, params }`. These ar
 
 An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only** chrome — a dashed box around the handle, for an emitter whose particles are born over an area rather than at a point. It is edited by its own Width/Height controls; the pad only shows it, because pressing anywhere on the pad places the handle and a second grab target would break that.
 
-Effect types: `wavelet`, `planewave`, `solid`, `gradient`, `emitter`, `particle_trail`, `noise`, `twinkle`. `embers` and `candy_sparkler` were absorbed into `emitter` and are **hidden**: still rendered for stored and imported layers, absent from this catalog, and not offered as a new layer.
+Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`. Three effects are **hidden**: still rendered for stored and imported layers, absent from this catalog, and not offered as a new layer. `embers` and `candy_sparkler` were absorbed into `emitter`; `gradient` was split into `gradient_linear` and `gradient_radial`.
 
 ---
 
