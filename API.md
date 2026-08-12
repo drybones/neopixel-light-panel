@@ -193,7 +193,7 @@ A **filmstrip** is a short loop of a scene rendered off the hot loop, so the sce
 
 Values are pre-brightness, like the WebSocket stream. `hash` covers the scene's content, and the server caches by it: an unedited scene costs nothing to re-request, and an edited one is re-rendered on the next call.
 
-The strip **loops cleanly**: particle effects are warmed for 8 s of simulated time before capture so they start lit rather than empty, and the tail is cross-dissolved into the head so frame `frames` is frame `0`. Play it end to end and repeat — no seam handling is needed client-side. Playing several strips at once, though, is worth offsetting: they are all the same length, so a shared clock puts every one of them at the same point in its loop.
+The strip **loops cleanly**: particle effects are warmed before capture so they start settled rather than empty — 8 s of simulated time by default, and as long as the scene's slowest layer asks for where an effect knows better (an emitter ramps up from empty over about one and a half of its lifetimes, so it asks for two of the longest life it can produce) — and the tail is cross-dissolved into the head so frame `frames` is frame `0`. Play it end to end and repeat — no seam handling is needed client-side. Playing several strips at once, though, is worth offsetting: they are all the same length, so a shared clock puts every one of them at the same point in its loop.
 
 ```
 GET /api/effects/previews     →  one filmstrip per effect, at its defaults

@@ -21,6 +21,7 @@
  */
 
 var { Compositor } = require('./compositor');
+var effects = require('../effects');
 
 // 40 frames at 100ms is a 4.0s loop, ~38KB of base64 per scene. The length is
 // a compromise between the seam coming round often enough to notice and the
@@ -47,12 +48,42 @@ var INTERVAL_MS = 100;
 // 2x. 16 buys nothing and ghosts for longer. See test/filmstrip.test.js.
 var FADE_FRAMES = 12;
 
-// Particle effects seed lazily, so frame 1 of a fresh instance is empty and
-// every particle would be born in lockstep. Warm past the longest lifetime
-// (embers: millis + random*5000 + 3000) so births are staggered by the time we
-// start capturing. Discarded frames, coarser steps — this is 8s of sim time.
-var WARMUP_FRAMES = 40;
+// Particle effects seed lazily, so frame 1 of a fresh instance is empty, and
+// an emitter additionally *ramps* — it fills from empty at count/life births
+// per second, which is the look on the panel and exactly the wrong thing to
+// capture in a card. So the warm-up has to outlast whatever the scene's
+// slowest layer takes to settle: effects that need one say so with
+// warmupMs(prepared), and the rest get the 8s that used to be the fixed
+// budget (enough for the legacy embers, whose oldest particle is 8s old).
+// Discarded frames, coarser steps than playback — none of this is captured.
+//
+// The step is also a floor on how finely the ramp can be paced: the emitter's
+// gate hands out births by elapsed time rather than per frame, so a coarse
+// step still fills at the right rate, but do not raise it past the shortest
+// lifetime a layer can have (0.2s) or a whole generation would live and die
+// inside one warm-up frame.
 var WARMUP_STEP_MS = 200;
+var DEFAULT_WARMUP_MS = 8000;
+// A typed lifetime is deliberately unclamped — a schema min/max is a slider
+// hint — so a layer can ask for any warm-up at all, and every millisecond of
+// it is renders on the same thread as the 10ms tick. The whole slider fits
+// under this (life 10s at lifeSpread 1 asks for 41s, ~200 renders, measured at
+// 22ms for a full-density emitter over the real panel); past it, a card
+// showing a still-filling layer is the better failure.
+var MAX_WARMUP_MS = 60000;
+
+function warmupMsFor(scene) {
+    var layers = scene._displayLayers || scene.layers || [];
+    var ms = 0;
+    for (var i = 0; i < layers.length; i++) {
+        var effect = effects.get(layers[i].effectType);
+        var want = effect && effect.warmupMs
+            ? effect.warmupMs(layers[i]._prepared || {})
+            : DEFAULT_WARMUP_MS;
+        if (want > ms) ms = want;
+    }
+    return ms > MAX_WARMUP_MS ? MAX_WARMUP_MS : ms;
+}
 
 // Fixed base so a filmstrip is reproducible apart from the effects' own
 // Math.random. It must not be 0: embers tests `if (!q.born)` to decide whether
@@ -78,8 +109,9 @@ function renderFilmstrip(scene, model) {
     var numPixels = model.length;
     var stride = numPixels * 3;
 
-    var t = TIME_BASE - WARMUP_FRAMES * WARMUP_STEP_MS;
-    for (var w = 0; w < WARMUP_FRAMES; w++) {
+    var warmupFrames = Math.ceil(warmupMsFor(scene) / WARMUP_STEP_MS);
+    var t = TIME_BASE - warmupFrames * WARMUP_STEP_MS;
+    for (var w = 0; w < warmupFrames; w++) {
         compositor.renderFrame(scene, t);
         t += WARMUP_STEP_MS;
     }
@@ -138,6 +170,9 @@ function renderEffectFilmstrip(effect, model) {
 module.exports = {
     renderFilmstrip: renderFilmstrip,
     renderEffectFilmstrip: renderEffectFilmstrip,
+    warmupMsFor: warmupMsFor,
     FRAMES: FRAMES,
     INTERVAL_MS: INTERVAL_MS,
+    DEFAULT_WARMUP_MS: DEFAULT_WARMUP_MS,
+    MAX_WARMUP_MS: MAX_WARMUP_MS,
 };
