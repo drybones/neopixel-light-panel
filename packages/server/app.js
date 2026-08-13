@@ -7,6 +7,7 @@ var model = OPC.loadModel(__dirname + '/layout.json');
 
 var { Compositor } = require('./engine/compositor');
 var { SceneStore } = require('./engine/scene-store');
+var { SettingsStore } = require('./engine/settings-store');
 var { Broadcaster } = require('./engine/broadcast');
 var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
 var { FrameStats } = require('./engine/frame-stats');
@@ -34,24 +35,26 @@ app.use(express.json());
 
 var storage = require('node-persist');
 
-// Scenes live in their own crash-safe file (atomic writes + .bak) — a
-// power cut once corrupted a node-persist file, which made init() reject
-// and every scene "vanish". node-persist remains for brightness and the
-// legacy keys, with forgiveParseErrors so one bad file can't sink boot.
+// Scenes live in their own crash-safe file (atomic writes + .bak) —
+// node-persist remains only for the legacy keys, with forgiveParseErrors so
+// one bad file can't sink boot.
 var SCENES_FILE = path.join(__dirname, 'data', 'scenes-v2.json');
 var store = new SceneStore(compositor, SCENES_FILE);
 
-const GLOBAL_BRIGHTNESS_CONFIG_KEY = 'global_brightness';
-var global_brightness = 1.0;
+var SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
+var settings = new SettingsStore(SETTINGS_FILE);
 
 // Render-loop instrumentation. Off by default and costed for the hot loop;
 // the toggle persists alongside brightness so a soak survives a restart of
 // lightpanel.service.
-const FRAME_STATS_CONFIG_KEY = 'frame_stats_enabled';
 var TICK_MS = 10;
 var frameStats = new FrameStats({ targetMs: TICK_MS });
 
 async function initStorage() {
+    settings.load();
+    client.brightness = settings.brightness;
+    frameStats.setEnabled(settings.frameStatsEnabled);
+
     // Collect legacy/auxiliary state from node-persist first; any failure
     // here must not stop the scene file from loading.
     var legacy = {};
@@ -69,14 +72,6 @@ async function initStorage() {
         legacy.activeSceneId = await storage.getItem('active_scene_id');
         legacy.seeded = await storage.getItem('seeded_builtins_v1');
         legacy.migrated = await migrate.migrate(storage);
-
-        const brightnessValue = await storage.getItem(GLOBAL_BRIGHTNESS_CONFIG_KEY);
-        if (brightnessValue) {
-            global_brightness = parseFloat(brightnessValue);
-            client.brightness = global_brightness;
-        }
-
-        frameStats.setEnabled(await storage.getItem(FRAME_STATS_CONFIG_KEY));
     } catch (err) {
         console.error('node-persist initialization failed (continuing with scene file only):', err);
     }
@@ -129,6 +124,7 @@ initStorage();
 
 async function shutdown() {
     await store.flush();
+    await settings.flush();
     process.exit(0);
 }
 process.on('SIGINT', shutdown);
@@ -139,12 +135,11 @@ app.get('/api/virtual', function(req, res) {
 });
 
 app.get('/api/brightness/', function(req, res) {
-    res.send(global_brightness.toString()); // Cast to string; a number implies an http status code
+    res.send(settings.brightness.toString()); // Cast to string; a number implies an http status code
 });
 app.put('/api/brightness/:brightness', function(req, res) {
-    global_brightness = Math.min(1, Math.max(0, parseFloat(req.params.brightness)));
-    client.brightness = global_brightness;
-    storage.setItem(GLOBAL_BRIGHTNESS_CONFIG_KEY, global_brightness).catch(err => console.error('Failed to save brightness:', err));
+    settings.setBrightness(Math.min(1, Math.max(0, parseFloat(req.params.brightness))));
+    client.brightness = settings.brightness;
     res.sendStatus(200);
 });
 
@@ -165,8 +160,7 @@ app.put('/api/fps', function(req, res) {
         return res.status(400).json({ error: 'expected {enabled: boolean}' });
     }
     frameStats.setEnabled(req.body.enabled);
-    storage.setItem(FRAME_STATS_CONFIG_KEY, frameStats.enabled)
-        .catch(err => console.error('Failed to save frame-stats toggle:', err));
+    settings.setFrameStatsEnabled(frameStats.enabled);
     res.json(frameStatsSnapshot());
 });
 
