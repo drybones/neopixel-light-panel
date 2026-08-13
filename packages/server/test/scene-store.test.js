@@ -165,6 +165,34 @@ test('a noise layer with no contrast at all just gets the defaults', () => {
     assert.strictEqual(params.max, 1);
 });
 
+// ---- duplicate layer ids ----
+
+test('duplicate layer ids across scenes are repaired on load', () => {
+    // The compositor caches one render instance per layer id, so a shared id
+    // is harmless while both layers are the same effect type but, once their
+    // effect types differ, the two scenes render each other's params — in
+    // practice, a black or NaN panel.
+    const shared = 'dupe1234';
+    const store = makeStore();
+    store.setScenes([
+        { id: 'sceneone', name: 'Solid', layers: [{ id: shared, effectType: 'solid', params: { color: '#ff0000', level: 1 } }] },
+        { id: 'scenetwo', name: 'Wavelet', layers: [{ id: shared, effectType: 'wavelet', params: {} }] },
+    ]);
+
+    const ids = store.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(ids[0], ids[1], 'layer ids must be unique across the document');
+    assert.strictEqual(store.scenes[0].layers[0].effectType, 'solid');
+    assert.strictEqual(store.scenes[1].layers[0].effectType, 'wavelet');
+
+    // Both must still render real colour after the other has been synced.
+    for (const scene of [store.scenes[1], store.scenes[0], store.scenes[1]]) {
+        store.compositor.renderFrame(scene, 1234);
+        const comp = store.compositor.composite;
+        assert.ok(comp.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
+        assert.ok(comp.some((v) => v > 0), `${scene.name} rendered black`);
+    }
+});
+
 // ---- reorder ----
 
 function threeScenes(store) {

@@ -164,3 +164,17 @@ test('changing effectType recreates the instance, changing params does not', () 
     compositor.syncScene(scene);
     assert.notStrictEqual(compositor.layers.get('l1').instance, first);
 });
+
+test('the compositor refuses to render a layer whose cached instance is stale', () => {
+    const model = makeModel(2);
+    const client = makeClient();
+    const store = new SceneStore(new Compositor(client, model), null);
+    store.setScenes([{ id: 'aaaaaaaa', name: 'One', layers: [{ id: 'layer001', effectType: 'solid', params: { color: '#ffffff', level: 1 } }] }]);
+    const scene = store.scenes[0];
+
+    // Simulate the collision directly: another scene rebinds the id.
+    store.compositor.syncScene({ layers: [{ id: 'layer001', effectType: 'wavelet' }] });
+    store.compositor.renderFrame(scene, 0);
+    assert.ok(store.compositor.composite.every(Number.isFinite),
+        'a stale entry must never put NaN on the panel');
+});
