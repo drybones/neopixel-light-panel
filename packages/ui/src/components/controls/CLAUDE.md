@@ -26,8 +26,6 @@ None of the variants closes over the frame stream, unlike `XYPad` — the dial r
 
 `decor` is read-only chrome for effects whose position means more than a point: the emitter passes its emission box, drawn as a dashed rect around the handle, so the pad shows where particles are actually born. It is edited by its own Width/Height controls. The box is stroked **white, not the layer colour** — it sits on top of that layer's own render, so taking its colour makes it invisible on exactly the layers that have one.
 
-It carried a gravity arrow too, in the bottom corner. That came out: a static arrow duplicating a dial two rows up earned less than the space and the ink it cost.
-
 There is deliberately **no resize handle on the box.** `handlePointerDown` calls `apply()` unconditionally — pressing anywhere places the handle, with no hit-testing anywhere in the component — so a second grab target means fingertip-sized slop that breaks tap-to-place near the corner, a second `role="slider"` aria contract, `fitZoom` accounting for the box, and special-casing the drag out of `padToWorld`, whose far-ring compression is a mapping for *positions* and makes nonsense of a size. That is a new gesture model to duplicate two sliders that already exist.
 
 The chrome reads `decorRef`, not props. The frame subscription is created per geometry and its callback holds whatever `draw()` closed over then, so a prop the chrome reads is frozen at mount and the stream repaints over every correct frame — see the root [CLAUDE.md](../../../../../CLAUDE.md).

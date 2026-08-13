@@ -1,9 +1,9 @@
 /*
- * Settings store — brightness and the frame-stats toggle, the two scalars
- * node-persist used to hold. Same crash-safe file (engine/json-store) and
- * debounced-write shape as SceneStore, at a longer interval: brightness
- * drags reach here at the UI's 80ms throttle, and writing through at that
- * rate would be many fsync+rename pairs a second onto the SD card.
+ * Settings store — brightness and the frame-stats toggle. Same crash-safe
+ * file (engine/json-store) and debounced-write shape as SceneStore, at a
+ * longer interval: brightness drags reach here at the UI's 80ms throttle,
+ * and writing through at that rate would be many fsync+rename pairs a
+ * second onto the SD card.
  */
 
 var jsonStore = require('./json-store');

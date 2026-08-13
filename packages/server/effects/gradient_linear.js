@@ -2,28 +2,24 @@
  * Linear gradient — a multi-stop ramp running along a chosen direction, with
  * optional scroll along it and optional rotation of the whole thing.
  *
- * This and gradient_radial were one effect with a `mode` enum, which left the
- * centre pad inert here and the angle inert there. They are separated for the
- * same reason wavelet and planewave are: the two shapes are told apart by a
- * *control type* — a pad against a dial — and no parameter interpolates one
- * into the other. See engine/gradient-migrate for the conversion.
+ * This and gradient_radial are separate effects, not one with a `mode` enum,
+ * for the same reason wavelet and planewave are: the two shapes are told
+ * apart by a *control type* — a pad against a dial — and no parameter
+ * interpolates one into the other.
  *
  * `angle` is where the ramp runs, from the first stop to the last, and it is
  * also the direction positive Scroll carries the colours — which is why the
  * scroll term is subtracted rather than added. Holding a colour's position
- * fixed as t grows means proj must grow with it, so the picture advances along
- * the dial's arrow. The old effect added it and drifted the other way; see the
- * migration's header for what that costs.
+ * fixed as t grows means proj must grow with it, so the picture advances
+ * along the dial's arrow.
  *
  * There is deliberately no inward/outward toggle here. The dial already
  * reverses the scroll (angle + 180) — unlike the radial, which has no dial and
  * therefore does carry one.
  *
  * The projection is `modelX * ca - modelZ * sa`, with the negation planewave
- * spells the same way: modelZ +0.875 is the panel's *bottom* row while the dial
- * draws +y up. The effect this replaced was missing it, so its ramp ran
- * downward at 90 degrees; nobody saw it because the control was a bare slider
- * with no picture. The migration mirrors the stored angle to cancel the fix.
+ * spells the same way: modelZ +0.875 is the panel's *bottom* row while the
+ * dial draws +y up.
  */
 
 var panel = require('../engine/panel');

@@ -4,8 +4,8 @@
  * `angle` is the direction the wave *travels*, in screen terms: 0 degrees
  * moves right, 90 moves up. That is what the dial's arrow points along, so
  * the control agrees with the motion you can see. Note it is the opposite of
- * where an equivalent wavelet's source would sit — waves move away from their
- * source — which is why the migration below adds 180 degrees.
+ * where an equivalent wavelet's source would sit — waves move away from
+ * their source, so the bearing *to* the source is `angle + 180`.
  *
  * This is the far-field limit of wavelet. For a source at S = (x, -y) a
  * distance D from the centre, wavelet's r = |P - S| approaches D - P·û with
@@ -18,8 +18,8 @@
  *     theta = wt - (px·cos a - pz·sin a)/lambda + (delta - D/lambda)
  *
  * with a = atan2(y, x) + 180. The D/lambda term is *constant*, so it folds
- * into delta — which is what engine/planewave-migrate exploits to convert the
- * old "shove the source 1000 units away" presets without changing a pixel.
+ * into delta — a distant wavelet and a plane wave at the equivalent angle
+ * are interchangeable without changing a pixel.
  *
  * The minus on the projection is what makes crests advance along `angle`
  * rather than against it: holding theta constant as t grows requires P·d to

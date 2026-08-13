@@ -42,7 +42,7 @@ export default function FilmstripCanvas({
     const phase = phaseFor(id, frames);
     const bandFor = (index) => (index + phase) % frames;
 
-    // Dropped when the card leaves the viewport — a sheet is ~1.9MB, and the
+    // Dropped when the card leaves the viewport — a sheet is ~3.7MB, and the
     // canvas keeps its last frame, so scrolling back shows the scene rather
     // than a flash of black while it rebuilds.
     let sheet = null;

@@ -118,7 +118,7 @@ app.listen(3000, function () {
 });
 
 // Render loop. When no scene is active ("off"), render one black frame,
-// push it to WS clients, then idle — same behaviour as the old f:off preset.
+// push it to WS clients, then idle.
 var offRendered = false;
 
 function tick() {

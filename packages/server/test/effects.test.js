@@ -639,9 +639,10 @@ test('emitter survives a typed size of 0', () => {
     assert.ok(out.every(v => Number.isFinite(v)), 'size 0 put non-finite values in the buffer');
 });
 
-// The documented filmstrip trap: embers tested `if (!q.born)`, so a born time
-// of 0 re-seeded every particle every frame and the layer rendered black. The
-// emitter uses an explicit alive flag, which has to hold at t=0 too.
+// The documented filmstrip trap: a particle effect testing a falsy birth time
+// to decide whether a slot needs seeding would re-seed every particle every
+// frame at t=0 and render black. The emitter uses an explicit alive flag
+// instead, which has to hold at t=0 too.
 test('emitter renders at a zero time base', () => {
     const ctx = panelCtx();
     const p = emitter.prepare({ ...emitter.defaults, count: 40 });

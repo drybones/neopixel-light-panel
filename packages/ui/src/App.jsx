@@ -7,8 +7,8 @@ import BrightnessSlider from './components/switcher/BrightnessSlider';
 import FrameRate from './components/switcher/FrameRate';
 
 function parseHash() {
-  // Scene ids are 8-char hex for new scenes, but migrated presets keep
-  // their old shortid ids, which can include _ and - (e.g. HJ_f5ckwf).
+  // Scene ids are 8-char hex for new scenes, but some older scenes carry
+  // shortid ids, which can include _ and - (e.g. HJ_f5ckwf).
   const m = window.location.hash.match(/^#\/edit\/([\w-]+)/);
   return m ? { view: 'editor', sceneId: m[1] } : { view: 'switcher' };
 }

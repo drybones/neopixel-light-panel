@@ -4,11 +4,11 @@
  * The scene selector needs to show what each scene looks like, but the render
  * loop only ever renders the active one (app.js), so there is no frame to send
  * for the other 22 cards. Rather than run a second live loop, this renders a
- * fixed 2s loop per scene once, off the hot path; the client caches it and
+ * fixed 4s loop per scene once, off the hot path; the client caches it and
  * plays it back. Two properties of the engine make that cheap:
  *
  *   - Every effect is a pure function of *absolute* millis — none integrate a
- *     fixed dt — so a 2s loop costs FRAMES renders, not 2s worth of ticks. The
+ *     fixed dt — so a 4s loop costs FRAMES renders, not 4s worth of ticks. The
  *     step below is the playback interval, nothing to do with the 10ms tick.
  *   - SceneStore.preprocess() already runs on every scene, so _prepared,
  *     _blend and _displayLayers are there for the taking.
@@ -16,8 +16,8 @@
  * The one thing that cannot be borrowed is the live Compositor: renderFrame
  * writes the composite out through client.setPixel, i.e. to the panel. So this
  * builds a throwaway Compositor over a no-op sink. That also gives it its own
- * layer instance map, which matters — warming up a scene's embers through the
- * live compositor would jump its particles the next time it went active.
+ * layer instance map, which matters — warming up a scene's particles through
+ * the live compositor would jump them the next time it went active.
  */
 
 var { Compositor } = require('./compositor');
@@ -31,8 +31,8 @@ var effects = require('../effects');
 var FRAMES = 40;
 var INTERVAL_MS = 100;
 
-// The loop is not naturally cyclic — embers and the sparkler are not periodic
-// at all, and a multi-layer scene's period is an unusable LCM — so the last
+// The loop is not naturally cyclic — particle effects are not periodic at
+// all, and a multi-layer scene's period is an unusable LCM — so the last
 // frame cutting back to the first undoes 4s of motion in one step, which reads
 // as a glitch rather than a loop. Instead, render FADE_FRAMES *past* the end
 // and dissolve that continuation into the head, so frame FRAMES genuinely is
@@ -42,10 +42,11 @@ var INTERVAL_MS = 100;
 // bloom that reads as a soft cross-dissolve. Static scenes are untouched,
 // since identical frames blend to themselves.
 //
-// 12 frames (1.2s) was chosen by measuring the wrap as a step size against the
-// median step between ordinary frames: a plain cut is 23x for noise and 9x for
-// embers, 6 frames brings the worst to 3.4x, and 12 brings every effect inside
-// 2x. 16 buys nothing and ghosts for longer. See test/filmstrip.test.js.
+// 12 frames (1.2s): measured as a step size against the median step between
+// ordinary frames, a plain cut is over 20x for the discriminating cases
+// (noise, an aperiodic particle field), 6 frames brings the worst to 3.4x,
+// and 12 brings every effect inside 2x. 16 buys nothing and ghosts for
+// longer. See test/filmstrip.test.js.
 var FADE_FRAMES = 12;
 
 // Particle effects seed lazily, so frame 1 of a fresh instance is empty, and
@@ -53,9 +54,8 @@ var FADE_FRAMES = 12;
 // per second, which is the look on the panel and exactly the wrong thing to
 // capture in a card. So the warm-up has to outlast whatever the scene's
 // slowest layer takes to settle: effects that need one say so with
-// warmupMs(prepared), and the rest get the 8s that used to be the fixed
-// budget (enough for the legacy embers, whose oldest particle is 8s old).
-// Discarded frames, coarser steps than playback — none of this is captured.
+// warmupMs(prepared), and the rest get 8s. Discarded frames, coarser steps
+// than playback — none of this is captured.
 //
 // The step is also a floor on how finely the ramp can be paced: the emitter's
 // gate hands out births by elapsed time rather than per frame, so a coarse
@@ -86,9 +86,10 @@ function warmupMsFor(scene) {
 }
 
 // Fixed base so a filmstrip is reproducible apart from the effects' own
-// Math.random. It must not be 0: embers tests `if (!q.born)` to decide whether
-// a particle needs seeding, so a born time of 0 re-seeds it every single frame
-// and the layer renders black.
+// Math.random. It must not be 0: a particle effect testing a falsy birth
+// time to decide whether a slot needs seeding would treat a born time of 0
+// as unseeded and re-seed it every single frame, rendering the layer black.
+// `emitter` carries an explicit `alive` flag for exactly this reason.
 var TIME_BASE = 1e6;
 
 var NULL_SINK = {

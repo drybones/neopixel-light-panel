@@ -11,7 +11,7 @@ import {
 //
 // `mode` picks how a pixel is drawn:
 //   bloom — core plus multi-scale glow, how the panel actually looks
-//   dots  — flat discs, what shipped before the bloom
+//   dots  — flat discs, the pre-bloom look
 //   fill  — flat cell rectangles, for canvases too small for either
 // Below `minCellPx` the painter falls back to flat on its own, so the
 // thumbnails stay cheap whatever they ask for.

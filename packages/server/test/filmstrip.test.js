@@ -174,7 +174,7 @@ test('a long-lived emitter is settled by the time capture starts', () => {
 });
 
 test('rendering a scene does not disturb the live compositor', () => {
-    const { store, scene } = sceneWith([{ effectType: 'embers' }]);
+    const { store, scene } = sceneWith([{ effectType: 'emitter' }]);
     const before = store.compositor.getLayerBuffer(scene.layers[0].id);
     renderFilmstrip(scene, MODEL);
     const after = store.compositor.getLayerBuffer(scene.layers[0].id);
@@ -195,8 +195,8 @@ test('the cache re-renders only when scene content changes', () => {
     assert.strictEqual(Buffer.from(edited.data, 'base64')[0], 255);
 });
 
-// The picker used to need a hand-picked colour per effect in the UI, so the
-// point of these is that adding an effect module is enough on its own.
+// A new effect needs nothing added to the UI — the picker renders every
+// effect's filmstrip from its defaults, so a module is enough on its own.
 test('every registered effect renders a lit filmstrip from its defaults', () => {
     const catalog = effects.list();
     assert.ok(catalog.length > 0);

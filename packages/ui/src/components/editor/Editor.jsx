@@ -107,13 +107,12 @@ export default function Editor({ sceneId, onClose }) {
     if (name !== scene.name) updateScene(sceneId, { ...scene, name });
   }
 
-  // Two clicks, in the page. This used to be a window.confirm, which is the
-  // one thing in the app that asked the browser for UI — and a browser is free
-  // to refuse: iOS runs this from the Home Screen (the manifest says
+  // Two clicks, in the page — never `window.confirm`: a browser is free to
+  // refuse it silently. iOS runs this from the Home Screen (the manifest says
   // display: standalone) where confirm() can return false without ever
-  // appearing, and Chrome's "prevent additional dialogs" checkbox does the same
-  // on desktop. Either way the button silently did nothing while every other
-  // control kept working, which is exactly how it was reported.
+  // appearing, and Chrome's "prevent additional dialogs" checkbox does the
+  // same on desktop. Either way the button would silently do nothing while
+  // every other control kept working.
   async function handleDeleteScene() {
     if (!confirmingDelete) {
       setConfirmingDelete(true);

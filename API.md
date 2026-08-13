@@ -90,7 +90,7 @@ An effect may also carry `presets`: an array of `{ id, name, params }`. These ar
 
 An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only** chrome — a dashed box around the handle, for an emitter whose particles are born over an area rather than at a point. It is edited by its own Width/Height controls; the pad only shows it, because pressing anywhere on the pad places the handle and a second grab target would break that.
 
-Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`. Three effects are **hidden**: still rendered for stored and imported layers, absent from this catalog, and not offered as a new layer. `embers` and `candy_sparkler` were absorbed into `emitter`; `gradient` was split into `gradient_linear` and `gradient_radial`.
+Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`. `emitter`'s presets are where the look of the old `embers`/`candy_sparkler` effects live now; a stored or imported layer using either of those types, or the old combined `gradient`, renders nothing — they are not resolvable effect types.
 
 ---
 
@@ -289,7 +289,7 @@ The `planewave` effect is the far-field limit of `wavelet`: parallel wavefronts 
 | `min`    | number  | Minimum intensity |
 | `max`    | number  | Maximum intensity |
 
-An outward `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. An inward one is the same identity with both signs flipped: the angle is the bearing *of* the source, and the dropped distance is a phase lag instead of a lead. That identity is what the conversion in `engine/planewave-migrate.js` uses.
+An outward `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. An inward one is the same identity with both signs flipped: the angle is the bearing *of* the source, and the dropped distance is a phase lag instead of a lead.
 
 ## WebSocket pixel stream
 
@@ -310,24 +310,3 @@ and while that scene is active you receive, at ~15 FPS:
 ```
 
 instead of v1 frames. `composite` is pre-brightness like v1; layer frames are additionally pre-opacity (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
-
-## Migration from the preset API
-
-The old preset endpoints (`/api/all_presets/`, `/api/current_preset_id/`, `/api/wave_config/`, `/api/all_wave_config/`) were removed. On first boot after upgrading, persisted wavelet presets are automatically converted to scenes (one `wavelet` layer per wavelet, `add` blend) under the same IDs; the old `wave_config` storage key is left in place for rollback. The old fixed presets exist as ordinary editable scenes seeded once ("Embers", "Particle Trail", "Candy Sparkler"); `pastel_spots` was retired.
-
-## Migration to plane waves
-
-Several presets faked a plane wave by putting the source a thousand units off-panel, which the position pad could not represent or recover. On first boot after upgrading, any `wavelet` layer far enough away that its residual wavefront curvature is negligible becomes a `planewave` with the equivalent `angle` and `delta`. Layers with a short `lambda` are left alone, since curvature stays visible for them however distant the source. The pre-conversion document is written to `.node-persist/scenes-v2.pre-planewave.json` for rollback, and a `planeWaveMigrated` flag in the scene document stops it running twice — so a `wavelet` you later drag out to the pad's far edge stays a `wavelet`.
-
-## Migration to the emitter
-
-`candy_sparkler` and `embers` were the same particle engine with different constants compiled into it — emission origin, direction, spread, speed, lifetime, colour source and the intensity envelope were all literals, which is why each had one look and candy sparkler had no colour control at all. Both are now presets of a single `emitter` effect that exposes them.
-
-On first boot after upgrading, every `candy_sparkler` and `embers` layer becomes an `emitter`. The pre-conversion document is written to `.node-persist/scenes-v2.pre-emitter.json` for rollback, and an `emitterMigrated` flag in the scene document stops it running twice. The old effect types stay registered but **hidden**: they still render, so an export taken before the migration and imported long afterwards is never blank, but nothing offers them as a new layer.
-
-The conversion is **not bit-exact**, deliberately. The old effects drew per-particle velocity from distributions that do not map onto a direction/spread pair term for term — candy sparkler drew a radial speed over a full 2π, embers drew independent x and z components, a rectangular distribution. The drift is the same; particle for particle it is not. Two specific corrections are applied:
-
-- Embers' envelope peaked at **0.7** where the sparkler's peaked at 1.0, so the factor is folded into the layer's `opacity`.
-- Embers' hue jitter was **asymmetric** (`hue + hueSpread * (random() - 0.15)`, biased up by `0.35 × hueSpread`); the emitter's is symmetric, so the converted swatch is shifted by that bias.
-
-Both effects also carried an ambient backglow particle that the emitter does not have, so migrated layers read flatter. Restoring the wash means adding a `solid` layer beneath **on `add` blend** — under `normal` at opacity 1 it would be composited and then entirely overwritten, dark pixels included.
