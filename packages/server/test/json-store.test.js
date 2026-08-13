@@ -23,6 +23,13 @@ test('load returns null when the file never existed', () => {
     assert.strictEqual(jsonStore.load(tmpFile('missing.json')), null);
 });
 
+test('save creates its target directory if missing', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsonstore-'));
+    const file = path.join(dir, 'nested', 'doc.json');
+    jsonStore.save(file, { n: 1 });
+    assert.deepStrictEqual(jsonStore.load(file), { n: 1 });
+});
+
 test('a second save keeps the previous version as .bak', () => {
     const file = tmpFile('doc.json');
     jsonStore.save(file, { n: 1 });

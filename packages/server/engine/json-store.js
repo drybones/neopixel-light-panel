@@ -14,6 +14,7 @@
  */
 
 var fs = require('fs');
+var path = require('path');
 
 function readJson(file) {
     var raw;
@@ -47,6 +48,7 @@ function load(file, onWarn) {
 }
 
 function save(file, data) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
     var tmp = file + '.tmp';
     var json = JSON.stringify(data);
     var fd = fs.openSync(tmp, 'w');
