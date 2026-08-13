@@ -38,7 +38,7 @@ var storage = require('node-persist');
 // power cut once corrupted a node-persist file, which made init() reject
 // and every scene "vanish". node-persist remains for brightness and the
 // legacy keys, with forgiveParseErrors so one bad file can't sink boot.
-var SCENES_FILE = path.join(__dirname, '.node-persist', 'scenes-v2.json');
+var SCENES_FILE = path.join(__dirname, 'data', 'scenes-v2.json');
 var store = new SceneStore(compositor, SCENES_FILE);
 
 const GLOBAL_BRIGHTNESS_CONFIG_KEY = 'global_brightness';
