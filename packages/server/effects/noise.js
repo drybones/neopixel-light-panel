@@ -101,38 +101,6 @@ module.exports = {
         };
     },
 
-    // Contrast was a gain about the midpoint, so it could only harden or soften
-    // the field around a fixed 50% balance — density was the one thing it could
-    // not reach. Levels replaces it: contrast c becomes a span of c/1.5 centred
-    // on 0.5, so the old default of 1.5 lands exactly on the new default of 0/1
-    // and the ordering of every stored value is preserved.
-    //
-    // This is deliberately *not* look-preserving. Against the recalibrated field
-    // (see AMPLITUDE) the same fraction of the ramp is a stronger image, so
-    // converted scenes come out about 1.2x more contrasty than they were. That
-    // was the point: the old numbers encoded a field that only ever used the
-    // middle of its range.
-    //
-    // Runs on the raw params from disk, before the effect's defaults are merged
-    // over them (see scene-store's normaliseLayer): applying the defaults first
-    // would hand a `contrast: 3` layer the *default* levels and flatten it.
-    upgradeParams(params) {
-        if (!params) return params;
-        if (typeof params.contrast !== 'number') return params;
-        if (typeof params.min === 'number' || typeof params.max === 'number') return params;
-
-        var c = params.contrast;
-        var out = {};
-        for (var key in params) {
-            if (Object.prototype.hasOwnProperty.call(params, key) && key !== 'contrast') {
-                out[key] = params[key];
-            }
-        }
-        out.min = 0.5 - c / 3;
-        out.max = 0.5 + c / 3;
-        return out;
-    },
-
     createInstance(ctx) {
         var modelX = ctx.modelX;
         var modelZ = ctx.modelZ;

@@ -64,14 +64,7 @@ function stripRuntime(scene) {
 
 function normaliseLayer(layer) {
     var effect = effects.get(layer.effectType);
-    // An effect may rewrite params it has outgrown (noise's contrast -> levels).
-    // It runs on the stored params *before* the defaults are merged over them,
-    // or a layer carrying only the old key would be given the new key's default
-    // and silently change look. Both the load path and importMerge come through
-    // here, so an old export still converts however long from now.
-    var raw = layer.params || {};
-    if (effect && effect.upgradeParams) raw = effect.upgradeParams(raw);
-    var params = Object.assign({}, effect ? effect.defaults : {}, raw);
+    var params = Object.assign({}, effect ? effect.defaults : {}, layer.params || {});
     return {
         id: layer.id || newId(),
         effectType: layer.effectType,

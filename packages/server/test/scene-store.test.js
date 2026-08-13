@@ -139,40 +139,7 @@ test('getPublic strips runtime fields', () => {
     assert.strictEqual(pub.layers[0]._blend, undefined);
 });
 
-test('stored noise layers trade contrast for the equivalent levels pair', () => {
-    const store = makeStore();
-    store.setScenes([{
-        id: 'night', name: 'Night sky',
-        layers: [{ id: 'n1', effectType: 'noise', params: { c1: '#050a1e', scale: 0.8, contrast: 1.8 } }],
-    }]);
-
-    const params = store.scenes[0].layers[0].params;
-    // 0.5 - 1.8/3 is -0.09999999999999998, so compare with a tolerance rather
-    // than writing the float out — the value is right, decimal just can't say so.
-    assert.ok(Math.abs(params.min - -0.1) < 1e-12, `min was ${params.min}`);
-    assert.ok(Math.abs(params.max - 1.1) < 1e-12, `max was ${params.max}`);
-    assert.strictEqual(params.contrast, undefined);
-    assert.strictEqual(params.scale, 0.8, 'untouched params survive');
-    assert.strictEqual(params.c1, '#050a1e');
-    // The default levels must not have won over the stored contrast.
-    assert.notStrictEqual(params.min, 0);
-});
-
-test('an old export still converts when imported', () => {
-    const store = makeStore();
-    store.setScenes([]);
-    store.importMerge([{
-        id: 'old', name: 'From an old export',
-        layers: [{ id: 'o1', effectType: 'noise', params: { contrast: 3 } }],
-    }]);
-
-    const params = store.get('old').layers[0].params;
-    assert.strictEqual(params.min, -0.5);
-    assert.strictEqual(params.max, 1.5);
-    assert.strictEqual(params.contrast, undefined);
-});
-
-test('a noise layer with no contrast at all just gets the defaults', () => {
+test('a noise layer with no params at all just gets the defaults', () => {
     const store = makeStore();
     store.setScenes([{ id: 's', name: 'n', layers: [{ id: 'l', effectType: 'noise', params: {} }] }]);
     const params = store.scenes[0].layers[0].params;

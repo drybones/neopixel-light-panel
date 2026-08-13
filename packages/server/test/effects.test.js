@@ -303,62 +303,6 @@ function renderNoise(params, millis, ctx) {
     return out;
 }
 
-test('noise upgradeParams converts contrast to the equivalent levels pair', () => {
-    const up = noise.upgradeParams({ c1: '#000000', scale: 0.8, contrast: 3 });
-    assert.strictEqual(up.min, -0.5);
-    assert.strictEqual(up.max, 1.5);
-    assert.strictEqual(up.contrast, undefined, 'the dead key should not survive');
-    assert.strictEqual(up.scale, 0.8, 'other params must be carried over');
-    assert.strictEqual(up.c1, '#000000');
-});
-
-test('noise upgradeParams leaves already-converted params alone', () => {
-    const converted = { scale: 1, min: 0, max: 1 };
-    assert.strictEqual(noise.upgradeParams(converted), converted);
-    // Idempotent: running it on its own output changes nothing.
-    const once = noise.upgradeParams({ contrast: 1.8 });
-    assert.strictEqual(noise.upgradeParams(once), once);
-    // And a params object that never had contrast is passed straight through.
-    const fresh = { scale: 2 };
-    assert.strictEqual(noise.upgradeParams(fresh), fresh);
-});
-
-test('noise upgradeParams keeps min/max when a stray contrast is also present', () => {
-    // Nothing validates params, so a hand-edited or half-migrated layer can
-    // carry both. The new keys win rather than being overwritten.
-    const up = noise.upgradeParams({ contrast: 8, min: 0, max: 1 });
-    assert.strictEqual(up.min, 0);
-    assert.strictEqual(up.max, 1);
-});
-
-test('contrast converts to a proportional span about the ramp centre', () => {
-    // Deliberately not look-preserving: the field was recalibrated at the same
-    // time (see AMPLITUDE), so the same fraction of the ramp is now a stronger
-    // image. What the conversion does preserve is the *meaning* of the stored
-    // number — its position in the ordering, and the balance point it sat on.
-    for (const contrast of [0.25, 1.22, 1.5, 1.8, 3, 16]) {
-        const up = noise.upgradeParams({ contrast });
-        assert.ok(Math.abs((up.min + up.max) / 2 - 0.5) < 1e-12,
-            `contrast ${contrast} should stay centred on the ramp midpoint`);
-        assert.ok(Math.abs((up.max - up.min) - contrast / 1.5) < 1e-12,
-            `contrast ${contrast} should become a span of c/1.5`);
-    }
-
-    // The old default lands exactly on the new one, so a layer that was never
-    // touched comes through the conversion reading 0 / 1.
-    const fromDefault = noise.upgradeParams({ contrast: 1.5 });
-    assert.strictEqual(fromDefault.min, 0);
-    assert.strictEqual(fromDefault.max, 1);
-    assert.strictEqual(fromDefault.min, noise.defaults.min);
-    assert.strictEqual(fromDefault.max, noise.defaults.max);
-
-    // Ordering survives: a scene stored more contrasty stays more contrasty.
-    const pairs = [1, 1.5, 3, 8].map(c => noise.upgradeParams({ contrast: c }));
-    for (let i = 1; i < pairs.length; i++) {
-        assert.ok(pairs[i].max - pairs[i].min > pairs[i - 1].max - pairs[i - 1].min);
-    }
-});
-
 test('the default levels use the whole ramp, both rails included', () => {
     // The calibration this effect exists to have: at 0 / 1 the field should
     // rest on each rail about 1% of the time — enough that "fully dark" and
