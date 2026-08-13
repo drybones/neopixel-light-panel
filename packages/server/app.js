@@ -12,7 +12,6 @@ var { Broadcaster } = require('./engine/broadcast');
 var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
 var { FrameStats } = require('./engine/frame-stats');
 var effects = require('./effects');
-var migrate = require('./engine/migrate');
 var createScenesRouter = require('./routes/scenes');
 
 var compositor = new Compositor(client, model);
@@ -33,11 +32,7 @@ app.use(cors());
 app.use(express.static(path.join(__dirname, '../ui/dist')));
 app.use(express.json());
 
-var storage = require('node-persist');
-
-// Scenes live in their own crash-safe file (atomic writes + .bak) —
-// node-persist remains only for the legacy keys, with forgiveParseErrors so
-// one bad file can't sink boot.
+// Scenes live in their own crash-safe file (atomic writes + .bak).
 var SCENES_FILE = path.join(__dirname, 'data', 'scenes-v2.json');
 var store = new SceneStore(compositor, SCENES_FILE);
 
@@ -55,30 +50,8 @@ async function initStorage() {
     client.brightness = settings.brightness;
     frameStats.setEnabled(settings.frameStatsEnabled);
 
-    // Collect legacy/auxiliary state from node-persist first; any failure
-    // here must not stop the scene file from loading.
-    var legacy = {};
     try {
-        // Storage dir pinned next to the server code so behaviour doesn't
-        // depend on the working directory (matches the Pi service, which
-        // runs with WorkingDirectory=packages/server).
-        await storage.init({
-            dir: path.join(__dirname, '.node-persist/storage'),
-            interval: 1000,
-            forgiveParseErrors: true,
-        });
-
-        legacy.scenes = await storage.getItem('scenes_v2');
-        legacy.activeSceneId = await storage.getItem('active_scene_id');
-        legacy.seeded = await storage.getItem('seeded_builtins_v1');
-        legacy.migrated = await migrate.migrate(storage);
-    } catch (err) {
-        console.error('node-persist initialization failed (continuing with scene file only):', err);
-    }
-
-    try {
-        await store.load(legacy);
-        await seedBuiltins();
+        await store.load();
         console.log('Loaded ' + store.scenes.length + ' scene(s); active: ' + store.activeSceneId);
     } catch (err) {
         console.error('Scene store load failed:', err);
@@ -92,32 +65,6 @@ async function initStorage() {
         .then(function() { return effectPreviewCache.all(effects.visible()); })
         .then(function(previews) { console.log('Rendered ' + previews.length + ' effect preview(s).'); })
         .catch(function(err) { console.error('Preview warm-up failed:', err); });
-}
-// Recreate the old fixed presets as ordinary editable scenes, once. The
-// flag lives inside the scene document so it can't get out of sync with
-// the scene list.
-async function seedBuiltins() {
-    if (store.seededBuiltins) return;
-    // Embers and Candy Sparkler are emitter presets now, not effect types of
-    // their own. Seeding the old types here would hand a *fresh* install two
-    // hidden-effect layers that no migration will ever reach — the emitter
-    // migration marks itself done on a first boot, before this runs — and that
-    // the picker cannot recreate.
-    var emitter = effects.get('emitter');
-    function preset(id) {
-        var match = emitter.presets.filter(function(p) { return p.id === id; })[0];
-        return Object.assign({}, emitter.defaults, match.params);
-    }
-    [
-        { name: 'Embers', effectType: 'emitter', params: preset('embers') },
-        { name: 'Particle Trail', effectType: 'particle_trail' },
-        { name: 'Candy Sparkler', effectType: 'emitter', params: preset('sparkler') },
-    ].forEach(function(b) {
-        store.create({ name: b.name, layers: [{ effectType: b.effectType, params: b.params }] });
-    });
-    store.seededBuiltins = true;
-    store.markDirty();
-    await store.flush();
 }
 
 initStorage();

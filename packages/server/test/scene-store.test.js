@@ -1,14 +1,29 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const { Compositor } = require('../engine/compositor');
 const { SceneStore } = require('../engine/scene-store');
+const jsonStore = require('../engine/json-store');
+const effects = require('../effects');
 
 function makeStore() {
     const model = [{ point: [0, 0, 0] }, { point: [0.25, 0, 0] }];
     const client = { brightness: 1, setPixel() {}, writePixels() {} };
     const compositor = new Compositor(client, model);
     return new SceneStore(compositor, null);
+}
+
+function tmpFile(name) {
+    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'scenestore-')), name);
+}
+
+function makePersistedStore(file) {
+    const model = [{ point: [0, 0, 0] }, { point: [0.25, 0, 0] }];
+    const client = { brightness: 1, setPixel() {}, writePixels() {} };
+    return new SceneStore(new Compositor(client, model), file);
 }
 
 test('preprocess filters disabled layers and honours solo', () => {
@@ -191,6 +206,84 @@ test('duplicate layer ids across scenes are repaired on load', () => {
         assert.ok(comp.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
         assert.ok(comp.some((v) => v > 0), `${scene.name} rendered black`);
     }
+});
+
+// ---- load() / seeding ----
+
+test('a fresh install seeds the four built-ins in order with no NaN', async () => {
+    const store = makePersistedStore(tmpFile('scenes.json'));
+    await store.load();
+    assert.deepStrictEqual(store.scenes.map((s) => s.name), ['Default', 'Embers', 'Particle Trail', 'Candy Sparkler']);
+
+    const catalogTypes = effects.catalog().map((e) => e.type);
+    for (const scene of store.scenes) {
+        for (const layer of scene.layers) {
+            assert.ok(catalogTypes.includes(layer.effectType), `${layer.effectType} missing from catalog`);
+        }
+        store.compositor.renderFrame(scene, 1000);
+        assert.ok(store.compositor.composite.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
+    }
+});
+
+test('a second store on the same file loads four and does not re-seed', async () => {
+    const file = tmpFile('scenes.json');
+    const first = makePersistedStore(file);
+    await first.load();
+
+    const second = makePersistedStore(file);
+    await second.load();
+    assert.strictEqual(second.scenes.length, 4);
+});
+
+test('{version: 2, scenes: []} loads as zero scenes', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, { version: 2, activeSceneId: null, scenes: [] });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.scenes.length, 0);
+});
+
+test('a missing/non-array scenes key is treated as fresh', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, { version: 2, activeSceneId: null });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.scenes.length, 4);
+});
+
+test('an activeSceneId naming an absent scene falls back to null', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, {
+        version: 2, activeSceneId: 'ghost123',
+        scenes: [{ id: 'real1234', name: 'Real', layers: [] }],
+    });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.activeSceneId, null);
+});
+
+test('duplicate-id repair from load() is persisted', async () => {
+    const file = tmpFile('scenes.json');
+    const shared = 'dupe1234';
+    jsonStore.save(file, {
+        version: 2, activeSceneId: null,
+        scenes: [
+            { id: 'sceneone', name: 'Solid', layers: [{ id: shared, effectType: 'solid', params: {} }] },
+            { id: 'scenetwo', name: 'Wavelet', layers: [{ id: shared, effectType: 'wavelet', params: {} }] },
+        ],
+    });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    const ids = store.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(ids[0], ids[1]);
+
+    const reloaded = jsonStore.load(file);
+    const reloadedIds = reloaded.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(reloadedIds[0], reloadedIds[1], 'the repair must have been flushed to disk');
 });
 
 // ---- reorder ----

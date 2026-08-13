@@ -97,7 +97,7 @@ test('opacity halves a solid layer over black', () => {
     assert.deepStrictEqual(client.pixels[0], [127, 127, 127]);
 });
 
-test('migrated multi-wavelet scene reproduces the old interactive_wave sum', () => {
+test('a multi-wavelet scene sums per-layer additive blending correctly', () => {
     const model = makeModel(8);
     const client = makeClient();
     const compositor = new Compositor(client, model);
@@ -108,7 +108,7 @@ test('migrated multi-wavelet scene reproduces the old interactive_wave sum', () 
         { color: '#c04010', freq: 0.6, lambda: 0.9, delta: 2.1, x: 0.75, y: -0.1, min: 0.0, max: 0.4 },
     ];
     const scene = {
-        id: 's1', name: 'migrated',
+        id: 's1', name: 'multi-wavelet',
         layers: wavelets.map((w, i) => ({
             id: 'w' + i, effectType: 'wavelet', params: w,
             blendMode: 'add', opacity: 1, enabled: true, solo: false,
