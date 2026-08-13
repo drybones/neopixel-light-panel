@@ -25,6 +25,9 @@ test('catalog exposes type, name, schema and defaults', () => {
         assert.ok(Array.isArray(entry.schema));
         assert.ok(entry.defaults && typeof entry.defaults === 'object');
     }
+    // Guards against reintroducing a filter between the two: every registered
+    // effect belongs in the catalog now that nothing is hidden.
+    assert.strictEqual(catalog.length, effects.list().length);
 });
 
 test('every effect renders its defaults without throwing', () => {
@@ -736,11 +739,10 @@ test('emitter gravity pulls sideways, not just down', () => {
 test('emitter is the only particle effect in the catalog', () => {
     const types = effects.catalog().map(e => e.type);
     assert.ok(types.includes('emitter'));
-    assert.ok(!types.includes('candy_sparkler'), 'superseded effects must not be offered');
+    assert.ok(!types.includes('candy_sparkler'));
     assert.ok(!types.includes('embers'));
-    // Still registered, so stored and imported layers keep rendering.
-    assert.ok(effects.get('candy_sparkler'), 'candy_sparkler must stay resolvable');
-    assert.ok(effects.get('embers'), 'embers must stay resolvable');
+    assert.strictEqual(effects.get('embers'), null, 'the superseded effect module is gone entirely');
+    assert.strictEqual(effects.get('candy_sparkler'), null);
 });
 
 test('every catalog entry with presets renders each of them', () => {
@@ -787,26 +789,6 @@ test('twinkle sharpness changes how much of the cycle is lit', () => {
     assert.ok(litSum(1) > litSum(12), 'sharpness must darken the duty cycle');
 });
 
-// app.js seeds the built-in scenes by looking these preset ids up, and only on
-// a *fresh* install — where emitterMigrated is already true, so nothing would
-// ever convert a layer seeded with a hidden type, and a renamed id throws at
-// boot rather than in any test that runs on an existing library.
-test('the preset ids app.js seeds built-ins from still exist', () => {
-    const ids = emitter.presets.map(p => p.id);
-    for (const id of ['embers', 'sparkler']) {
-        assert.ok(ids.includes(id), `seedBuiltins looks up the '${id}' preset`);
-    }
-});
-
-// Whatever a built-in is seeded as has to be something the picker can also
-// create, or the library ships with a layer the user cannot reproduce.
-test('no effect is both hidden and reachable from the catalog', () => {
-    const visible = new Set(effects.catalog().map(e => e.type));
-    for (const mod of effects.list()) {
-        assert.strictEqual(visible.has(mod.type), !mod.hidden,
-            `${mod.type} disagrees with its hidden flag`);
-    }
-});
 
 // The vertical axis inverts between param space (y up, what the pad and the
 // dials draw) and modelZ (+0.875 is the *bottom* row). Origin, travel and

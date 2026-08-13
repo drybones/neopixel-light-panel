@@ -62,7 +62,7 @@ async function initStorage() {
     // loop keeps its tick throughout.
     previewCache.all(store.scenes)
         .then(function(previews) { console.log('Rendered ' + previews.length + ' scene preview(s).'); })
-        .then(function() { return effectPreviewCache.all(effects.visible()); })
+        .then(function() { return effectPreviewCache.all(effects.list()); })
         .then(function(previews) { console.log('Rendered ' + previews.length + ' effect preview(s).'); })
         .catch(function(err) { console.error('Preview warm-up failed:', err); });
 }

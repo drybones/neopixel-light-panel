@@ -37,33 +37,35 @@ test('ambient particle with empty point [] lights all pixels equally', () => {
 });
 
 test('two particle-effect instances animate independently', () => {
-    const embers = effects.get('embers');
-    const prepared = embers.prepare(embers.defaults);
-    const a = embers.createInstance(ctx);
-    const b = embers.createInstance(ctx);
+    const emitter = effects.get('emitter');
+    const prepared = emitter.prepare(emitter.defaults);
+    const a = emitter.createInstance(ctx);
+    const b = emitter.createInstance(ctx);
 
-    const outA1 = new Float32Array(ctx.numPixels * 3);
+    // Step both forward at the real render loop's cadence rather than one
+    // large jump — a jump bigger than RESUME_MS reads as a's field going
+    // idle and resuming, not as steady animation.
+    const outA = new Float32Array(ctx.numPixels * 3);
     const outB = new Float32Array(ctx.numPixels * 3);
-    a.render(outA1, 1000, prepared);
-    // Advance only instance a; b starts later and must not share particle state
-    const outA2 = new Float32Array(ctx.numPixels * 3);
-    a.render(outA2, 5000, prepared);
-    b.render(outB, 5000, prepared);
+    for (let t = 0; t <= 5000; t += 10) {
+        a.render(outA, t, prepared);
+        b.render(outB, t, prepared);
+    }
 
-    // If b shared a's pool, its first frame at t=5000 would equal a's second frame.
-    // Randomised spawns make equality vanishingly unlikely when independent.
-    assert.notDeepStrictEqual(Array.from(outB), Array.from(outA2));
+    // If b shared a's pool, its state would equal a's. Randomised spawns make
+    // equality vanishingly unlikely when independent.
+    assert.notDeepStrictEqual(Array.from(outB), Array.from(outA));
 });
 
 test('param changes do not reset particle state', () => {
-    const embers = effects.get('embers');
-    const instance = embers.createInstance(ctx);
-    const p1 = embers.prepare(embers.defaults);
+    const emitter = effects.get('emitter');
+    const instance = emitter.createInstance(ctx);
+    const p1 = emitter.prepare(emitter.defaults);
     const out = new Float32Array(ctx.numPixels * 3);
     instance.render(out, 1000, p1);
 
     // Capture a live particle's birth time, then render with new params
-    const p2 = embers.prepare({ ...embers.defaults, speed: 2, glow: 0.2 });
+    const p2 = emitter.prepare({ ...emitter.defaults, speed: 2, glow: 0.2 });
     instance.render(out, 1100, p2);
     instance.render(out, 1200, p2);
     // No assertion on internals available; the contract is "no throw and
@@ -73,7 +75,7 @@ test('param changes do not reset particle state', () => {
 });
 
 test('particle effects render without allocation errors at max density', () => {
-    for (const type of ['embers', 'particle_trail', 'candy_sparkler']) {
+    for (const type of ['emitter', 'particle_trail']) {
         const mod = effects.get(type);
         const maxCount = mod.schema.find(s => s.key === 'count').max;
         const prepared = mod.prepare({ ...mod.defaults, count: maxCount });
