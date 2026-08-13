@@ -6,12 +6,10 @@
  * them had exactly one look. They are params here, and the two old effects come
  * back as presets (see `presets` below).
  *
- * The source is an origin plus a width/height box rather than a
- * point/panel/edge enum. An enum was the first cut and it was worse in both
- * directions: it made `x`/`y` inert in two of its three states, and its three
- * names could not reach an emitting line, a shallow band, or a wide soft
- * source. A continuous extent makes nothing inert and reaches all of them —
- * the same trade noise.js made when Levels replaced contrast.
+ * The source is an origin plus a width/height box, not a point/panel/edge
+ * enum — the box reaches an emitting line, a shallow band, or a wide soft
+ * source with nothing left inert, the same trade noise.js's Levels make
+ * over contrast.
  *
  * Gravity is a magnitude and an angle, not an up/down toggle. `dir` is the
  * launch velocity and gravity is a sustained acceleration; no launch angle
@@ -28,11 +26,9 @@
  * An emitter starting from an empty field fills at count/life births per
  * second — the ramp, see createInstance(). That covers a fresh instance and
  * equally a scene switched away from and back, which is the same start-up seen
- * far more often. Starting empty is the look; the alternative of pre-rolling
- * to a settled field before it is shown was considered and turned down.
- * Nothing else in here integrates state, so a filmstrip can still jump to any
- * absolute millis it likes — it just has to sit through the ramp first, which
- * is what warmupMs() below is for.
+ * far more often. Nothing else in here integrates state, so a filmstrip can
+ * still jump to any absolute millis it likes — it just has to sit through the
+ * ramp first, which is what warmupMs() below is for.
  */
 
 var color = require('../engine/color');
@@ -45,8 +41,7 @@ var MAX_PARTICLES = 80;
 // Emitted velocity and gravity are both stretched in x by this, which is what
 // makes an omnidirectional burst read as a circle rather than a tall ellipse,
 // and what makes a gravity angle and a travel angle of the same number point
-// the same way on screen. Migrated embers drift about 1.5x wider horizontally
-// than they used to as a result.
+// the same way on screen.
 var X_STRETCH = 1.5;
 
 // A gap this long between renders means this layer was not being rendered —

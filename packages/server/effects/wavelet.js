@@ -1,11 +1,9 @@
 /*
- * Wavelet effect — one instance is one wavelet (the old multi-wavelet sum
- * is now expressed as multiple layers with the "add" blend mode).
+ * Wavelet effect — one instance is one wavelet; a multi-wavelet look is
+ * multiple layers on the "add" blend mode.
  *
- * The inner loop comes from shader.js interactive_wave(), including the
- * dz = pz + y sign quirk, so migrated presets render identically. Output is
- * clamped per-layer to [0, 255], matching the old clip:true behaviour that
- * every UI-created wavelet had.
+ * dz = pz + y (see the effect y-axis note in the root CLAUDE.md). Output is
+ * clamped per-layer to [0, 255].
  *
  * `direction` is the whole of the inward/outward toggle: the phase is
  * theta = wt - r/lambda, and a crest is a point of constant theta, so as t
@@ -61,8 +59,8 @@ module.exports = {
         var rgb = color.hexToRgb(params.color);
         // 1/lambda with the travel direction's sign baked in, so the render
         // loop is a multiply and neither branches nor divides. Anything but
-        // 'inward' reads as outward, which is what gives a layer stored before
-        // the toggle existed its old behaviour.
+        // 'inward' reads as outward — the default for a layer with no stored
+        // direction.
         //
         // A lambda of 0 would divide to Infinity and put NaN in the pixel
         // buffer and out through setPixel; the slider can't reach 0, but the

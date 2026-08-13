@@ -3,7 +3,7 @@ import NumField from './NumField';
 import { sliderToValue, valueToSlider } from '../../lib/perceptual';
 
 // Min/max slider pair (atan perceptual scale) for schema `range` entries —
-// the old wavelet brightness control. Keeps min ≤ max while dragging.
+// wavelet's brightness control, among others. Keeps min ≤ max while dragging.
 export default function RangeControl({ entry, minValue, maxValue, onChange, onCommit }) {
   // Both the sliders and the typed fields go through these, so the invariant
   // holds however the value was entered: pushing one end past the other takes

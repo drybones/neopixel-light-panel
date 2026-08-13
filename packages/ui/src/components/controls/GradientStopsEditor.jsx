@@ -9,8 +9,8 @@ const POPOVER_WIDTH = 216;
 
 // Half a pin. A drag has to travel this far before it counts as one rather than
 // as a click, and a click this close to a pin is taken as aimed at the pin
-// rather than as a new stop — which is also what stops a double-click, an
-// ingrained habit from when that was the gesture, landing two stops at once.
+// rather than as a new stop — which also guards against a double-click
+// landing two stops at once.
 const PIN_RADIUS = 8;
 
 // Gradient stop strip: the strip previews the gradient; stops are pins you drag

@@ -175,9 +175,9 @@ export function fitZoom(entry, x, y, extX = 0, extY = 0) {
   return levels[levels.length - 1];
 }
 
-// Keeps a handle inside its container so it stays visible and, crucially, still
-// hittable — an unclamped handle used to render outside an overflow:hidden box,
-// where it could neither be seen nor grabbed.
+// Keeps a handle inside its container so it stays visible and, crucially,
+// still hittable — an unclamped handle can render outside an overflow:hidden
+// container, where it is neither visible nor grabbable.
 export function clampHandle(fx, fy) {
   const cx = Math.min(1, Math.max(0, fx));
   const cy = Math.min(1, Math.max(0, fy));

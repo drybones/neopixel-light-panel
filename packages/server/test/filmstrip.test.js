@@ -64,13 +64,13 @@ test('the loop wraps without a jump', () => {
         return sum / stride;
     };
 
-    // noise and embers are the discriminating cases — uncrossfaded they wrap
-    // at 23x and 9x the median step. wavelet is near-periodic over the loop
-    // and would pass either way; it is here to catch the fade *breaking* a
-    // case that was already fine.
+    // noise and the emitter are the discriminating cases — uncrossfaded,
+    // aperiodic particle motion wraps far above the median step. wavelet is
+    // near-periodic over the loop and would pass either way; it is here to
+    // catch the fade *breaking* a case that was already fine.
     for (const layers of [
         [{ effectType: 'wavelet', params: { freq: 1 } }],
-        [{ effectType: 'embers' }],
+        [{ effectType: 'emitter' }],
         [{ effectType: 'noise' }],
     ]) {
         const { scene } = sceneWith(layers);
@@ -99,11 +99,9 @@ test('an animated scene differs between frames', () => {
 });
 
 // Particle effects seed lazily off `millis`, so without the warm-up the first
-// captured frame is an empty field. embers additionally tests `if (!q.born)`,
-// which makes a born time of 0 falsy and re-seeds every particle every frame —
-// a zero time base renders the layer permanently black.
+// captured frame is an empty field.
 test('particle effects are lit by the time capture starts', () => {
-    for (const effectType of ['embers', 'candy_sparkler']) {
+    for (const effectType of ['emitter', 'particle_trail']) {
         const { scene } = sceneWith([{ effectType }]);
         const strip = renderFilmstrip(scene, MODEL);
         const stride = MODEL.length * 3;
@@ -176,7 +174,7 @@ test('a long-lived emitter is settled by the time capture starts', () => {
 });
 
 test('rendering a scene does not disturb the live compositor', () => {
-    const { store, scene } = sceneWith([{ effectType: 'embers' }]);
+    const { store, scene } = sceneWith([{ effectType: 'emitter' }]);
     const before = store.compositor.getLayerBuffer(scene.layers[0].id);
     renderFilmstrip(scene, MODEL);
     const after = store.compositor.getLayerBuffer(scene.layers[0].id);
@@ -197,8 +195,8 @@ test('the cache re-renders only when scene content changes', () => {
     assert.strictEqual(Buffer.from(edited.data, 'base64')[0], 255);
 });
 
-// The picker used to need a hand-picked colour per effect in the UI, so the
-// point of these is that adding an effect module is enough on its own.
+// A new effect needs nothing added to the UI — the picker renders every
+// effect's filmstrip from its defaults, so a module is enough on its own.
 test('every registered effect renders a lit filmstrip from its defaults', () => {
     const catalog = effects.list();
     assert.ok(catalog.length > 0);
@@ -213,13 +211,13 @@ test('every registered effect renders a lit filmstrip from its defaults', () => 
 
 test('effect previews are keyed by type and rendered once', async () => {
     const cache = new EffectPreviewCache(MODEL);
-    const visible = effects.visible();
-    const all = await cache.all(visible);
-    assert.deepStrictEqual(all.map((p) => p.id), visible.map((e) => e.type));
+    const list = effects.list();
+    const all = await cache.all(list);
+    assert.deepStrictEqual(all.map((p) => p.id), list.map((e) => e.type));
 
     const solid = effects.get('solid');
     assert.strictEqual(cache.get(solid).data, cache.get(solid).data);
-    assert.strictEqual(cache.entries.size, visible.length);
+    assert.strictEqual(cache.entries.size, list.length);
 });
 
 // An effect's presets are starting points inside its layer editor, not extra
@@ -228,22 +226,13 @@ test('presets do not add picker tiles', async () => {
     const emitter = effects.get('emitter');
     assert.ok(emitter.presets.length > 1, 'emitter should ship several presets');
 
-    const types = effects.visible().map((e) => e.type);
+    const types = effects.list().map((e) => e.type);
     assert.strictEqual(types.filter((t) => t === 'emitter').length, 1);
     assert.strictEqual(new Set(types).size, types.length, 'one tile per effect');
 
     const cache = new EffectPreviewCache(MODEL);
-    await cache.all(effects.visible());
-    assert.strictEqual(cache.entries.size, effects.visible().length);
-});
-
-// The superseded effects still render, so a layer that predates the migration
-// is never blank — but nothing should offer them as a new layer.
-test('hidden effects are absent from the picker but still resolvable', () => {
-    const types = effects.visible().map((e) => e.type);
-    assert.ok(!types.includes('candy_sparkler'));
-    assert.ok(!types.includes('embers'));
-    assert.ok(effects.get('embers'));
+    await cache.all(effects.list());
+    assert.strictEqual(cache.entries.size, effects.list().length);
 });
 
 test('the cache forgets scenes that no longer exist', async () => {

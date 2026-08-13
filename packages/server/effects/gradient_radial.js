@@ -2,8 +2,8 @@
  * Radial gradient — a multi-stop ramp running outward from a centre, with
  * optional scroll along the radius.
  *
- * Split from the linear gradient; see effects/gradient_linear for why, and
- * engine/gradient-migrate for the conversion.
+ * A separate effect from the linear gradient rather than one with a mode
+ * enum; see effects/gradient_linear for why.
  *
  * `aspect` stretches the radius in x. The panel is 30x8 on a square pitch, so a
  * true circle is clipped hard at the left and right edges and the corners are
@@ -88,8 +88,8 @@ module.exports = {
             // The scroll direction's sign baked in, so the render loop neither
             // branches nor reads the enum. Adding to u puts a given colour at a
             // smaller radius as t grows, i.e. the rings converge — so inward is
-            // the positive one. Anything but 'inward' reads as outward, which
-            // is what gives a layer stored before the toggle its old behaviour.
+            // the positive one. Anything but 'inward' reads as outward — the
+            // default for a layer with no stored travel direction.
             scroll: (params.travel === 'inward' ? 1 : -1) * params.scroll,
         };
     },

@@ -4,26 +4,43 @@
  * filtery happens here, never in the render loop), and persistence.
  *
  * Persistence goes to a single crash-safe JSON document (engine/json-store,
- * atomic tmp+rename with a .bak fallback) — deliberately NOT node-persist,
- * whose non-atomic writes lost scene data to a power cut once. Writes are
- * debounced (trailing 2s) so slider drags don't hammer the SD card;
- * flush() is called from signal handlers on shutdown.
+ * atomic tmp+rename with a .bak fallback). Writes are debounced (trailing
+ * 2s) so slider drags don't hammer the SD card; flush() is called from
+ * signal handlers on shutdown.
  *
- * Document shape: { version: 2, activeSceneId, seededBuiltins, scenes: [...] }
+ * Document shape: { version: 2, activeSceneId, scenes: [...] }
  */
 
 var crypto = require('crypto');
 var effects = require('../effects');
 var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
-var planewaveMigrate = require('./planewave-migrate');
-var emitterMigrate = require('./emitter-migrate');
-var gradientMigrate = require('./gradient-migrate');
 
 var SAVE_DEBOUNCE_MS = 2000;
 
 function newId() {
     return crypto.randomUUID().split('-')[0];
+}
+
+function warn(msg) {
+    console.warn('Scene store: ' + msg);
+}
+
+// The four scenes a fresh install starts with. Embers and Candy Sparkler are
+// emitter presets, not effect types of their own — the picker offers them as
+// starting points, but seeding needs their full param sets up front.
+function builtinScenes() {
+    var emitter = effects.get('emitter');
+    function preset(id) {
+        var match = emitter.presets.filter(function(p) { return p.id === id; })[0];
+        return Object.assign({}, emitter.defaults, match.params);
+    }
+    return [
+        { name: 'Default', layers: [{ effectType: 'wavelet', params: { color: '#ffffff', freq: 0.3, lambda: 0.3, min: 0.2, max: 0.4 }, blendMode: 'add' }] },
+        { name: 'Embers', layers: [{ effectType: 'emitter', params: preset('embers') }] },
+        { name: 'Particle Trail', layers: [{ effectType: 'particle_trail' }] },
+        { name: 'Candy Sparkler', layers: [{ effectType: 'emitter', params: preset('sparkler') }] },
+    ];
 }
 
 function stripRuntime(scene) {
@@ -47,14 +64,7 @@ function stripRuntime(scene) {
 
 function normaliseLayer(layer) {
     var effect = effects.get(layer.effectType);
-    // An effect may rewrite params it has outgrown (noise's contrast -> levels).
-    // It runs on the stored params *before* the defaults are merged over them,
-    // or a layer carrying only the old key would be given the new key's default
-    // and silently change look. Both the load path and importMerge come through
-    // here, so an old export still converts however long from now.
-    var raw = layer.params || {};
-    if (effect && effect.upgradeParams) raw = effect.upgradeParams(raw);
-    var params = Object.assign({}, effect ? effect.defaults : {}, raw);
+    var params = Object.assign({}, effect ? effect.defaults : {}, layer.params || {});
     return {
         id: layer.id || newId(),
         effectType: layer.effectType,
@@ -72,10 +82,6 @@ class SceneStore {
         this.persistFile = persistFile || null;
         this.scenes = [];
         this.activeSceneId = null;
-        this.seededBuiltins = false;
-        this.planeWaveMigrated = false;
-        this.emitterMigrated = false;
-        this.gradientMigrated = false;
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -116,10 +122,6 @@ class SceneStore {
             jsonStore.save(this.persistFile, {
                 version: 2,
                 activeSceneId: this.activeSceneId,
-                seededBuiltins: this.seededBuiltins,
-                planeWaveMigrated: this.planeWaveMigrated,
-                emitterMigrated: this.emitterMigrated,
-                gradientMigrated: this.gradientMigrated,
                 scenes: this.scenes.map(stripRuntime),
             });
         } catch (err) {
@@ -128,156 +130,29 @@ class SceneStore {
         }
     }
 
-    // legacy: { scenes, activeSceneId, seeded, migrated } — values recovered
-    // from node-persist (pre-json-store deployments and the original
-    // wave_config presets). Only consulted when the scene file is absent.
-    async load(legacy) {
-        var doc = this.persistFile
-            ? jsonStore.load(this.persistFile, function(msg) { console.warn('Scene store: ' + msg); })
-            : null;
-        legacy = legacy || {};
-
+    async load() {
+        var doc = this.persistFile ? jsonStore.load(this.persistFile, warn) : null;
+        // Array.isArray, not `.length` — an *empty* scenes array is someone
+        // who deleted their library, not a fresh install. Only the absence
+        // of a usable scenes key means "seed the built-ins."
         if (doc && Array.isArray(doc.scenes)) {
-            this.planeWaveMigrated = !!doc.planeWaveMigrated;
-            this.emitterMigrated = !!doc.emitterMigrated;
-            this.gradientMigrated = !!doc.gradientMigrated;
-            var migrated = this.convertPlaneWaves(doc.scenes, doc);
-            var emitters = this.convertEmitters(migrated.scenes, doc);
-            var gradients = this.convertGradients(emitters.scenes, doc);
-            this.setScenes(gradients.scenes);
-            this.seededBuiltins = !!doc.seededBuiltins;
+            this.setScenes(doc.scenes);
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
-            if (migrated.ranNow || emitters.ranNow || gradients.ranNow) {
-                this._dirty = true;
-                await this.flush();
-            }
+            await this.flush();          // no-op unless setScenes repaired an id
             return;
         }
-
-        var active = null;
-        var raw = null;
-        var source = '';
-        if (legacy.scenes && legacy.scenes.length > 0) {
-            raw = legacy.scenes;
-            this.seededBuiltins = !!legacy.seeded;
-            active = legacy.activeSceneId;
-            source = 'Recovered {n} scene(s) from node-persist.';
-        } else if (legacy.migrated && legacy.migrated.scenes.length > 0) {
-            raw = legacy.migrated.scenes;
-            active = legacy.migrated.activeSceneId;
-            source = 'Migrated {n} wavelet preset(s) to scenes.';
-        }
-
-        if (raw) {
-            var legacyScenes = this.convertPlaneWaves(raw).scenes;
-            legacyScenes = this.convertEmitters(legacyScenes).scenes;
-            this.setScenes(this.convertGradients(legacyScenes).scenes);
-            console.log(source.replace('{n}', this.scenes.length));
-        } else {
-            this.planeWaveMigrated = true;
-            this.emitterMigrated = true;
-            this.gradientMigrated = true;
-            this.setScenes([this.defaultScene()]);
-        }
-        this.activeSceneId = (active && this.get(active)) ? active : null;
+        this.setScenes(builtinScenes());
+        this.activeSceneId = null;
         this._dirty = true;
         await this.flush();
     }
 
-    // Distant wavelets are a hand-rolled plane wave the old UI could not edit;
-    // convert them once so they get a Direction control. The pre-conversion
-    // document is snapshotted alongside the scene file for rollback — the same
-    // caution engine/migrate takes by leaving the old wave_config key in place.
-    // Takes and returns raw (un-normalised) scenes, so the new effect's
-    // defaults are applied by setScenes rather than the old effect's.
-    // sourceDoc, when present, is the file exactly as it was read — snapshot
-    // that rather than just the scenes, so copying the backup over the scene
-    // file is a complete rollback. A scenes-only snapshot would drop
-    // seededBuiltins and re-seed the built-in scenes as duplicates.
-    convertPlaneWaves(rawScenes, sourceDoc) {
-        if (this.planeWaveMigrated) return { scenes: rawScenes, ranNow: false };
-        this.planeWaveMigrated = true;
-
-        var result = planewaveMigrate.convertScenes(rawScenes);
-        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
-
-        if (this.persistFile) {
-            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-planewave.json';
-            try {
-                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
-                console.log('Saved pre-conversion scenes to ' + backup);
-            } catch (err) {
-                console.error('Failed to snapshot scenes before plane-wave conversion:', err);
-            }
-        }
-        console.log('Converted ' + result.converted + ' distant wavelet layer(s) to plane waves.');
-        return { scenes: result.scenes, ranNow: true };
-    }
-
-    // candy_sparkler and embers were one engine with different constants baked
-    // in; convert them once so their knobs become editable. Same shape as
-    // convertPlaneWaves — raw scenes in and out, its own snapshot, its own flag
-    // — because the two run in sequence on the same load and either can be the
-    // one that has already happened.
-    //
-    // The old effects stay registered (hidden) rather than being deleted: this
-    // runs once against the stored document, and an export taken beforehand can
-    // be imported long afterwards through a path that does not re-migrate.
-    convertEmitters(rawScenes, sourceDoc) {
-        if (this.emitterMigrated) return { scenes: rawScenes, ranNow: false };
-        this.emitterMigrated = true;
-
-        var result = emitterMigrate.convertScenes(rawScenes);
-        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
-
-        if (this.persistFile) {
-            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-emitter.json';
-            try {
-                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
-                console.log('Saved pre-conversion scenes to ' + backup);
-            } catch (err) {
-                console.error('Failed to snapshot scenes before emitter conversion:', err);
-            }
-        }
-        console.log('Converted ' + result.converted + ' particle layer(s) to emitters.');
-        return { scenes: result.scenes, ranNow: true };
-    }
-
-    // The gradient's `mode` enum decided what its other controls meant, leaving
-    // the centre pad, the angle and one whole Motion option inert depending on
-    // where it was set; convert once so each shape shows only its own controls.
-    // Same shape as the two above — raw scenes in and out, its own snapshot,
-    // its own flag — because all three now run in sequence on the same load and
-    // any one of them can be the one that has already happened.
-    convertGradients(rawScenes, sourceDoc) {
-        if (this.gradientMigrated) return { scenes: rawScenes, ranNow: false };
-        this.gradientMigrated = true;
-
-        var result = gradientMigrate.convertScenes(rawScenes);
-        if (result.converted === 0) return { scenes: rawScenes, ranNow: true };
-
-        if (this.persistFile) {
-            var backup = this.persistFile.replace(/\.json$/, '') + '.pre-gradient.json';
-            try {
-                jsonStore.save(backup, sourceDoc || { version: 2, scenes: rawScenes });
-                console.log('Saved pre-conversion scenes to ' + backup);
-            } catch (err) {
-                console.error('Failed to snapshot scenes before gradient conversion:', err);
-            }
-        }
-        console.log('Converted ' + result.converted + ' gradient layer(s) to linear/radial gradients.');
-        return { scenes: result.scenes, ranNow: true };
-    }
-
     setScenes(rawScenes) {
         var self = this;
-        // The compositor caches a render instance per layer id across all
+        // The compositor caches one render instance per layer id across all
         // scenes, so an id shared by two scenes makes them fight over one
-        // entry. That was survivable while every legacy preset was a wavelet
-        // — same effectType, so the cached instance still fitted — but two
-        // scenes with different effect types on one id render each other's
-        // params and produce NaN. The old wave_config data does contain a
-        // duplicate, so repair ids here rather than trusting the document.
+        // entry — harmless while both share an effect type, NaN once they
+        // don't. Repair happens here rather than trusting the document.
         var seen = Object.create(null);
         this.scenes = rawScenes.map(function(s) {
             return {
@@ -295,14 +170,6 @@ class SceneStore {
             };
         });
         this.scenes.forEach(function(s) { self.preprocess(s); });
-    }
-
-    defaultScene() {
-        return {
-            id: newId(),
-            name: 'Default',
-            layers: [normaliseLayer({ effectType: 'wavelet', params: { color: '#ffffff', freq: 0.3, lambda: 0.3, min: 0.2, max: 0.4 }, blendMode: 'add' })],
-        };
     }
 
     // ---- queries ----

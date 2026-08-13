@@ -4,8 +4,8 @@
 // log sliders reach 0.001 (the glow floors) and 0.002 (gradient drift), and a
 // flat 2dp would show those as "0" — and a speed of 0.005 as "0.01", which is
 // worse than useless because it looks like a real reading. Values at or above
-// 1 keep the old formatting exactly, which covers everything the position pad
-// and the angle dial produce.
+// 1 use plain 2dp formatting, which covers everything the position pad and
+// the angle dial produce.
 export function formatNumber(v) {
   if (!Number.isFinite(v)) return '';
   if (v === 0) return '0';

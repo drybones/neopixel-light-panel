@@ -97,7 +97,7 @@ test('opacity halves a solid layer over black', () => {
     assert.deepStrictEqual(client.pixels[0], [127, 127, 127]);
 });
 
-test('migrated multi-wavelet scene reproduces the old interactive_wave sum', () => {
+test('a multi-wavelet scene sums per-layer additive blending correctly', () => {
     const model = makeModel(8);
     const client = makeClient();
     const compositor = new Compositor(client, model);
@@ -108,7 +108,7 @@ test('migrated multi-wavelet scene reproduces the old interactive_wave sum', () 
         { color: '#c04010', freq: 0.6, lambda: 0.9, delta: 2.1, x: 0.75, y: -0.1, min: 0.0, max: 0.4 },
     ];
     const scene = {
-        id: 's1', name: 'migrated',
+        id: 's1', name: 'multi-wavelet',
         layers: wavelets.map((w, i) => ({
             id: 'w' + i, effectType: 'wavelet', params: w,
             blendMode: 'add', opacity: 1, enabled: true, solo: false,
@@ -163,4 +163,29 @@ test('changing effectType recreates the instance, changing params does not', () 
     scene.layers[0].effectType = 'wavelet';
     compositor.syncScene(scene);
     assert.notStrictEqual(compositor.layers.get('l1').instance, first);
+});
+
+test('the compositor refuses to render a layer whose cached instance is stale', () => {
+    const model = makeModel(2);
+    const client = makeClient();
+    const store = new SceneStore(new Compositor(client, model), null);
+    store.setScenes([{ id: 'aaaaaaaa', name: 'One', layers: [{ id: 'layer001', effectType: 'solid', params: { color: '#ffffff', level: 1 } }] }]);
+    const scene = store.scenes[0];
+
+    // Simulate the collision directly: another scene rebinds the id.
+    store.compositor.syncScene({ layers: [{ id: 'layer001', effectType: 'wavelet' }] });
+    store.compositor.renderFrame(scene, 0);
+    assert.ok(store.compositor.composite.every(Number.isFinite),
+        'a stale entry must never put NaN on the panel');
+});
+
+test('a layer whose effectType has no module renders nothing and throws nothing', () => {
+    const model = makeModel(2);
+    const client = makeClient();
+    const store = new SceneStore(new Compositor(client, model), null);
+    store.setScenes([{ id: 'aaaaaaaa', name: 'One', layers: [{ id: 'l1', effectType: 'no_such_effect', params: {} }] }]);
+    const scene = store.scenes[0];
+
+    assert.doesNotThrow(() => store.compositor.renderFrame(scene, 0));
+    assert.ok(store.compositor.composite.every((v) => v === 0), 'an unknown effect must not put anything on the panel');
 });

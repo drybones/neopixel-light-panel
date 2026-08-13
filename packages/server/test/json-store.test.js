@@ -23,6 +23,13 @@ test('load returns null when the file never existed', () => {
     assert.strictEqual(jsonStore.load(tmpFile('missing.json')), null);
 });
 
+test('save creates its target directory if missing', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsonstore-'));
+    const file = path.join(dir, 'nested', 'doc.json');
+    jsonStore.save(file, { n: 1 });
+    assert.deepStrictEqual(jsonStore.load(file), { n: 1 });
+});
+
 test('a second save keeps the previous version as .bak', () => {
     const file = tmpFile('doc.json');
     jsonStore.save(file, { n: 1 });
@@ -59,24 +66,22 @@ function makeStore(file) {
 test('SceneStore persists and reloads through the file', async () => {
     const file = tmpFile('scenes.json');
     const a = makeStore(file);
-    await a.load({});
+    await a.load();
     const scene = a.create({ name: 'Keep me', layers: [{ effectType: 'solid', params: {} }] });
     a.setActive(scene.id);
-    a.seededBuiltins = true;
     await a.flush();
 
     const b = makeStore(file);
-    await b.load({});
+    await b.load();
     assert.ok(b.get(scene.id));
     assert.strictEqual(b.get(scene.id).name, 'Keep me');
     assert.strictEqual(b.activeSceneId, scene.id);
-    assert.strictEqual(b.seededBuiltins, true);
 });
 
 test('SceneStore recovers scenes from .bak after main-file corruption', async () => {
     const file = tmpFile('scenes.json');
     const a = makeStore(file);
-    await a.load({});
+    await a.load();
     const scene = a.create({ name: 'Survivor' });
     await a.flush();
     a.create({ name: 'Later edit' });
@@ -85,42 +90,6 @@ test('SceneStore recovers scenes from .bak after main-file corruption', async ()
     fs.writeFileSync(file, '{"version": 2, "scen'); // power cut mid-write
 
     const b = makeStore(file);
-    await b.load({});
+    await b.load();
     assert.ok(b.get(scene.id), 'scene from the .bak generation should survive');
-});
-
-test('SceneStore prefers the file over legacy node-persist data', async () => {
-    const file = tmpFile('scenes.json');
-    const a = makeStore(file);
-    await a.load({});
-    a.create({ name: 'From file' });
-    await a.flush();
-
-    const b = makeStore(file);
-    await b.load({ scenes: [{ id: 'aaaaaaaa', name: 'From legacy', layers: [] }] });
-    assert.ok(b.scenes.some((s) => s.name === 'From file'));
-    assert.ok(!b.scenes.some((s) => s.name === 'From legacy'));
-});
-
-test('SceneStore falls back to legacy scenes, then migration, then default', async () => {
-    const legacyStore = makeStore(tmpFile('scenes.json'));
-    await legacyStore.load({
-        scenes: [{ id: 'aaaaaaaa', name: 'From legacy', layers: [] }],
-        activeSceneId: 'aaaaaaaa',
-        seeded: true,
-    });
-    assert.strictEqual(legacyStore.scenes[0].name, 'From legacy');
-    assert.strictEqual(legacyStore.activeSceneId, 'aaaaaaaa');
-    assert.strictEqual(legacyStore.seededBuiltins, true);
-
-    const migratedStore = makeStore(tmpFile('scenes.json'));
-    await migratedStore.load({
-        migrated: { scenes: [{ id: 'bbbbbbbb', name: 'From migration', layers: [] }], activeSceneId: null },
-    });
-    assert.strictEqual(migratedStore.scenes[0].name, 'From migration');
-
-    const defaultStore = makeStore(tmpFile('scenes.json'));
-    await defaultStore.load({});
-    assert.strictEqual(defaultStore.scenes.length, 1);
-    assert.strictEqual(defaultStore.scenes[0].name, 'Default');
 });

@@ -1,13 +1,12 @@
 /*
- * Particle → layer-buffer renderer, ported from opc.js/virtual-opc.js
- * mapParticles(). Writes additively-summed particle light into a Float32
- * layer buffer instead of straight into the OPC client, so particle
- * effects can participate in layer blending.
+ * Particle → layer-buffer renderer. Writes additively-summed particle light
+ * into a Float32 layer buffer instead of straight into the OPC client, so
+ * particle effects can participate in layer blending.
  *
  * Particles: { point: [x, y, z], intensity, falloff, color: [r, g, b] }.
  * A particle with an empty point [] contributes at zero distance
- * everywhere (the "ambient" particle trick from the old shader), which
- * the (diff || 0) fallback reproduces.
+ * everywhere — the "ambient" particle trick — which the (diff || 0)
+ * fallback reproduces.
  */
 
 function defaultFalloff(distanceSq, intensity, falloff) {

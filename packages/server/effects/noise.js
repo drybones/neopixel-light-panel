@@ -4,42 +4,38 @@
  * Each instance gets its own permutation table so two noise layers
  * don't move in lockstep.
  *
- * This was *value* noise until the field was found to pulse rather than flow:
- * interpolating with a fade whose derivative is zero at both ends means that
- * every time the time axis crosses an integer, the field coasts to a near-stop
- * and picks back up — one stall per 1/speed seconds, which at the 0.3 default
- * is a visible beat every 3.3 s. Value noise pins a fixed value to each lattice
- * point, so it genuinely does settle onto a grid state at every integer t; a
- * gradient (Perlin) lattice stores directions instead, the value at a lattice
- * point is not fixed, and there is nothing to settle onto. Measured over 48 s,
- * the 10th percentile of per-frame change against the median went from 57% to
- * 85% of the way to constant velocity — see the stall-depth test in
- * test/effects.test.js, which is what stops this regressing.
+ * This is gradient (Perlin) noise, not value noise: value noise pins a fixed
+ * value to each lattice point, so interpolating between them with a fade
+ * whose derivative is zero at both ends makes the field coast to a near-stop
+ * and pick back up every time the time axis crosses an integer — a visible
+ * pulse rather than a flow. A gradient lattice stores directions instead, so
+ * the value at a lattice point isn't fixed and there is nothing to settle
+ * onto. The stall-depth test in test/effects.test.js pins this against
+ * regressing back to a pulse.
  *
- * The fade below is therefore Perlin's quintic rather than the old smoothstep:
- * with gradient noise the second derivative also has to vanish at the lattice
- * or the seams show up as creases.
+ * The fade below is Perlin's quintic rather than a plain smoothstep: with
+ * gradient noise the second derivative also has to vanish at the lattice or
+ * the seams show up as creases.
  */
 
 var color = require('../engine/color');
 
-// Gradient noise covers more ground per unit t than value noise did, and stored
-// scenes carry a `speed` chosen against the old rate — TIME_RATE holds the pace
-// where it was, so the switch changes the character of the motion and not how
-// fast the layer reads. Measured against the old implementation, not guessed.
+// TIME_RATE calibrates how fast the field moves against a stored scene's
+// `speed` value — gradient noise covers more ground per unit t than a
+// differently-scaled field would at the same `speed`. This is a deliberate,
+// measured calibration, not a guess; retuning it changes how fast a stored
+// `speed` reads.
 var TIME_RATE = 0.7;
 
-// AMPLITUDE is what makes `min: 0, max: 1` mean *the full ramp*, the same thing
-// it means on a wavelet — and getting there took a deliberate recalibration.
+// AMPLITUDE is what makes `min: 0, max: 1` mean *the full ramp*, the same
+// thing it means on a wavelet.
 //
 // A wavelet's sine is bounded and hits both ends every cycle at every pixel;
 // better, a sine lingers at its turning points, so at 0/1 about 9% of samples
 // sit within 2% of each rail. A gradient field is nothing like that: it is a
 // blend of eight dot products, so it is bell-shaped with a strong central
-// tendency and no value it reliably reaches. Scaled to match the old value
-// noise it occupied roughly 0.22..0.77 of the ramp and touched neither end,
-// which made `0/1` quietly mean "the middle half" and left the real calibration
-// sitting in the old contrast default rather than in the field.
+// tendency and no value it reliably reaches — an uncalibrated field quietly
+// means "the middle of the ramp" at 0/1, not the full range.
 //
 // So the field is scaled here instead: 1.124 puts its 1st and 99th percentiles
 // on 0 and 1 (measured over 1.15M pixel-samples across six permutation tables),
@@ -99,38 +95,6 @@ module.exports = {
             min: params.min,
             max: params.max,
         };
-    },
-
-    // Contrast was a gain about the midpoint, so it could only harden or soften
-    // the field around a fixed 50% balance — density was the one thing it could
-    // not reach. Levels replaces it: contrast c becomes a span of c/1.5 centred
-    // on 0.5, so the old default of 1.5 lands exactly on the new default of 0/1
-    // and the ordering of every stored value is preserved.
-    //
-    // This is deliberately *not* look-preserving. Against the recalibrated field
-    // (see AMPLITUDE) the same fraction of the ramp is a stronger image, so
-    // converted scenes come out about 1.2x more contrasty than they were. That
-    // was the point: the old numbers encoded a field that only ever used the
-    // middle of its range.
-    //
-    // Runs on the raw params from disk, before the effect's defaults are merged
-    // over them (see scene-store's normaliseLayer): applying the defaults first
-    // would hand a `contrast: 3` layer the *default* levels and flatten it.
-    upgradeParams(params) {
-        if (!params) return params;
-        if (typeof params.contrast !== 'number') return params;
-        if (typeof params.min === 'number' || typeof params.max === 'number') return params;
-
-        var c = params.contrast;
-        var out = {};
-        for (var key in params) {
-            if (Object.prototype.hasOwnProperty.call(params, key) && key !== 'contrast') {
-                out[key] = params[key];
-            }
-        }
-        out.min = 0.5 - c / 3;
-        out.max = 0.5 + c / 3;
-        return out;
     },
 
     createInstance(ctx) {

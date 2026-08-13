@@ -25,6 +25,9 @@ test('catalog exposes type, name, schema and defaults', () => {
         assert.ok(Array.isArray(entry.schema));
         assert.ok(entry.defaults && typeof entry.defaults === 'object');
     }
+    // Guards against reintroducing a filter between the two: every registered
+    // effect belongs in the catalog now that nothing is hidden.
+    assert.strictEqual(catalog.length, effects.list().length);
 });
 
 test('every effect renders its defaults without throwing', () => {
@@ -299,62 +302,6 @@ function renderNoise(params, millis, ctx) {
     noise.createInstance(ctx).render(out, millis, p);
     return out;
 }
-
-test('noise upgradeParams converts contrast to the equivalent levels pair', () => {
-    const up = noise.upgradeParams({ c1: '#000000', scale: 0.8, contrast: 3 });
-    assert.strictEqual(up.min, -0.5);
-    assert.strictEqual(up.max, 1.5);
-    assert.strictEqual(up.contrast, undefined, 'the dead key should not survive');
-    assert.strictEqual(up.scale, 0.8, 'other params must be carried over');
-    assert.strictEqual(up.c1, '#000000');
-});
-
-test('noise upgradeParams leaves already-converted params alone', () => {
-    const converted = { scale: 1, min: 0, max: 1 };
-    assert.strictEqual(noise.upgradeParams(converted), converted);
-    // Idempotent: running it on its own output changes nothing.
-    const once = noise.upgradeParams({ contrast: 1.8 });
-    assert.strictEqual(noise.upgradeParams(once), once);
-    // And a params object that never had contrast is passed straight through.
-    const fresh = { scale: 2 };
-    assert.strictEqual(noise.upgradeParams(fresh), fresh);
-});
-
-test('noise upgradeParams keeps min/max when a stray contrast is also present', () => {
-    // Nothing validates params, so a hand-edited or half-migrated layer can
-    // carry both. The new keys win rather than being overwritten.
-    const up = noise.upgradeParams({ contrast: 8, min: 0, max: 1 });
-    assert.strictEqual(up.min, 0);
-    assert.strictEqual(up.max, 1);
-});
-
-test('contrast converts to a proportional span about the ramp centre', () => {
-    // Deliberately not look-preserving: the field was recalibrated at the same
-    // time (see AMPLITUDE), so the same fraction of the ramp is now a stronger
-    // image. What the conversion does preserve is the *meaning* of the stored
-    // number — its position in the ordering, and the balance point it sat on.
-    for (const contrast of [0.25, 1.22, 1.5, 1.8, 3, 16]) {
-        const up = noise.upgradeParams({ contrast });
-        assert.ok(Math.abs((up.min + up.max) / 2 - 0.5) < 1e-12,
-            `contrast ${contrast} should stay centred on the ramp midpoint`);
-        assert.ok(Math.abs((up.max - up.min) - contrast / 1.5) < 1e-12,
-            `contrast ${contrast} should become a span of c/1.5`);
-    }
-
-    // The old default lands exactly on the new one, so a layer that was never
-    // touched comes through the conversion reading 0 / 1.
-    const fromDefault = noise.upgradeParams({ contrast: 1.5 });
-    assert.strictEqual(fromDefault.min, 0);
-    assert.strictEqual(fromDefault.max, 1);
-    assert.strictEqual(fromDefault.min, noise.defaults.min);
-    assert.strictEqual(fromDefault.max, noise.defaults.max);
-
-    // Ordering survives: a scene stored more contrasty stays more contrasty.
-    const pairs = [1, 1.5, 3, 8].map(c => noise.upgradeParams({ contrast: c }));
-    for (let i = 1; i < pairs.length; i++) {
-        assert.ok(pairs[i].max - pairs[i].min > pairs[i - 1].max - pairs[i - 1].min);
-    }
-});
 
 test('the default levels use the whole ramp, both rails included', () => {
     // The calibration this effect exists to have: at 0 / 1 the field should
@@ -692,9 +639,10 @@ test('emitter survives a typed size of 0', () => {
     assert.ok(out.every(v => Number.isFinite(v)), 'size 0 put non-finite values in the buffer');
 });
 
-// The documented filmstrip trap: embers tested `if (!q.born)`, so a born time
-// of 0 re-seeded every particle every frame and the layer rendered black. The
-// emitter uses an explicit alive flag, which has to hold at t=0 too.
+// The documented filmstrip trap: a particle effect testing a falsy birth time
+// to decide whether a slot needs seeding would re-seed every particle every
+// frame at t=0 and render black. The emitter uses an explicit alive flag
+// instead, which has to hold at t=0 too.
 test('emitter renders at a zero time base', () => {
     const ctx = panelCtx();
     const p = emitter.prepare({ ...emitter.defaults, count: 40 });
@@ -736,11 +684,10 @@ test('emitter gravity pulls sideways, not just down', () => {
 test('emitter is the only particle effect in the catalog', () => {
     const types = effects.catalog().map(e => e.type);
     assert.ok(types.includes('emitter'));
-    assert.ok(!types.includes('candy_sparkler'), 'superseded effects must not be offered');
+    assert.ok(!types.includes('candy_sparkler'));
     assert.ok(!types.includes('embers'));
-    // Still registered, so stored and imported layers keep rendering.
-    assert.ok(effects.get('candy_sparkler'), 'candy_sparkler must stay resolvable');
-    assert.ok(effects.get('embers'), 'embers must stay resolvable');
+    assert.strictEqual(effects.get('embers'), null, 'the superseded effect module is gone entirely');
+    assert.strictEqual(effects.get('candy_sparkler'), null);
 });
 
 test('every catalog entry with presets renders each of them', () => {
@@ -787,26 +734,6 @@ test('twinkle sharpness changes how much of the cycle is lit', () => {
     assert.ok(litSum(1) > litSum(12), 'sharpness must darken the duty cycle');
 });
 
-// app.js seeds the built-in scenes by looking these preset ids up, and only on
-// a *fresh* install — where emitterMigrated is already true, so nothing would
-// ever convert a layer seeded with a hidden type, and a renamed id throws at
-// boot rather than in any test that runs on an existing library.
-test('the preset ids app.js seeds built-ins from still exist', () => {
-    const ids = emitter.presets.map(p => p.id);
-    for (const id of ['embers', 'sparkler']) {
-        assert.ok(ids.includes(id), `seedBuiltins looks up the '${id}' preset`);
-    }
-});
-
-// Whatever a built-in is seeded as has to be something the picker can also
-// create, or the library ships with a layer the user cannot reproduce.
-test('no effect is both hidden and reachable from the catalog', () => {
-    const visible = new Set(effects.catalog().map(e => e.type));
-    for (const mod of effects.list()) {
-        assert.strictEqual(visible.has(mod.type), !mod.hidden,
-            `${mod.type} disagrees with its hidden flag`);
-    }
-});
 
 // The vertical axis inverts between param space (y up, what the pad and the
 // dials draw) and modelZ (+0.875 is the *bottom* row). Origin, travel and

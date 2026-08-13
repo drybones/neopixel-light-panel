@@ -1,14 +1,29 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
 const { Compositor } = require('../engine/compositor');
 const { SceneStore } = require('../engine/scene-store');
+const jsonStore = require('../engine/json-store');
+const effects = require('../effects');
 
 function makeStore() {
     const model = [{ point: [0, 0, 0] }, { point: [0.25, 0, 0] }];
     const client = { brightness: 1, setPixel() {}, writePixels() {} };
     const compositor = new Compositor(client, model);
     return new SceneStore(compositor, null);
+}
+
+function tmpFile(name) {
+    return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'scenestore-')), name);
+}
+
+function makePersistedStore(file) {
+    const model = [{ point: [0, 0, 0] }, { point: [0.25, 0, 0] }];
+    const client = { brightness: 1, setPixel() {}, writePixels() {} };
+    return new SceneStore(new Compositor(client, model), file);
 }
 
 test('preprocess filters disabled layers and honours solo', () => {
@@ -124,45 +139,118 @@ test('getPublic strips runtime fields', () => {
     assert.strictEqual(pub.layers[0]._blend, undefined);
 });
 
-test('stored noise layers trade contrast for the equivalent levels pair', () => {
-    const store = makeStore();
-    store.setScenes([{
-        id: 'night', name: 'Night sky',
-        layers: [{ id: 'n1', effectType: 'noise', params: { c1: '#050a1e', scale: 0.8, contrast: 1.8 } }],
-    }]);
-
-    const params = store.scenes[0].layers[0].params;
-    // 0.5 - 1.8/3 is -0.09999999999999998, so compare with a tolerance rather
-    // than writing the float out — the value is right, decimal just can't say so.
-    assert.ok(Math.abs(params.min - -0.1) < 1e-12, `min was ${params.min}`);
-    assert.ok(Math.abs(params.max - 1.1) < 1e-12, `max was ${params.max}`);
-    assert.strictEqual(params.contrast, undefined);
-    assert.strictEqual(params.scale, 0.8, 'untouched params survive');
-    assert.strictEqual(params.c1, '#050a1e');
-    // The default levels must not have won over the stored contrast.
-    assert.notStrictEqual(params.min, 0);
-});
-
-test('an old export still converts when imported', () => {
-    const store = makeStore();
-    store.setScenes([]);
-    store.importMerge([{
-        id: 'old', name: 'From an old export',
-        layers: [{ id: 'o1', effectType: 'noise', params: { contrast: 3 } }],
-    }]);
-
-    const params = store.get('old').layers[0].params;
-    assert.strictEqual(params.min, -0.5);
-    assert.strictEqual(params.max, 1.5);
-    assert.strictEqual(params.contrast, undefined);
-});
-
-test('a noise layer with no contrast at all just gets the defaults', () => {
+test('a noise layer with no params at all just gets the defaults', () => {
     const store = makeStore();
     store.setScenes([{ id: 's', name: 'n', layers: [{ id: 'l', effectType: 'noise', params: {} }] }]);
     const params = store.scenes[0].layers[0].params;
     assert.strictEqual(params.min, 0);
     assert.strictEqual(params.max, 1);
+});
+
+// ---- duplicate layer ids ----
+
+test('duplicate layer ids across scenes are repaired on load', () => {
+    // The compositor caches one render instance per layer id, so a shared id
+    // is harmless while both layers are the same effect type but, once their
+    // effect types differ, the two scenes render each other's params — in
+    // practice, a black or NaN panel.
+    const shared = 'dupe1234';
+    const store = makeStore();
+    store.setScenes([
+        { id: 'sceneone', name: 'Solid', layers: [{ id: shared, effectType: 'solid', params: { color: '#ff0000', level: 1 } }] },
+        { id: 'scenetwo', name: 'Wavelet', layers: [{ id: shared, effectType: 'wavelet', params: {} }] },
+    ]);
+
+    const ids = store.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(ids[0], ids[1], 'layer ids must be unique across the document');
+    assert.strictEqual(store.scenes[0].layers[0].effectType, 'solid');
+    assert.strictEqual(store.scenes[1].layers[0].effectType, 'wavelet');
+
+    // Both must still render real colour after the other has been synced.
+    for (const scene of [store.scenes[1], store.scenes[0], store.scenes[1]]) {
+        store.compositor.renderFrame(scene, 1234);
+        const comp = store.compositor.composite;
+        assert.ok(comp.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
+        assert.ok(comp.some((v) => v > 0), `${scene.name} rendered black`);
+    }
+});
+
+// ---- load() / seeding ----
+
+test('a fresh install seeds the four built-ins in order with no NaN', async () => {
+    const store = makePersistedStore(tmpFile('scenes.json'));
+    await store.load();
+    assert.deepStrictEqual(store.scenes.map((s) => s.name), ['Default', 'Embers', 'Particle Trail', 'Candy Sparkler']);
+
+    const catalogTypes = effects.catalog().map((e) => e.type);
+    for (const scene of store.scenes) {
+        for (const layer of scene.layers) {
+            assert.ok(catalogTypes.includes(layer.effectType), `${layer.effectType} missing from catalog`);
+        }
+        store.compositor.renderFrame(scene, 1000);
+        assert.ok(store.compositor.composite.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
+    }
+});
+
+test('a second store on the same file loads four and does not re-seed', async () => {
+    const file = tmpFile('scenes.json');
+    const first = makePersistedStore(file);
+    await first.load();
+
+    const second = makePersistedStore(file);
+    await second.load();
+    assert.strictEqual(second.scenes.length, 4);
+});
+
+test('{version: 2, scenes: []} loads as zero scenes', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, { version: 2, activeSceneId: null, scenes: [] });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.scenes.length, 0);
+});
+
+test('a missing/non-array scenes key is treated as fresh', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, { version: 2, activeSceneId: null });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.scenes.length, 4);
+});
+
+test('an activeSceneId naming an absent scene falls back to null', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, {
+        version: 2, activeSceneId: 'ghost123',
+        scenes: [{ id: 'real1234', name: 'Real', layers: [] }],
+    });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.activeSceneId, null);
+});
+
+test('duplicate-id repair from load() is persisted', async () => {
+    const file = tmpFile('scenes.json');
+    const shared = 'dupe1234';
+    jsonStore.save(file, {
+        version: 2, activeSceneId: null,
+        scenes: [
+            { id: 'sceneone', name: 'Solid', layers: [{ id: shared, effectType: 'solid', params: {} }] },
+            { id: 'scenetwo', name: 'Wavelet', layers: [{ id: shared, effectType: 'wavelet', params: {} }] },
+        ],
+    });
+
+    const store = makePersistedStore(file);
+    await store.load();
+    const ids = store.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(ids[0], ids[1]);
+
+    const reloaded = jsonStore.load(file);
+    const reloadedIds = reloaded.scenes.map((s) => s.layers[0].id);
+    assert.notStrictEqual(reloadedIds[0], reloadedIds[1], 'the repair must have been flushed to disk');
 });
 
 // ---- reorder ----

@@ -95,27 +95,25 @@ export function bloomParams(cellPx, opts) {
 // px across, and it clamps at the canvas edge where the real blur spills off
 // and is lost. So a missing blur means flat, and the detection has to be right.
 //
-// WebKit does not have it — not iOS specifically, WebKit. It went unimplemented
-// from 2019 until it landed behind an experimental control in 2024 (webkit.org
-// bug 198416), and Safari 27 still ships without it on both iOS *and* macOS,
-// measured on each. Everything around it is current — `ctx.roundRect`,
-// `Object.groupBy`, `Array.fromAsync`, `text-wrap: pretty` — and CSS filters and
-// SVG `feGaussianBlur` both work, so the gap is canvas-specific and is not a
-// legacy story that ages out.
+// WebKit does not have it — not iOS specifically, WebKit, on either iOS or
+// macOS. This is not a gap that ages out: it has stayed absent across every
+// other canvas/CSS API landing around it (`ctx.roundRect`, `Object.groupBy`,
+// CSS filters, SVG `feGaussianBlur` all work), so a version check or a feature
+// list is not a substitute for testing the property itself.
 //
-// Test for the property, and test for it with `in`. The old detection assigned
-// a value and read it back, which fails exactly here: assigning to a property
-// the engine does not implement just creates an expando that reads back as
-// whatever was written, so it reported support on the engines that have none.
-// The bloom then stacked *unblurred* discs at a combined gain of 4.9x and
-// clipped a fifth of the image to white, silently, on every Safari.
+// Test for the property, and test for it with `in`, never by assigning a
+// value and reading it back: assigning to a property the engine does not
+// implement just creates an expando that reads back as whatever was written,
+// reporting support on engines that have none. The bloom would then stack
+// *unblurred* discs at a combined gain of 4.9x and clip a fifth of the image
+// to white, silently, on every Safari.
 //
-// `in` is enough because WebKit's runtime-enabled features remove the attribute
-// from the prototype rather than leaving it inert, so an unsupported or
-// flagged-off `filter` is always absent — verified on both Safaris (`'filter'
-// in ctx` false, `ctx.filter` undefined). What it cannot catch is an engine
-// that has the property and ignores it for `drawImage`; no such engine is known,
-// and the earlier suspicion that Safari was one was wrong.
+// `in` is correct because WebKit's runtime-enabled features remove the
+// attribute from the prototype rather than leaving it inert, so an
+// unsupported or flagged-off `filter` is always absent (verified on both
+// Safaris: `'filter' in ctx` false, `ctx.filter` undefined). What it cannot
+// catch is an engine that has the property and ignores it for `drawImage`;
+// no such engine is known.
 let filterSupport = null;
 
 export function blurWorks() {
@@ -142,9 +140,10 @@ function fillCores(ctx, pixels, positions, radius, cutoff) {
   }
 }
 
-// Today's renderer, kept for the layer thumbnails (whose cells are 4px wide)
-// and as the fallback whenever a bloom cannot say anything. `fill` draws cell
-// rectangles instead of dots, which is what reads at thumbnail size.
+// The flat (pre-bloom) renderer, used for the layer thumbnails (whose cells
+// are 4px wide) and as the fallback whenever a bloom cannot say anything.
+// `fill` draws cell rectangles instead of dots, which is what reads at
+// thumbnail size.
 export function paintFlat(ctx, pixels, positions, radius, bg = BG, fill = false) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -204,8 +203,9 @@ export function paintBloom(ctx, scratch, pixels, positions, params, bg = BG) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
   if (params.fallback || !blurWorks()) {
-    // Today's radius, not the bloom's core radius — a fallback should look
-    // like what shipped before, not like a bloom with its halo removed.
+    // The flat renderer's own radius, not the bloom's core radius — a
+    // fallback should look like a complete flat rendering, not a bloom
+    // with its halo removed.
     paintFlat(ctx, pixels, positions, Math.min(w / COLS, h / ROWS) / 2 * 0.75, bg, false);
     return;
   }

@@ -1,10 +1,6 @@
 /*
- * Tiny crash-safe JSON file store for the scene data.
- *
- * node-persist (2.1) writes files with a bare fs.writeFile, which a power
- * cut can truncate mid-write — and the panel lives on a Raspberry Pi that
- * gets its power yanked. Scenes are the data that matters, so they get
- * their own file with atomic replacement:
+ * Tiny crash-safe JSON file store. The panel lives on a Raspberry Pi that
+ * gets its power yanked, so writes are atomic rather than a bare write:
  *
  *   write <file>.tmp  →  fsync  →  rename <file> to <file>.bak  →
  *   rename <file>.tmp to <file>
@@ -14,6 +10,7 @@
  */
 
 var fs = require('fs');
+var path = require('path');
 
 function readJson(file) {
     var raw;
@@ -47,6 +44,7 @@ function load(file, onWarn) {
 }
 
 function save(file, data) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
     var tmp = file + '.tmp';
     var json = JSON.stringify(data);
     var fd = fs.openSync(tmp, 'w');

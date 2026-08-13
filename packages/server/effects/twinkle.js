@@ -38,14 +38,13 @@ module.exports = {
     name: 'Twinkle',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
-        // 0 is every star the same colour, which is what this did before the
-        // param existed and is why it defaults there.
+        // 0 is every star the same colour — the default.
         { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true, modulatable: true },
         { key: 'density', type: 'number', label: 'Density', min: 0.02, max: 1, step: 0.01, scale: 'linear', modulatable: true },
         { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 5, scale: 'log', modulatable: true },
-        // Was the hardcoded fourth power below. Log because the interesting
-        // range is 1 (a soft sine swell) to about 16 (a hard blink), and the
-        // difference between 1 and 2 is far bigger than between 12 and 16.
+        // Log because the interesting range is 1 (a soft sine swell) to about
+        // 16 (a hard blink), and the difference between 1 and 2 is far bigger
+        // than between 12 and 16.
         { key: 'sharpness', type: 'number', label: 'Sharpness', min: 0.5, max: 16, scale: 'log', modulatable: true },
         { key: 'background', type: 'number', label: 'Backglow', min: 0.01, max: 0.5, scale: 'log', zeroable: true, modulatable: true },
     ],
@@ -92,9 +91,9 @@ module.exports = {
                     var level = p.background;
                     if (lottery[i] < p.density) {
                         var s = Math.sin(phase[i] + t * Math.PI * 2 / period[i]);
-                        // Sharpen so pixels are dark most of the cycle. The
-                        // exponent was a hardcoded 4; Math.pow is the price of
-                        // making it a param, paid only on the lit pixels.
+                        // Sharpen so pixels are dark most of the cycle.
+                        // Math.pow is the price of a per-layer exponent,
+                        // paid only on the lit pixels.
                         if (s > 0) level += Math.pow(s, p.sharpness);
                     }
 
