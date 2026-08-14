@@ -7,6 +7,7 @@
 
 const net = require('net');
 const fs = require('fs');
+const { PowerMeter } = require('./engine/power');
 
 
 /********************************************************************************
@@ -19,6 +20,9 @@ class OPC {
         this.port = port;
         this.brightness = brightness; // Could implement this via a whitepoint config instead?
         this.pixelBuffer = null;
+        // Owned here rather than injected so setPixel needs no null test in
+        // the hot loop. app.js configures it in place, like brightness.
+        this.power = new PowerMeter();
     }
 
     _reconnect() {
@@ -45,7 +49,30 @@ class OPC {
         });
     }
 
+    /*
+     * Closes the power frame and, when the frame exceeds the budget, rescales
+     * the buffer before it goes out. A second pass rather than a factor
+     * folded into setPixel's multiply, because the frame's total is not known
+     * until its last pixel has been written — and it only runs on the frames
+     * that are actually over.
+     *
+     * endFrame() comes before the connection test so the accumulator is
+     * always closed: skipping it while fcserver is down would let one frame's
+     * sum roll into the next indefinitely.
+     */
     writePixels() {
+        var scale = this.power.endFrame();
+        if (scale < 1 && this.pixelBuffer != null) {
+            var buf = this.pixelBuffer;
+            // From 4: the OPC header is not pixel data. Truncating rather
+            // than rounding keeps the result at or under the budget, never
+            // over — at most one count per channel, on a frame whose values
+            // are large by definition.
+            for (var i = 4; i < buf.length; i++) {
+                buf[i] = (buf[i] * scale) | 0;
+            }
+        }
+
         if (!this.socket) {
             this._reconnect();
         }
@@ -60,6 +87,7 @@ class OPC {
         if (this.pixelBuffer == null || this.pixelBuffer.length != length) {
             this.pixelBuffer = new Buffer.alloc(length);
         }
+        this.power.setPixelCount(num);
 
         // Initialize OPC header
         this.pixelBuffer.writeUInt8(0, 0);           // Channel
@@ -73,9 +101,18 @@ class OPC {
             this.setPixelCount(num + 1);
         }
 
-        this.pixelBuffer.writeUInt8(Math.max(0, Math.min(255, (r | 0) * this.brightness)), offset);
-        this.pixelBuffer.writeUInt8(Math.max(0, Math.min(255, (g | 0) * this.brightness)), offset + 1);
-        this.pixelBuffer.writeUInt8(Math.max(0, Math.min(255, (b | 0) * this.brightness)), offset + 2);
+        // Bytes taken once and reused, so the power estimate is summed over
+        // exactly the values Fadecandy receives. `| 0` is what writeUInt8
+        // would have done to the float anyway.
+        var rb = Math.max(0, Math.min(255, (r | 0) * this.brightness)) | 0;
+        var gb = Math.max(0, Math.min(255, (g | 0) * this.brightness)) | 0;
+        var bb = Math.max(0, Math.min(255, (b | 0) * this.brightness)) | 0;
+
+        this.pixelBuffer.writeUInt8(rb, offset);
+        this.pixelBuffer.writeUInt8(gb, offset + 1);
+        this.pixelBuffer.writeUInt8(bb, offset + 2);
+
+        this.power.accumulate(rb, gb, bb);
     }
 
     /********************************************************************************

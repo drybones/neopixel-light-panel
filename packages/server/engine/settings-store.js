@@ -1,12 +1,13 @@
 /*
- * Settings store — brightness and the frame-stats toggle. Same crash-safe
- * file (engine/json-store) and debounced-write shape as SceneStore, at a
- * longer interval: brightness drags reach here at the UI's 80ms throttle,
- * and writing through at that rate would be many fsync+rename pairs a
- * second onto the SD card.
+ * Settings store — brightness, the frame-stats toggle and the power config.
+ * Same crash-safe file (engine/json-store) and debounced-write shape as
+ * SceneStore, at a longer interval: brightness drags reach here at the UI's
+ * 80ms throttle, and writing through at that rate would be many fsync+rename
+ * pairs a second onto the SD card.
  */
 
 var jsonStore = require('./json-store');
+var power = require('./power');
 
 var SAVE_DEBOUNCE_MS = 1000;
 
@@ -15,6 +16,7 @@ class SettingsStore {
         this.persistFile = persistFile || null;
         this.brightness = 1;
         this.frameStatsEnabled = false;
+        this.power = power.normaliseConfig(null);
         this._saveTimer = null;
         this._dirty = false;
     }
@@ -31,6 +33,10 @@ class SettingsStore {
             this.brightness = Math.min(1, Math.max(0, doc.brightness));
         }
         this.frameStatsEnabled = !!doc.frameStatsEnabled;
+        // normaliseConfig validates every field on its own and falls back to
+        // the defaults per field, so a half-written or hand-edited power
+        // block degrades to the shipped numbers rather than to NaN.
+        this.power = power.normaliseConfig(doc.power);
     }
 
     setBrightness(value) {
@@ -41,6 +47,12 @@ class SettingsStore {
     setFrameStatsEnabled(value) {
         this.frameStatsEnabled = value;
         this.markDirty();
+    }
+
+    setPower(config) {
+        this.power = power.normaliseConfig(config, this.power);
+        this.markDirty();
+        return this.power;
     }
 
     markDirty() {
@@ -62,6 +74,7 @@ class SettingsStore {
                 version: 1,
                 brightness: this.brightness,
                 frameStatsEnabled: this.frameStatsEnabled,
+                power: this.power,
             });
         } catch (err) {
             console.error('Failed to persist settings:', err);
