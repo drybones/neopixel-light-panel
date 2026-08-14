@@ -23,6 +23,20 @@ You will need:
 
 If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL=1`), which replaces the Fadecandy connection with a WebSocket that streams pixel data to the UI's built-in LED visualiser.
 
+### Power
+
+240 WS2812B at full white is about **13.4 A at 5 V**, and almost nothing else comes close — Fadecandy's gamma curve means a mid-grey frame draws roughly a fifth of that, so ordinary scenes sit far below the worst case.
+
+Sizing the supply for 13.4 A is not the whole story, though. The constraint that bites first is usually **voltage, not current**: everything downstream of the supply's terminals shares a resistance (regulation droop, leads, connectors), so the rail falls as `V = V_oc − I × R_eff`. A very ordinary 40 mΩ costs half a volt at 14 A, which is enough to push a Pi sharing that supply below its ~4.63 V undervoltage trip — on a supply rated for 20 A, with 6 A to spare on paper. If a solid-white test scene browns out the Pi while every real scene is fine, this is why, and thicker leads or power injection fixes more than a bigger PSU does.
+
+The server estimates the draw and can hold frames inside a budget (`GET|PUT /api/power`, and the "Power budget" panel in the UI). To set that budget from the wiring you actually have rather than from the label on the supply, run the calibration sweep **on the Pi**:
+
+```bash
+node packages/server/tools/power-sweep.js
+```
+
+It ramps a white scene up a current ramp, reads the real 5 V rail from the Pi's PMIC ADC at each step (Pi 4 and Pi 5), aborts if undervoltage is detected, and fits `V_oc` and `R_eff` from the measurements.
+
 ## Prerequisites
 
 - Node.js 16+ (14 is supported but 16+ recommended)
