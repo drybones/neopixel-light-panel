@@ -101,7 +101,9 @@ body {
   border-radius: 6px;
   padding: 2px 6px;
   color: var(--text-dim);
+  font-family: inherit;
   font-size: 12px;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
@@ -139,6 +141,7 @@ body {
   padding: 2px 6px;
   color: var(--text-dim);
   font-size: 12px;
+  line-height: 1.5;
   font-variant-numeric: tabular-nums;
   cursor: default;
 }
