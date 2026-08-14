@@ -2,16 +2,14 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const power = require('../engine/power');
-const { PowerMeter, scaleFor, budgetFor, railVolts, normaliseConfig, milliampsFor } = power;
+const { PowerMeter, scaleFor, budgetFor, normaliseConfig, milliampsFor } = power;
 const VirtualOPC = require('../virtual-opc');
-const sweep = require('../tools/power-sweep');
 
 const NUM_LEDS = 240;
 
-// The rail this panel actually has to live with: a 5V/20A supply whose
-// wiring puts the Pi under 4.75V somewhere around 10A. Deliberately the
-// worked example from the plan, so the numbers below can be checked by hand.
-const RAIL = { openCircuitVolts: 5.15, ohms: 0.04, floorVolts: 4.75 };
+// A tight budget for exercising the limiter, without needing a real supply
+// on the test machine — same 8800mA the old rail-calibrated example used.
+const TIGHT_BUDGET = { maxMilliamps: 10000 };
 
 function config(overrides) {
     return normaliseConfig(Object.assign({}, overrides));
@@ -72,39 +70,21 @@ test('whitepoint is carried into the estimate', () => {
 
 // ------------------------------------------------------------------ budget
 
-test('the tighter of the PSU and rail caps binds, and says which', () => {
-    const psuOnly = budgetFor(config());
-    assert.strictEqual(psuOnly.boundBy, 'psu');
-    assert.strictEqual(psuOnly.milliamps, 20000 - 1200);
-
-    const withRail = budgetFor(config({ rail: RAIL }));
-    assert.strictEqual(withRail.boundBy, 'rail');
-    // (5.15 - 4.75) / 0.04 = 10A total, less 1.2A of overhead.
-    assert.ok(Math.abs(withRail.milliamps - 8800) < 1e-6);
-
-    // A generous rail leaves the PSU binding.
-    const easyRail = budgetFor(config({ rail: { openCircuitVolts: 5.2, ohms: 0.005, floorVolts: 4.75 } }));
-    assert.strictEqual(easyRail.boundBy, 'psu');
+test('the budget is the PSU rating less the reserved overhead', () => {
+    assert.strictEqual(budgetFor(config()), 20000 - 1200);
+    assert.strictEqual(budgetFor(config(TIGHT_BUDGET)), 10000 - 1200);
 });
 
-test('an uncalibrated or nonsense rail reads as no rail at all', () => {
-    assert.strictEqual(config({ rail: null }).rail, null);
-    assert.strictEqual(config({ rail: { openCircuitVolts: 5.1, ohms: 0, floorVolts: 4.75 } }).rail, null);
-    // A floor at or above the open-circuit voltage describes a negative budget.
-    assert.strictEqual(config({ rail: { openCircuitVolts: 4.7, ohms: 0.04, floorVolts: 4.75 } }).rail, null);
-    assert.strictEqual(config({ rail: { openCircuitVolts: 'five', ohms: 0.04, floorVolts: 4.75 } }).rail, null);
-});
-
-test('the PSU alone does not bind this panel — which is the point', () => {
+test('the PSU cap does not bind this panel at its default rating', () => {
     const snap = paint(sinkWith(config()), 255, 255, 255);
     assert.strictEqual(snap.limiting, false);
-    assert.ok(snap.requestedMilliamps < budgetFor(config()).milliamps);
+    assert.ok(snap.requestedMilliamps < budgetFor(config()));
 });
 
 // ----------------------------------------------------------------- limiter
 
 test('a limited frame is sent at or under the budget, never over', () => {
-    const cfg = config({ rail: RAIL });
+    const cfg = config(TIGHT_BUDGET);
     const sink = sinkWith(cfg);
     const snap = paint(sink, 255, 255, 255);
 
@@ -121,7 +101,7 @@ test('a limited frame is sent at or under the budget, never over', () => {
 });
 
 test('the rescale is gamma-corrected, not linear', () => {
-    const sink = sinkWith(config({ rail: RAIL }));
+    const sink = sinkWith(config(TIGHT_BUDGET));
     paint(sink, 255, 255, 255);
     // Needing 65% of the current means scaling values by 0.65^0.4 = 0.843,
     // i.e. white at byte 215. A linear rescale would drop it to 166 and dim
@@ -130,7 +110,7 @@ test('the rescale is gamma-corrected, not linear', () => {
 });
 
 test('an already-limited frame is not dimmed twice', () => {
-    const cfg = config({ rail: RAIL });
+    const cfg = config(TIGHT_BUDGET);
     const first = sinkWith(cfg);
     paint(first, 255, 255, 255);
     const limited = first.pixelBuffer[0];
@@ -148,15 +128,15 @@ test('an already-limited frame is not dimmed twice', () => {
  * crossed the line.
  */
 test('the scale is continuous at the budget boundary', () => {
-    const cfg = config({ rail: RAIL });
-    const budget = budgetFor(cfg).milliamps;
+    const cfg = config(TIGHT_BUDGET);
+    const budget = budgetFor(cfg);
     assert.strictEqual(scaleFor(budget, NUM_LEDS, cfg).scale, 1);
     assert.ok(scaleFor(budget + 1, NUM_LEDS, cfg).scale > 0.9999);
     assert.ok(scaleFor(budget + 1, NUM_LEDS, cfg).scale < 1);
 });
 
 test('limit:false measures without acting', () => {
-    const sink = sinkWith(config({ rail: RAIL, limit: false }));
+    const sink = sinkWith(config({ ...TIGHT_BUDGET, limit: false }));
     const snap = paint(sink, 255, 255, 255);
     assert.strictEqual(sink.pixelBuffer[0], 255);
     assert.strictEqual(snap.scale, 1);
@@ -192,18 +172,6 @@ test('the limiter never returns WLED’s +1 overshoot', () => {
 });
 
 // ------------------------------------------------------------- reporting
-
-test('predicted rail volts falls with current', () => {
-    assert.strictEqual(railVolts(0, RAIL), 5.15);
-    assert.ok(Math.abs(railVolts(10000, RAIL) - 4.75) < 1e-9);
-    assert.strictEqual(railVolts(10000, null), null);
-});
-
-test('a snapshot includes the rail prediction under load', () => {
-    const snap = paint(sinkWith(config({ rail: RAIL })), 255, 255, 255);
-    // Limited to 8800mA of panel plus 1200mA of overhead = 10A, i.e. the floor.
-    assert.ok(Math.abs(snap.railVolts - 4.75) < 0.01, `got ${snap.railVolts}`);
-});
 
 test('nothing rendered lately reports idle, not zero', () => {
     let t = 10000;
@@ -242,7 +210,7 @@ test('limiting dims the panel and leaves the composite the previews read', () =>
 
     const sink = new VirtualOPC();
     sink.setPixelCount(model.length);
-    sink.power.setConfig(config({ rail: RAIL }));
+    sink.power.setConfig(config(TIGHT_BUDGET));
 
     const compositor = new Compositor(sink, model);
     const store = new SceneStore(compositor, null);
@@ -278,13 +246,11 @@ test('does not allocate per frame', () => {
 // -------------------------------------------------------------- config I/O
 
 test('a partial config merges rather than resetting to defaults', () => {
-    const first = normaliseConfig({ maxMilliamps: 15000, rail: RAIL });
+    const first = normaliseConfig({ maxMilliamps: 15000, ledMilliamps: 60 });
     const second = normaliseConfig({ limit: false }, first);
     assert.strictEqual(second.maxMilliamps, 15000);
-    assert.deepStrictEqual(second.rail, RAIL);
+    assert.strictEqual(second.ledMilliamps, 60);
     assert.strictEqual(second.limit, false);
-    // An explicit null clears the calibration; an absent key does not.
-    assert.strictEqual(normaliseConfig({ rail: null }, first).rail, null);
 });
 
 test('garbage in a config field falls back to the default, not NaN', () => {
@@ -293,104 +259,4 @@ test('garbage in a config field falls back to the default, not NaN', () => {
     assert.strictEqual(cfg.gamma, power.DEFAULTS.gamma);
     assert.strictEqual(cfg.ledMilliamps, 0);
     assert.ok(isFinite(milliampsFor(100, NUM_LEDS, cfg)));
-});
-
-// ------------------------------------------------------- calibration maths
-
-test('the rail fit recovers a synthetic V_oc and R_eff', () => {
-    const samples = [];
-    for (let amps = 1; amps <= 10; amps += 0.5) {
-        samples.push({ amps, volts: 5.15 - 0.04 * amps });
-    }
-    const fit = sweep.fitRail(samples);
-    assert.ok(Math.abs(fit.openCircuitVolts - 5.15) < 1e-6);
-    assert.ok(Math.abs(fit.ohms - 0.04) < 1e-6);
-    assert.strictEqual(fit.bent, false);
-    assert.ok(Math.abs(sweep.currentAtVolts(fit, 4.75) - 10) < 1e-6);
-});
-
-test('the fit drops the bend at the top rather than flattening the slope', () => {
-    const samples = [];
-    for (let amps = 1; amps <= 10; amps += 0.5) {
-        // Linear up to 8A, then the regulators start dropping out.
-        const excess = Math.max(0, amps - 8);
-        samples.push({ amps, volts: 5.15 - 0.04 * amps - 0.06 * excess * excess });
-    }
-    const fit = sweep.fitRail(samples);
-    assert.ok(fit.droppedHighCurrent > 0, 'should have dropped the bent tail');
-    assert.ok(Math.abs(fit.ohms - 0.04) < 0.005, `slope ${fit.ohms} should survive the bend`);
-});
-
-test('R_eff is insensitive to a wrong overhead figure', () => {
-    const base = [];
-    for (let amps = 1; amps <= 10; amps += 0.5) base.push({ amps, volts: 5.15 - 0.04 * amps });
-    // Overhead guessed 0.8A too low: every current shifts by the same amount.
-    const shifted = base.map((s) => ({ amps: s.amps - 0.8, volts: s.volts }));
-    assert.ok(Math.abs(sweep.fitRail(shifted).ohms - sweep.fitRail(base).ohms) < 1e-9);
-});
-
-test('sweep steps are evenly spaced in current, not in brightness', () => {
-    const steps = sweep.brightnessSteps(10, 2.5);
-    const currents = steps.map((b) => Math.pow(b, 2.5));
-    const gaps = [];
-    for (let i = 1; i < currents.length; i++) gaps.push(currents[i] - currents[i - 1]);
-    const spread = Math.max(...gaps) - Math.min(...gaps);
-    assert.ok(spread < 1e-9, 'current steps should be uniform');
-    assert.ok(steps[0] > 0.4, 'the ramp starts partway up, not at standby');
-});
-
-/*
- * The fit is a number with no provenance on its own. A record that says
- * "40 mΩ" without the samples, the residual, or the ledMilliamps and gamma
- * the currents were estimated under cannot be re-read after any of those
- * change — which is exactly when someone would go looking for it.
- */
-test('the calibration record carries the samples and the assumptions, not just the fit', () => {
-    const samples = [];
-    for (let amps = 1; amps <= 10; amps += 0.5) {
-        samples.push({ amps, volts: 5.15 - 0.04 * amps, brightness: 0.5, panelMilliamps: amps * 1000 - 1200 });
-    }
-    const fit = sweep.fitRail(samples);
-    const snapshot = new PowerMeter({ numLeds: NUM_LEDS, config: config() }).snapshot();
-    const record = sweep.calibrationRecord(samples, fit, { floor: 4.75 }, { power: snapshot, aborted: false });
-
-    assert.strictEqual(record.samples.length, samples.length);
-    assert.strictEqual(record.assumptions.gamma, 2.5);
-    assert.strictEqual(record.assumptions.ledMilliamps, 55);
-    assert.strictEqual(record.assumptions.numLeds, NUM_LEDS);
-    assert.ok(record.measuredAt);
-    assert.ok(Math.abs(record.floorAmps - 10) < 1e-6);
-    // The rail block is the thing to paste, so it must be shaped exactly as
-    // normaliseConfig accepts it — a record that needs translating is a
-    // record that gets mistyped.
-    assert.deepStrictEqual(normaliseConfig({ rail: record.rail }).rail, record.rail);
-});
-
-test('an aborted sweep still produces a record, marked as one', () => {
-    const snapshot = new PowerMeter({ numLeds: NUM_LEDS, config: config() }).snapshot();
-    const record = sweep.calibrationRecord([{ amps: 3, volts: 5.0 }], null, { floor: 4.75 },
-        { power: snapshot, aborted: true });
-    assert.strictEqual(record.aborted, true);
-    assert.strictEqual(record.fit, null);
-    assert.strictEqual(record.rail, null);
-    assert.strictEqual(record.samples.length, 1);
-});
-
-test('vcgencmd output parsing', () => {
-    const pmic = [
-        '3V7_WL_SW_A current(0)=0.00000000A',
-        'EXT5V_V volt(24)=5.06015625V',
-        'BATT_V volt(25)=0.00000000V',
-    ].join('\n');
-    assert.strictEqual(sweep.parsePmicVolts(pmic), 5.06015625);
-    assert.strictEqual(sweep.parsePmicVolts('no such rail'), null);
-
-    assert.deepStrictEqual(sweep.parseThrottled('throttled=0x0'),
-        { raw: 0, underVoltageNow: false, underVoltageEver: false });
-    // Under-voltage now, and since boot.
-    assert.deepStrictEqual(sweep.parseThrottled('throttled=0x10001'),
-        { raw: 0x10001, underVoltageNow: true, underVoltageEver: true });
-    // Has happened, but not right now — must not abort a sweep.
-    assert.strictEqual(sweep.parseThrottled('throttled=0x50000').underVoltageNow, false);
-    assert.strictEqual(sweep.parseThrottled('nonsense'), null);
 });

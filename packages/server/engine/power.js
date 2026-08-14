@@ -21,14 +21,14 @@
  *   which is why solid white is the one scene that bites. The gamma and
  *   whitepoint here MUST match fcserver.json or every reading is wrong.
  *
- * - **The budget is two constraints, not one.** The PSU's rating is one cap.
- *   The other is the supply rail sagging under IR drop in the shared leads
- *   and connectors — V = openCircuitVolts - I * ohms — until the Pi trips
- *   undervoltage at ~4.63V. On this panel the second one binds first and by a
- *   wide margin: a 5V/20A supply, but ~40mOhm of wiring puts the Pi under
- *   4.75V somewhere around 10A. budgetFor() takes the tighter of the two and
- *   says which bound, so the code is plain ABL until tools/power-sweep.js
- *   fits the rail figures and then tightens with no separate mode.
+ * - **The budget is the PSU's rating, not a modelled rail.** A tighter,
+ *   IR-drop-aware cap (V = openCircuitVolts - I * ohms, tightening as the
+ *   supply rail sags) was tried and dropped: fitting it needs a real voltage
+ *   reading, and the Pi's PMIC-ADC route to one — `vcgencmd pmic_read_adc` /
+ *   `EXT5V_V` — turned out to be undocumented and unavailable on a standard
+ *   Pi 4 Model B (Raspberry Pi Ltd's own "Extra PMIC features" whitepaper
+ *   scopes that ADC to CM4 only). Manual testing at full white held up fine
+ *   with no undervoltage, so the PSU cap alone is the budget.
  *
  * - **The rescale is gamma-corrected too.** Scaling channel values by k
  *   scales current by k^gamma, so hitting a current ratio s needs
@@ -73,9 +73,6 @@ var DEFAULTS = {
     // MUST match fcserver.json.
     gamma: 2.5,
     whitepoint: [0.98, 1, 1],
-    // Filled in by tools/power-sweep.js; null means uncalibrated, in which
-    // case only the PSU cap applies.
-    rail: null, // {openCircuitVolts, ohms, floorVolts}
 };
 
 function num(value, fallback, min, max) {
@@ -103,9 +100,6 @@ function normaliseConfig(input, base) {
         // by zero in the rescale, so the low end is pinned above both.
         gamma: num(raw.gamma, from.gamma, 0.1, 10),
         whitepoint: normaliseWhitepoint(raw.whitepoint, from.whitepoint),
-        rail: normaliseRail(
-            Object.prototype.hasOwnProperty.call(raw, 'rail') ? raw.rail : from.rail
-        ),
     };
     return cfg;
 }
@@ -115,22 +109,6 @@ function normaliseWhitepoint(value, fallback) {
     var out = [];
     for (var i = 0; i < 3; i++) out.push(num(value[i], fallback[i], 0, 1));
     return out;
-}
-
-/*
- * A rail with zero or negative resistance, or a floor at/above the
- * open-circuit voltage, describes a cap that is either infinite or negative.
- * Neither is a calibration result, so both read as uncalibrated rather than
- * silently producing a nonsense budget.
- */
-function normaliseRail(value) {
-    if (!value || typeof value !== 'object') return null;
-    var openCircuitVolts = num(value.openCircuitVolts, NaN, 0, 60);
-    var ohms = num(value.ohms, NaN, 0, 100);
-    var floorVolts = num(value.floorVolts, NaN, 0, 60);
-    if (!isFinite(openCircuitVolts) || !isFinite(ohms) || !isFinite(floorVolts)) return null;
-    if (ohms <= 0 || floorVolts >= openCircuitVolts) return null;
-    return { openCircuitVolts: openCircuitVolts, ohms: ohms, floorVolts: floorVolts };
 }
 
 /*
@@ -157,24 +135,10 @@ function milliampsFor(dutySum, numLeds, cfg) {
     return (dutySum / 3) * cfg.ledMilliamps + numLeds * cfg.standbyMilliamps;
 }
 
-function railVolts(totalMilliamps, rail) {
-    if (!rail) return null;
-    return rail.openCircuitVolts - (totalMilliamps / 1000) * rail.ohms;
-}
-
-/*
- * The LED budget: what the panel may draw, after reserving overhead for
- * everything else on the supply. The tighter of the PSU's rating and the
- * current at which the rail falls to floorVolts.
- */
+// The LED budget: what the panel may draw, after reserving overhead for
+// everything else on the supply.
 function budgetFor(cfg) {
-    var psu = cfg.maxMilliamps - cfg.overheadMilliamps;
-    if (!cfg.rail) return { milliamps: psu, boundBy: 'psu' };
-    var railTotal = ((cfg.rail.openCircuitVolts - cfg.rail.floorVolts) / cfg.rail.ohms) * 1000;
-    var rail = railTotal - cfg.overheadMilliamps;
-    return rail < psu
-        ? { milliamps: rail, boundBy: 'rail' }
-        : { milliamps: psu, boundBy: 'psu' };
+    return cfg.maxMilliamps - cfg.overheadMilliamps;
 }
 
 /*
@@ -192,7 +156,7 @@ function budgetFor(cfg) {
  * showing a near-black panel with no explanation.
  */
 function scaleFor(milliamps, numLeds, cfg) {
-    var budget = budgetFor(cfg).milliamps;
+    var budget = budgetFor(cfg);
     if (!cfg.limit || milliamps <= budget) return { scale: 1, floored: false };
 
     var standby = numLeds * cfg.standbyMilliamps;
@@ -248,9 +212,7 @@ class PowerMeter {
         this._lutR = luts[0];
         this._lutG = luts[1];
         this._lutB = luts[2];
-        var budget = budgetFor(this.config);
-        this.budgetMilliamps = budget.milliamps;
-        this.boundBy = budget.boundBy;
+        this.budgetMilliamps = budgetFor(this.config);
     }
 
     setPixelCount(numLeds) {
@@ -316,22 +278,15 @@ class PowerMeter {
             standbyMilliamps: cfg.standbyMilliamps,
             gamma: cfg.gamma,
             whitepoint: cfg.whitepoint.slice(),
-            rail: cfg.rail ? {
-                openCircuitVolts: cfg.rail.openCircuitVolts,
-                ohms: cfg.rail.ohms,
-                floorVolts: cfg.rail.floorVolts,
-            } : null,
 
             numLeds: this.numLeds,
             budgetMilliamps: this.budgetMilliamps,
-            boundBy: this.boundBy,
             maxMilliampsFullWhite: this.fullWhiteMilliamps(),
 
             idle: true,
             milliamps: null,
             requestedMilliamps: null,
             peakMilliamps: null,
-            railVolts: null,
             limiting: false,
             scale: this.scale,
             floored: this.floored,
@@ -363,8 +318,6 @@ class PowerMeter {
         snap.requestedMilliamps = requestedTotal / n;
         snap.peakMilliamps = peak;
         snap.limiting = snap.requestedMilliamps > snap.milliamps + 0.5;
-        // The rail sees the panel plus everything else on the supply.
-        snap.railVolts = railVolts(snap.milliamps + cfg.overheadMilliamps, cfg.rail);
         return snap;
     }
 
@@ -383,7 +336,6 @@ module.exports = {
     buildDutyLut: buildDutyLut,
     milliampsFor: milliampsFor,
     budgetFor: budgetFor,
-    railVolts: railVolts,
     scaleFor: scaleFor,
     WINDOW_MS: WINDOW_MS,
     MIN_SCALE: MIN_SCALE,

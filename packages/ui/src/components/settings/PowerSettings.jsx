@@ -1,7 +1,7 @@
 import React from 'react';
 import { useStore } from '../../state/store';
 import DraftField from '../controls/DraftField';
-import { formatAmps, formatVolts } from '../../lib/power';
+import { formatAmps } from '../../lib/power';
 import SettingsSection, { SettingsRow } from './SettingsSection';
 
 // Typed entry only — these are numbers set once from a datasheet or a
@@ -38,18 +38,16 @@ function NumberEntry({ label, value, suffix, onChange }) {
  * a Pi on the same supply browns out. The limiter makes that unreachable
  * while leaving the brightness fader alone.
  *
- * The rail figures are read-only. They come from a measurement, not a
- * preference, and a hand-typed R_eff would produce a limiter that is
- * confidently wrong — so this points at the tool that measures them instead
- * of offering a text box.
+ * This used to also fit a tighter, IR-drop-aware cap from a voltage
+ * measurement (tools/power-sweep.js). Dropped: the Pi's PMIC-ADC route to a
+ * real reading isn't available on a standard Pi 4 Model B, and manual testing
+ * at full white held up fine against the PSU cap alone.
  */
 export default function PowerSettings() {
   const power = useStore((s) => s.power);
   const setPowerConfig = useStore((s) => s.setPowerConfig);
 
   if (!power) return null;
-
-  const calibrated = !!power.rail;
 
   return (
     <SettingsSection
@@ -109,29 +107,13 @@ export default function PowerSettings() {
 
       <SettingsRow
         label="Budget"
-        hint={power.boundBy === 'rail'
-          ? 'Bound by supply sag, not by the PSU’s rating.'
-          : 'Bound by the PSU’s rating, less what is reserved.'}
+        hint="Bound by the PSU’s rating, less what is reserved."
         control={<span className="settings-value">{formatAmps(power.budgetMilliamps)}</span>}
       />
       <SettingsRow
         label="Full white"
         hint="What the panel would ask for with every LED at maximum."
         control={<span className="settings-value">{formatAmps(power.maxMilliampsFullWhite)}</span>}
-      />
-      <SettingsRow
-        label="Supply rail"
-        hint={calibrated
-          ? 'Measured by tools/power-sweep.js on the Pi.'
-          : 'Run tools/power-sweep.js on the Pi to measure it. Until then only the PSU rating applies.'}
-        control={calibrated ? (
-          <span className="settings-value">
-            {formatVolts(power.rail.openCircuitVolts)} · {(power.rail.ohms * 1000).toFixed(1)} mΩ
-            {' '}· floor {formatVolts(power.rail.floorVolts)}
-          </span>
-        ) : (
-          <span className="settings-value settings-value--dim">not calibrated</span>
-        )}
       />
     </SettingsSection>
   );
