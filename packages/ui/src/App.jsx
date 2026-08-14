@@ -5,6 +5,7 @@ import SceneGrid from './components/switcher/SceneGrid';
 import Editor from './components/editor/Editor';
 import BrightnessSlider from './components/switcher/BrightnessSlider';
 import FrameRate from './components/switcher/FrameRate';
+import PowerMeter from './components/switcher/PowerMeter';
 
 function parseHash() {
   // Scene ids are 8-char hex for new scenes, but some older scenes carry
@@ -49,6 +50,7 @@ export default function App() {
             className={`ws-dot${wsConnected ? ' ws-dot--on' : ''}`}
             title={wsConnected ? 'Live preview connected' : 'Live preview disconnected'}
           />
+          {loaded && <PowerMeter />}
           {loaded && <FrameRate />}
         </div>
         {loaded && <BrightnessSlider />}

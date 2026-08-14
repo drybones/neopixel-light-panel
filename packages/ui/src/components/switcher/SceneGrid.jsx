@@ -3,6 +3,7 @@ import { useStore } from '../../state/store';
 import { api } from '../../api/client';
 import { downloadJson } from '../../lib/downloadJson';
 import SceneCard from './SceneCard';
+import PowerConfig from './PowerConfig';
 import useSceneDrag from './useSceneDrag';
 
 export default function SceneGrid({ onEdit }) {
@@ -125,6 +126,7 @@ export default function SceneGrid({ onEdit }) {
           onChange={handleImportFile}
         />
       </div>
+      <PowerConfig />
     </>
   );
 }

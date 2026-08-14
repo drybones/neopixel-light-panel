@@ -34,6 +34,10 @@ export const api = {
   virtual: () => request('GET', '/api/virtual'),
   fps: () => request('GET', '/api/fps'),
   setFps: (enabled) => request('PUT', '/api/fps', { enabled }),
+  power: () => request('GET', '/api/power'),
+  // Partial: the server merges field by field, so one control can be edited
+  // without resending (or stale-overwriting) the calibrated rail figures.
+  setPower: (config) => request('PUT', '/api/power', config),
   scenePreviews: () => request('GET', '/api/scenes/previews'),
   scenePreview: (id) => request('GET', `/api/scenes/${id}/preview`),
   exportScenes: () => request('GET', '/api/scenes/export'),

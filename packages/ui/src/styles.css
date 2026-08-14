@@ -125,6 +125,75 @@ body {
   letter-spacing: 0.04em;
 }
 
+/* Power readout — always lit, unlike the frame-rate pill: the measurement is
+   unconditional on the server, and this is the only place the limiter is
+   visible at all (the previews are pre-fader and never dim). Not a button,
+   so no hover affordance; the settings live in the switcher. */
+.power-meter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.power-meter-value { color: var(--text); }
+.power-meter--ok .power-meter-value { color: #3dd68c; }
+.power-meter--near .power-meter-value { color: #e8b339; }
+/* Amber, not red: limiting is the system working, not a fault. */
+.power-meter--limiting { border-color: #e8b339; }
+.power-meter--limiting .power-meter-value { color: #e8b339; }
+.power-meter--floored .power-meter-value { color: var(--danger); }
+.power-meter--idle .power-meter-value,
+.power-meter--wait .power-meter-value { color: var(--text-dim); }
+.power-meter-detail { color: var(--text-dim); }
+
+/* ── Power budget settings (switcher footer) ── */
+
+.power-config {
+  margin: 18px auto 0;
+  max-width: 520px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.power-config > summary {
+  padding: 10px 14px;
+  cursor: pointer;
+  color: var(--text-dim);
+  user-select: none;
+}
+.power-config[open] > summary { border-bottom: 1px solid var(--border); color: var(--text); }
+.power-config-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.power-config-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.power-config-fields { display: flex; flex-wrap: wrap; gap: 16px; }
+.power-config-field {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+.power-config-field-label { grid-column: 1 / -1; color: var(--text-dim); font-size: 12px; }
+.power-config-field-suffix { color: var(--text-dim); font-size: 12px; }
+.power-config-field-hint { grid-column: 1 / -1; color: var(--text-dim); font-size: 11px; }
+.power-config-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.power-config-summary dt { color: var(--text-dim); }
+.power-config-summary dd { margin: 0; }
+.power-config-dim { color: var(--text-dim); }
+.power-config-note { margin: 0; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+
 .app-loading { color: var(--text-dim); padding: 40px 0; text-align: center; }
 
 /* ── Buttons ── */
@@ -793,7 +862,8 @@ input[type="range"]::-moz-range-thumb {
   .scene-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .scene-card-edit { display: none; }
   .brightness input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9px; }
-  /* Phone header has room for the rate itself and nothing else; the render
-     time and late count stay in the tooltip. */
+  /* Phone header has room for the headline figures and nothing else; the
+     render time, late count and current draw stay in the tooltip. */
   .frame-rate-detail { display: none; }
+  .power-meter-detail { display: none; }
 }
