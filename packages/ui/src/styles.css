@@ -153,46 +153,24 @@ body {
 .power-meter--wait .power-meter-value { color: var(--text-dim); }
 .power-meter-detail { color: var(--text-dim); }
 
-/* ── Power budget settings (switcher footer) ── */
-
-.power-config {
-  margin: 18px auto 0;
-  max-width: 520px;
-  border: 1px solid var(--border);
+/* Header cog. Sits outside .app-header-brand so it lands at the far end of
+   the row, opposite the title, and stays there when the brightness slider
+   wraps to its own line. */
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: none;
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--surface);
-  font-size: 13px;
-}
-.power-config > summary {
-  padding: 10px 14px;
-  cursor: pointer;
   color: var(--text-dim);
-  user-select: none;
+  cursor: pointer;
+  flex: 0 0 auto;
 }
-.power-config[open] > summary { border-bottom: 1px solid var(--border); color: var(--text); }
-.power-config-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
-.power-config-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.power-config-fields { display: flex; flex-wrap: wrap; gap: 16px; }
-.power-config-field {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  gap: 2px 6px;
-}
-.power-config-field-label { grid-column: 1 / -1; color: var(--text-dim); font-size: 12px; }
-.power-config-field-suffix { color: var(--text-dim); font-size: 12px; }
-.power-config-field-hint { grid-column: 1 / -1; color: var(--text-dim); font-size: 11px; }
-.power-config-summary {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.power-config-summary dt { color: var(--text-dim); }
-.power-config-summary dd { margin: 0; }
-.power-config-dim { color: var(--text-dim); }
-.power-config-note { margin: 0; color: var(--text-dim); font-size: 11px; line-height: 1.5; }
+.settings-link:hover { border-color: var(--border); color: var(--text); }
+.settings-link--on { border-color: var(--border); background: var(--surface-2); color: var(--text); }
 
 .app-loading { color: var(--text-dim); padding: 40px 0; text-align: center; }
 
@@ -325,17 +303,6 @@ body {
 
 .scene-card-off-icon { font-size: 26px; line-height: 1; }
 
-/* ── Switcher footer ── */
-
-.switcher-footer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 22px;
-  padding-top: 22px;
-  border-top: 1px solid var(--border);
-}
-
 .brightness {
   display: flex;
   align-items: center;
@@ -388,6 +355,86 @@ input[type="range"]::-moz-range-thumb {
   background: var(--text);
   border: none;
 }
+
+/* ── Settings ── */
+
+/* Narrower than the scene grid on purpose: this is a reading column of
+   label/value rows, and full-width rows put the control a screen away from
+   the label it belongs to. */
+.settings {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.settings-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.settings-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  margin-bottom: 16px;
+}
+.settings-section-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-section-title { margin: 0; font-size: 14px; font-weight: 600; }
+.settings-section-description {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.settings-section-body { padding: 0 16px; }
+
+/* Rows separate themselves rather than the body spacing them, so a section
+   reads as a list and the last row sits flush with the section's edge. */
+.settings-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.settings-row:last-child { border-bottom: none; }
+/* Only the rows that wrap a control are labels; those get the pointer. */
+label.settings-row { cursor: pointer; }
+
+.settings-row-text { min-width: 0; }
+.settings-row-label { display: block; font-size: 13px; }
+.settings-row-hint {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-row-control {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.settings-unit { color: var(--text-dim); font-size: 12px; }
+/* Tabular figures so a column of readings doesn't jitter as they update. */
+.settings-value {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.settings-value--dim { color: var(--text-dim); }
 
 /* ── Editor ── */
 
@@ -866,4 +913,14 @@ input[type="range"]::-moz-range-thumb {
      render time, late count and current draw stay in the tooltip. */
   .frame-rate-detail { display: none; }
   .power-meter-detail { display: none; }
+  /* A label and its control side by side leaves neither enough room on a
+     phone, and the hints are the first thing to get squeezed to one word a
+     line. Stack them instead, control under label. */
+  .settings-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .settings-row-control { justify-content: flex-start; }
+  .settings-value { text-align: left; }
 }
