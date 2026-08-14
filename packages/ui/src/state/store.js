@@ -28,16 +28,18 @@ export const useStore = create((set, get) => ({
   brightness: 1.0,
   isVirtual: null,
   fps: null, // last /api/fps snapshot; null until the first read succeeds
+  power: null, // last /api/power snapshot; config and live figures together
   loaded: false,
 
   async init() {
-    const [scenes, active, brightness, effects, virtual, fps] = await Promise.all([
+    const [scenes, active, brightness, effects, virtual, fps, power] = await Promise.all([
       api.scenes(),
       api.activeScene(),
       api.brightness(),
       api.effects(),
       api.virtual().catch(() => ({ virtual: null })),
       api.fps().catch(() => null),
+      api.power().catch(() => null),
     ]);
     set({
       scenes,
@@ -46,6 +48,7 @@ export const useStore = create((set, get) => ({
       effects,
       isVirtual: virtual.virtual,
       fps,
+      power,
       loaded: true,
     });
     get().loadAllDetails();
@@ -118,6 +121,27 @@ export const useStore = create((set, get) => ({
     try {
       set({ fps: await api.fps() });
     } catch { /* keep the last snapshot */ }
+  },
+
+  // Power meter. Polled once a second like the frame rate; a failed poll
+  // keeps the last reading rather than blanking a diagnostic because the
+  // panel dropped off the network for a second.
+  async pollPower() {
+    try {
+      set({ power: await api.power() });
+    } catch { /* keep the last snapshot */ }
+  },
+
+  // The response carries the config back, so the controls always show what
+  // the server actually accepted rather than what was typed — a rejected or
+  // clamped field must not leave the UI claiming otherwise.
+  async setPowerConfig(patch) {
+    set((s) => ({ power: { ...(s.power || {}), ...patch } }));
+    try {
+      set({ power: await api.setPower(patch) });
+    } catch {
+      set({ power: await api.power().catch(() => null) });
+    }
   },
 
   async createScene(scene) {

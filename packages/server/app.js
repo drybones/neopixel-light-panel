@@ -16,6 +16,12 @@ var createScenesRouter = require('./routes/scenes');
 
 var compositor = new Compositor(client, model);
 
+// Size the sink up front. setPixel would grow the buffer one pixel at a time
+// on the first frame anyway; doing it here also means the power meter knows
+// the LED count before anything has rendered, so /api/power answers correctly
+// on a panel that is switched off.
+client.setPixelCount(model.length);
+
 // Scene-card filmstrips. Rendered off the hot loop into a throwaway
 // compositor, so this never touches the panel or the live layer instances.
 var previewCache = new PreviewCache(model);
@@ -48,6 +54,7 @@ var frameStats = new FrameStats({ targetMs: TICK_MS });
 async function initStorage() {
     settings.load();
     client.brightness = settings.brightness;
+    client.power.setConfig(settings.power);
     frameStats.setEnabled(settings.frameStatsEnabled);
 
     try {
@@ -109,6 +116,29 @@ app.put('/api/fps', function(req, res) {
     frameStats.setEnabled(req.body.enabled);
     settings.setFrameStatsEnabled(frameStats.enabled);
     res.json(frameStatsSnapshot());
+});
+
+/*
+ * Power meter and limiter. The estimate lives in the pixel sink alongside
+ * global brightness — the one place values are post-brightness, clamped, and
+ * about to become the bytes Fadecandy receives — so, like brightness, it is
+ * configured on the client rather than plumbed through the compositor.
+ *
+ * The measurement runs unconditionally; `limit` only decides whether it acts.
+ * Reading the headroom is the point of having it at all.
+ */
+app.get('/api/power', function(req, res) {
+    res.json(client.power.snapshot());
+});
+app.put('/api/power', function(req, res) {
+    if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ error: 'expected a power config object' });
+    }
+    // The store normalises field by field against the current config, so a
+    // partial PUT (the UI edits one control at a time) is a merge, not a
+    // reset to defaults.
+    client.power.setConfig(settings.setPower(req.body));
+    res.json(client.power.snapshot());
 });
 
 app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));

@@ -255,6 +255,57 @@ Four things the numbers do *not* mean:
 
 ---
 
+### Power meter and limiter
+
+```
+GET /api/power
+PUT /api/power                body: any subset of the config fields
+```
+
+Estimated panel current, and the limiter that keeps frames inside a budget. Both verbs return the same snapshot; the config persists across restarts. A `PUT` **merges** — send one field without resending the rest.
+
+```json
+{
+  "limit": true,
+  "maxMilliamps": 20000,
+  "overheadMilliamps": 1200,
+  "ledMilliamps": 55,
+  "standbyMilliamps": 1,
+  "gamma": 2.5,
+  "whitepoint": [0.98, 1, 1],
+  "rail": { "openCircuitVolts": 5.15, "ohms": 0.04, "floorVolts": 4.75 },
+
+  "numLeds": 240,
+  "budgetMilliamps": 8800,
+  "boundBy": "rail",
+  "maxMilliampsFullWhite": 13352,
+
+  "idle": false,
+  "milliamps": 8800,
+  "requestedMilliamps": 13352,
+  "peakMilliamps": 8800,
+  "railVolts": 4.75,
+  "limiting": true,
+  "scale": 0.843,
+  "floored": false
+}
+```
+
+The estimate is summed on the write path, over the post-brightness bytes the sink is about to send, and averaged over a rolling ~1 s window. `requestedMilliamps` is what the scene asked for and `milliamps` what was actually sent; they differ only while `limiting`.
+
+Four things worth knowing before trusting the numbers:
+
+- **The model is gamma-aware, and has to be.** `fcserver.json` applies `gamma: 2.5` and a whitepoint, so an LED's duty cycle is `whitepoint × (value/255)^gamma`, not `value/255`. A mid-grey frame draws about 18% of full white, not 50%. **`gamma` and `whitepoint` here must match `fcserver.json`** — change one without the other and every reading is wrong.
+- **`budgetMilliamps` is the tighter of two caps**, and `boundBy` says which. `psu` is `maxMilliamps − overheadMilliamps`. `rail` is the current at which supply sag brings the 5 V line down to `floorVolts` — `(openCircuitVolts − floorVolts) / ohms`, less the same overhead. On a panel whose wiring drops half a volt at 14 A, the rail binds long before the PSU does; `rail: null` (the default) means uncalibrated, and only the PSU cap applies.
+- **`scale` multiplies channel values, and is not the current ratio.** Current goes as `value^gamma`, so a frame cut to 65% of its current is scaled by `0.65^(1/2.5) = 0.843` — white at byte 215. It is continuous at the threshold, so nothing flickers as a scene animates across it.
+- **`floored: true` means the budget is below the panel's standby draw** (`numLeds × standbyMilliamps`), which no amount of dimming can reach. The panel is driven at a minimum rather than blacked out, but this is a misconfiguration, not a load.
+
+`railVolts` is a prediction from the calibrated model, not a measurement — as is everything here. Run `packages/server/tools/power-sweep.js` **on the Pi** to fit `openCircuitVolts` and `ohms` from real readings.
+
+Previews are unaffected: the WebSocket stream serialises the compositor's composite, which is pre-brightness and pre-limiter, so the UI stays a pre-fader meter and only the panel dims.
+
+---
+
 ## Wavelet parameters
 
 The `wavelet` effect renders one sinusoidal wave radiating from a point — or converging on it; stack several with the `add` blend for interference patterns.

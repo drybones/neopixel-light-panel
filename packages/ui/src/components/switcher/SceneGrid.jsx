@@ -1,7 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
-import { api } from '../../api/client';
-import { downloadJson } from '../../lib/downloadJson';
 import SceneCard from './SceneCard';
 import useSceneDrag from './useSceneDrag';
 
@@ -13,9 +11,6 @@ export default function SceneGrid({ onEdit }) {
   const activateScene = useStore((s) => s.activateScene);
   const createScene = useStore((s) => s.createScene);
   const reorderScenes = useStore((s) => s.reorderScenes);
-  const loadAllDetails = useStore((s) => s.loadAllDetails);
-  const loadPreviews = useStore((s) => s.loadPreviews);
-  const importInputRef = useRef(null);
   const gridRef = useRef(null);
   const [announcement, setAnnouncement] = useState('');
 
@@ -32,40 +27,6 @@ export default function SceneGrid({ onEdit }) {
   async function handleNewScene() {
     const created = await createScene({ name: 'New scene', layers: [{ effectType: 'wavelet' }] });
     onEdit(created.id);
-  }
-
-  function handleExport() {
-    api.exportScenes().then((data) => {
-      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      downloadJson(data, `lightpanel-scenes-${ts}.json`);
-    });
-  }
-
-  function handleImportFile(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    event.target.value = '';
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      let parsed;
-      try {
-        parsed = JSON.parse(e.target.result);
-      } catch {
-        alert('Import failed: file is not valid JSON.');
-        return;
-      }
-      try {
-        await api.importScenes(parsed);
-      } catch {
-        alert('Import failed: server rejected the file (expected {version: 2, scenes: [...]}).');
-        return;
-      }
-      const list = await api.scenes();
-      useStore.setState({ scenes: list });
-      loadAllDetails();
-      loadPreviews();
-    };
-    reader.readAsText(file);
   }
 
   return (
@@ -114,17 +75,6 @@ export default function SceneGrid({ onEdit }) {
         focused scene one place.
       </p>
       <p className="visually-hidden" role="status">{announcement}</p>
-      <div className="switcher-footer">
-        <button className="btn btn-ghost" onClick={handleExport}>Export</button>
-        <button className="btn btn-ghost" onClick={() => importInputRef.current.click()}>Import</button>
-        <input
-          ref={importInputRef}
-          type="file"
-          accept=".json,application/json"
-          style={{ display: 'none' }}
-          onChange={handleImportFile}
-        />
-      </div>
     </>
   );
 }

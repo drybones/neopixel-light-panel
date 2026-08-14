@@ -23,6 +23,22 @@ You will need:
 
 If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL=1`), which replaces the Fadecandy connection with a WebSocket that streams pixel data to the UI's built-in LED visualiser.
 
+### Power
+
+240 WS2812B at full white is about **13.4 A at 5 V**, and almost nothing else comes close — Fadecandy's gamma curve means a mid-grey frame draws roughly a fifth of that, so ordinary scenes sit far below the worst case.
+
+Sizing the supply for 13.4 A is not the whole story, though. The constraint that bites first is usually **voltage, not current**: everything downstream of the supply's terminals shares a resistance (regulation droop, leads, connectors), so the rail falls as `V = V_oc − I × R_eff`. A very ordinary 40 mΩ costs half a volt at 14 A, which is enough to push a Pi sharing that supply below its ~4.63 V undervoltage trip — on a supply rated for 20 A, with 6 A to spare on paper. If a solid-white test scene browns out the Pi while every real scene is fine, this is why, and thicker leads or power injection fixes more than a bigger PSU does.
+
+The server estimates the draw and can hold frames inside a budget (`GET|PUT /api/power`, and the "Power budget" panel in the UI). To set that budget from the wiring you actually have rather than from the label on the supply, run the calibration sweep **on the Pi**:
+
+```bash
+node packages/server/tools/power-sweep.js
+```
+
+It ramps a white scene up a current ramp, reads the real 5 V rail from the Pi's PMIC ADC at each step (Pi 4 and Pi 5), aborts if undervoltage is detected, and fits `V_oc` and `R_eff` from the measurements. It prints the block to `PUT` to `/api/power`, which is what actually arms the limiter — until then the rail is uncalibrated and only the (non-binding) PSU cap applies.
+
+Every run is also written to `packages/server/data/power-calibration.json`: the raw samples, the fit and its residual, and the LED figures the currents were estimated under. The fit on its own is a number with no provenance — the residual and the count of dropped high-current points are what say whether the rail follows a single slope at all. The previous run is kept alongside as `.bak`. Pass `--out` to write somewhere else.
+
 ## Prerequisites
 
 - Node.js 16+ (14 is supported but 16+ recommended)
@@ -105,7 +121,7 @@ Scenes and settings (brightness, the frame-stats toggle) are persisted to crash-
 
 ### `packages/ui/` -- React control interface
 
-A React 18 app built with Vite (zustand for state). The default view is a scene switcher — a responsive card grid with a live preview on the active scene, designed to work well on a phone. Opening a scene switches to the editor: a large read-only live preview, a layer stack with animated per-layer thumbnails, and a parameter panel rendered from each effect's schema (colour swatches, XY pads, gradient-stop strips, perceptual sliders). Edits stream to the server as you drag — the panel itself is the ultimate preview.
+A React 18 app built with Vite (zustand for state). The default view is a scene switcher — a responsive card grid with a live preview on the active scene, designed to work well on a phone. Opening a scene switches to the editor: a large read-only live preview, a layer stack with animated per-layer thumbnails, and a parameter panel rendered from each effect's schema (colour swatches, XY pads, gradient-stop strips, perceptual sliders). Edits stream to the server as you drag — the panel itself is the ultimate preview. The cog in the header opens a settings page holding the power budget and whole-library import/export.
 
 ## API
 
