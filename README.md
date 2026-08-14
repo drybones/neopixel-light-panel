@@ -35,7 +35,9 @@ The server estimates the draw and can hold frames inside a budget (`GET|PUT /api
 node packages/server/tools/power-sweep.js
 ```
 
-It ramps a white scene up a current ramp, reads the real 5 V rail from the Pi's PMIC ADC at each step (Pi 4 and Pi 5), aborts if undervoltage is detected, and fits `V_oc` and `R_eff` from the measurements.
+It ramps a white scene up a current ramp, reads the real 5 V rail from the Pi's PMIC ADC at each step (Pi 4 and Pi 5), aborts if undervoltage is detected, and fits `V_oc` and `R_eff` from the measurements. It prints the block to `PUT` to `/api/power`, which is what actually arms the limiter — until then the rail is uncalibrated and only the (non-binding) PSU cap applies.
+
+Every run is also written to `packages/server/data/power-calibration.json`: the raw samples, the fit and its residual, and the LED figures the currents were estimated under. The fit on its own is a number with no provenance — the residual and the count of dropped high-current points are what say whether the rail follows a single slope at all. The previous run is kept alongside as `.bak`. Pass `--out` to write somewhere else.
 
 ## Prerequisites
 

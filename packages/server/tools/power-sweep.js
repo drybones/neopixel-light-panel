@@ -3,6 +3,7 @@
  * Rail calibration sweep — run this ON THE PI, with the panel connected.
  *
  *   node tools/power-sweep.js [--steps 12] [--floor 4.75] [--api http://localhost:3000]
+ *                             [--out data/power-calibration.json]
  *
  * Why it exists: a 5V/20A supply that cannot deliver 14A is not a PSU
  * problem, it is an IR-drop problem. Everything downstream of the supply's
@@ -24,12 +25,21 @@
  * turns the limiter off for the duration — the point is to measure what the
  * panel really asks for.
  *
+ * The raw samples are written to data/power-calibration.json alongside the
+ * fit, because the fit alone is a number with no provenance: the residual and
+ * the count of dropped high-current points are what say whether the rail
+ * follows a single slope at all, and none of it can be recovered from a
+ * terminal that has scrolled. Written even when the sweep aborts — an aborted
+ * run is the most informative one there is.
+ *
  * Node 14 on the Pi: ES2019 only, and no global fetch.
  */
 
 var http = require('http');
 var url = require('url');
+var path = require('path');
 var execFile = require('child_process').execFile;
+var jsonStore = require('../engine/json-store');
 
 // ---------------------------------------------------------------- pure bits
 // Everything below this line is testable off the Pi, which is the only reason
@@ -209,15 +219,62 @@ var SETTLE_MS = 800;   // let the supply reach its droop, not just the LEDs
 var READS = 5;         // the PMIC ADC is noisy; take a median
 var READ_GAP_MS = 120;
 
+// Beside scenes and settings, and gitignored like them: this is a
+// measurement of one particular panel's wiring, not repo content.
+var DEFAULT_OUT = path.join(__dirname, '..', 'data', 'power-calibration.json');
+
 function parseArgs(argv) {
-    var out = { steps: 12, floor: 4.75, api: 'http://localhost:3000' };
+    var out = { steps: 12, floor: 4.75, api: 'http://localhost:3000', out: DEFAULT_OUT };
     for (var i = 0; i < argv.length; i++) {
         var arg = argv[i];
         if (arg === '--steps') out.steps = parseInt(argv[++i], 10);
         else if (arg === '--floor') out.floor = parseFloat(argv[++i]);
         else if (arg === '--api') out.api = argv[++i];
+        else if (arg === '--out') out.out = argv[++i];
     }
     return out;
+}
+
+// Rounded to the precision the measurement actually supports, and shaped
+// exactly as /api/power wants it.
+function railBlock(fit, floorVolts) {
+    return {
+        openCircuitVolts: Number(fit.openCircuitVolts.toFixed(4)),
+        ohms: Number(fit.ohms.toFixed(5)),
+        floorVolts: floorVolts,
+    };
+}
+
+/*
+ * The record of one sweep: what was measured, under what assumptions, and
+ * what was fitted from it. The assumptions travel with the samples because
+ * the currents are *estimates* — re-reading this file after changing
+ * ledMilliamps or the gamma without knowing which figures produced it would
+ * be worse than having no record at all.
+ */
+function calibrationRecord(samples, fit, opts, meta) {
+    var power = meta.power;
+    return {
+        version: 1,
+        measuredAt: new Date().toISOString(),
+        aborted: !!meta.aborted,
+        floorVolts: opts.floor,
+        assumptions: {
+            numLeds: power.numLeds,
+            gamma: power.gamma,
+            whitepoint: power.whitepoint,
+            ledMilliamps: power.ledMilliamps,
+            standbyMilliamps: power.standbyMilliamps,
+            overheadMilliamps: power.overheadMilliamps,
+            maxMilliamps: power.maxMilliamps,
+        },
+        samples: samples,
+        fit: fit || null,
+        floorAmps: fit ? currentAtVolts(fit, opts.floor) : null,
+        // Exactly what /api/power wants, so the file is the thing to paste
+        // from rather than a report about it.
+        rail: fit ? railBlock(fit, opts.floor) : null,
+    };
 }
 
 async function main() {
@@ -307,8 +364,16 @@ async function main() {
             if (railVolts === null || power.milliamps === null) continue;
 
             // The rail carries the panel plus everything else on the supply.
+            // `amps`/`volts` are what the fit reads; the rest is provenance
+            // for the record, and harmless to fitLine.
             var totalAmps = (power.milliamps + power.overheadMilliamps) / 1000;
-            samples.push({ amps: totalAmps, volts: railVolts, brightness: brightness });
+            samples.push({
+                amps: totalAmps,
+                volts: railVolts,
+                brightness: Number(brightness.toFixed(4)),
+                panelMilliamps: power.milliamps,
+                railVoltSamples: volts,
+            });
             console.log(
                 '  ' + brightness.toFixed(3).padStart(6)
                 + '  ' + power.milliamps.toFixed(0).padStart(10)
@@ -318,15 +383,29 @@ async function main() {
         }
 
         await restore();
-        report(samples, opts);
+        report(samples, opts, { aborted: aborted, power: savedPower });
     } catch (err) {
         await restore();
         throw err;
     }
 }
 
-function report(samples, opts) {
+function writeRecord(samples, fit, opts, meta) {
+    try {
+        jsonStore.save(opts.out, calibrationRecord(samples, fit, opts, meta));
+        console.log('\nSweep data written to ' + opts.out
+            + (fit ? '' : ' (samples only — no fit)'));
+        console.log('The previous run, if any, is beside it as .bak.');
+    } catch (err) {
+        console.error('\nCould not write ' + opts.out + ': ' + err.message);
+    }
+}
+
+function report(samples, opts, meta) {
     if (samples.length < 3) {
+        // Still worth keeping: a run that aborted after two steps says
+        // something about the rail, and re-running costs another sweep.
+        writeRecord(samples, null, opts, meta);
         console.error('\nOnly ' + samples.length + ' usable samples — not enough to fit.');
         process.exitCode = 1;
         return;
@@ -349,25 +428,13 @@ function report(samples, opts) {
     }
     console.log('  ' + opts.floor.toFixed(2) + ' V at      ' + floorAmps.toFixed(2) + ' A total');
 
+    var body = { rail: railBlock(fit, opts.floor), limit: true };
     console.log('\nPUT this to /api/power:\n');
-    console.log(JSON.stringify({
-        rail: {
-            openCircuitVolts: Number(fit.openCircuitVolts.toFixed(4)),
-            ohms: Number(fit.ohms.toFixed(5)),
-            floorVolts: opts.floor,
-        },
-        limit: true,
-    }, null, 2));
+    console.log(JSON.stringify(body, null, 2));
     console.log('\ncurl -X PUT -H "Content-Type: application/json" -d \''
-        + JSON.stringify({
-            rail: {
-                openCircuitVolts: Number(fit.openCircuitVolts.toFixed(4)),
-                ohms: Number(fit.ohms.toFixed(5)),
-                floorVolts: opts.floor,
-            },
-            limit: true,
-        })
-        + '\' ' + opts.api + '/api/power');
+        + JSON.stringify(body) + '\' ' + opts.api + '/api/power');
+
+    writeRecord(samples, fit, opts, meta);
 }
 
 if (require.main === module) {
@@ -381,6 +448,8 @@ module.exports = {
     brightnessSteps: brightnessSteps,
     fitLine: fitLine,
     fitRail: fitRail,
+    railBlock: railBlock,
+    calibrationRecord: calibrationRecord,
     currentAtVolts: currentAtVolts,
     parsePmicVolts: parsePmicVolts,
     parseThrottled: parseThrottled,

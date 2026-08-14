@@ -339,6 +339,43 @@ test('sweep steps are evenly spaced in current, not in brightness', () => {
     assert.ok(steps[0] > 0.4, 'the ramp starts partway up, not at standby');
 });
 
+/*
+ * The fit is a number with no provenance on its own. A record that says
+ * "40 mΩ" without the samples, the residual, or the ledMilliamps and gamma
+ * the currents were estimated under cannot be re-read after any of those
+ * change — which is exactly when someone would go looking for it.
+ */
+test('the calibration record carries the samples and the assumptions, not just the fit', () => {
+    const samples = [];
+    for (let amps = 1; amps <= 10; amps += 0.5) {
+        samples.push({ amps, volts: 5.15 - 0.04 * amps, brightness: 0.5, panelMilliamps: amps * 1000 - 1200 });
+    }
+    const fit = sweep.fitRail(samples);
+    const snapshot = new PowerMeter({ numLeds: NUM_LEDS, config: config() }).snapshot();
+    const record = sweep.calibrationRecord(samples, fit, { floor: 4.75 }, { power: snapshot, aborted: false });
+
+    assert.strictEqual(record.samples.length, samples.length);
+    assert.strictEqual(record.assumptions.gamma, 2.5);
+    assert.strictEqual(record.assumptions.ledMilliamps, 55);
+    assert.strictEqual(record.assumptions.numLeds, NUM_LEDS);
+    assert.ok(record.measuredAt);
+    assert.ok(Math.abs(record.floorAmps - 10) < 1e-6);
+    // The rail block is the thing to paste, so it must be shaped exactly as
+    // normaliseConfig accepts it — a record that needs translating is a
+    // record that gets mistyped.
+    assert.deepStrictEqual(normaliseConfig({ rail: record.rail }).rail, record.rail);
+});
+
+test('an aborted sweep still produces a record, marked as one', () => {
+    const snapshot = new PowerMeter({ numLeds: NUM_LEDS, config: config() }).snapshot();
+    const record = sweep.calibrationRecord([{ amps: 3, volts: 5.0 }], null, { floor: 4.75 },
+        { power: snapshot, aborted: true });
+    assert.strictEqual(record.aborted, true);
+    assert.strictEqual(record.fit, null);
+    assert.strictEqual(record.rail, null);
+    assert.strictEqual(record.samples.length, 1);
+});
+
 test('vcgencmd output parsing', () => {
     const pmic = [
         '3V7_WL_SW_A current(0)=0.00000000A',
