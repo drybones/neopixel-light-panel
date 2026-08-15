@@ -2,6 +2,11 @@
 // interesting cases — idle, a loop falling behind, sub-millisecond renders —
 // are testable without mounting anything.
 
+// Share of late frames at which the pill goes from green to red. One dropped
+// frame a second is not something you can see on a 100 fps panel; a twentieth
+// of them is.
+const LATE_SLOW_PERCENT = 5;
+
 // A healthy render is a fraction of a millisecond, so a fixed 1 decimal
 // reports the good case as a flat "0.0 ms" and says nothing about how much
 // of the 10ms budget is left.
@@ -12,6 +17,18 @@ export function formatMs(value) {
 
 function num(value, digits) {
   return value === null || value === undefined ? '–' : value.toFixed(digits);
+}
+
+// The share of frames that landed late, over the server's rolling window.
+// A 10s window at ~91 fps holds ~900 frames, so the smallest rate that can
+// occur is about a tenth of a percent — but rounding a real stall to
+// "0.0% late" would say the opposite of what happened, so anything non-zero
+// keeps a floor.
+export function formatLatePercent(value) {
+  if (value === null || value === undefined) return '–';
+  if (value === 0) return '0%';
+  if (value < 0.1) return '<0.1%';
+  return `${value < 10 ? value.toFixed(1) : value.toFixed(0)}%`;
 }
 
 /*
@@ -51,19 +68,39 @@ export function describeFrameRate(snap, isVirtual) {
     // is falling behind, or whether our own work is eating its budget.
     const behind = snap.frameMs > targetMs * 1.33;
     const crowded = snap.tickMs > targetMs * 0.8;
-    state = behind || crowded ? 'slow' : 'ok';
+    // A loop can drop frames in bursts and still average out fine over one
+    // second, so the rate gets its own test. The threshold is well clear of
+    // ordinary jitter for the same reason the others are loose: a pill that
+    // sits red says nothing. It matters most on a phone, where the detail
+    // line is hidden and a tooltip cannot be hovered — the colour is then
+    // the only thing lateness can show up in.
+    const stumbling = snap.latePercent >= LATE_SLOW_PERCENT;
+    state = behind || crowded || stumbling ? 'slow' : 'ok';
   }
 
   const detail = [];
   if (snap.renderMs !== null && snap.renderMs !== undefined) detail.push(formatMs(snap.renderMs));
-  if (snap.overruns > 0) detail.push(`${snap.overruns} late`);
+  // A rate, not a running total: it appears when the loop starts stumbling
+  // and goes away again when it recovers, so the pill saying nothing is the
+  // good case rather than an old number nobody can date.
+  if (snap.latePercent > 0) detail.push(`${formatLatePercent(snap.latePercent)} late`);
 
+  const windowSeconds = Math.round((snap.lateWindowMs || 0) / 1000);
   const title = [
     `Render loop: ${num(snap.fps, 1)} fps measured, ${num(snap.targetFps, 0)} fps nominal `
       + '(setInterval clamps, so a healthy loop sits a little under).',
     `Render ${formatMs(snap.renderMs)}, whole tick ${formatMs(snap.tickMs)} per frame `
       + `(worst render ${formatMs(snap.worstRenderMs)}).`,
-    `${snap.overruns || 0} late frames of ${snap.frames || 0} since the tracker was switched on.`,
+    // Both figures, because they answer different questions — is it stumbling
+    // now, and has it stumbled at all. The window is named: a bare percentage
+    // is a share of an unstated denominator.
+    snap.windowFrames
+      ? `${formatLatePercent(snap.latePercent)} of frames late over the last ${windowSeconds}s `
+        + `(${snap.lateFrames} of ${snap.windowFrames}).`
+      : '',
+    `${snap.overruns || 0} late frame${snap.overruns === 1 ? '' : 's'} of ${snap.frames || 0} `
+      + 'since this scene became active — the tracker restarts when you switch scenes, since '
+      + 'render cost is a property of the scene.',
     snap.idle ? 'Idle: no scene is rendering, so these are the last figures taken.' : '',
     isVirtual
       ? 'Dev mode: same loop and compositor, but no hardware write — not comparable to the panel.'

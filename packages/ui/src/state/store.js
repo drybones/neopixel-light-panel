@@ -106,7 +106,19 @@ export const useStore = create((set, get) => ({
   // enabled flag always comes back from the response rather than being
   // assumed here — a rejected PUT must not leave the pill lit.
   async setFpsEnabled(enabled) {
-    set((s) => ({ fps: { ...(s.fps || {}), enabled, idle: true, fps: null, frames: 0, overruns: 0 } }));
+    set((s) => ({
+      fps: {
+        ...(s.fps || {}),
+        enabled,
+        idle: true,
+        fps: null,
+        frames: 0,
+        overruns: 0,
+        latePercent: null,
+        lateFrames: 0,
+        windowFrames: 0,
+      },
+    }));
     try {
       set({ fps: await api.setFps(enabled) });
     } catch {

@@ -913,7 +913,8 @@ label.settings-row { cursor: pointer; }
   .scene-card-edit { display: none; }
   .brightness input[type="range"]::-webkit-slider-thumb { width: 22px; height: 22px; margin-top: -9px; }
   /* Phone header has room for the headline figures and nothing else; the
-     render time, late count and current draw stay in the tooltip. */
+     render time, late share and current draw stay in the tooltip — which a
+     touch device cannot hover, so the pill's colour carries the warning. */
   .frame-rate-detail { display: none; }
   .power-meter-detail { display: none; }
   /* A label and its control side by side leaves neither enough room on a

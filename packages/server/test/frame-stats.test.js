@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { FrameStats, RESUME_MS, IDLE_MS } = require('../engine/frame-stats');
+const { FrameStats, RESUME_MS, IDLE_MS, LATE_WINDOW_MS, BUCKET_MS } = require('../engine/frame-stats');
 
 // A hand-cranked clock, so the assertions are about the arithmetic rather
 // than about how fast the test machine happens to be.
@@ -106,6 +106,83 @@ test('a gap under 2x the target is jitter, not an overrun', () => {
     runFrames(h, 10, 1);
 
     assert.strictEqual(h.stats.snapshot().overruns, 0);
+});
+
+// A tick that lands a whole period late, i.e. one dropped frame.
+function runLateFrames(h, count) {
+    for (var i = 0; i < count; i++) {
+        h.clock.advance(h.rateMs * 2);
+        runFrames(h, 1, 1);
+    }
+}
+
+test('reports late frames as a rate over a window, not just a running total', () => {
+    const h = statsAt(10);
+    runFrames(h, 90, 1);
+    runLateFrames(h, 10);
+
+    const snap = h.stats.snapshot();
+    assert.strictEqual(snap.overruns, 10);
+    assert.strictEqual(snap.lateFrames, 10);
+    assert.strictEqual(snap.windowFrames, 100);
+    assert.ok(Math.abs(snap.latePercent - 10) < 0.001, 'latePercent was ' + snap.latePercent);
+    assert.strictEqual(snap.lateWindowMs, LATE_WINDOW_MS);
+});
+
+test('the late rate falls back to zero once the stall ages out of the window', () => {
+    const h = statsAt(10);
+    runFrames(h, 10, 1); // so the first stalled tick has a predecessor to be late against
+    runLateFrames(h, 10);
+    // A full window of healthy frames, plus a bucket's worth to clear the
+    // partial second the stall landed in.
+    runFrames(h, (LATE_WINDOW_MS + BUCKET_MS) / 10, 1);
+
+    const snap = h.stats.snapshot();
+    assert.strictEqual(snap.latePercent, 0, 'the stall is still being reported');
+    assert.strictEqual(snap.lateFrames, 0);
+    // Cumulative counters are the long soak, and do keep it.
+    assert.strictEqual(snap.overruns, 10);
+});
+
+test('seconds in which nothing rendered stay out of the denominator', () => {
+    const h = statsAt(10);
+    runFrames(h, 90, 1);
+    runLateFrames(h, 10);
+    // Scene off for five seconds, then rendering again. Billing that idle
+    // stretch as wall-clock time would put ~500 phantom frames under the
+    // percentage and quietly wash the stall out.
+    h.clock.advance(RESUME_MS * 10);
+    runFrames(h, 100, 1);
+
+    // 199, not 200: the tick that resumes is the discontinuity itself and is
+    // not sampled at all. What matters is that it is nowhere near the ~700
+    // that billing the idle stretch as wall-clock time would produce.
+    const snap = h.stats.snapshot();
+    assert.strictEqual(snap.windowFrames, 199, 'idle time reached the denominator');
+    assert.strictEqual(snap.lateFrames, 10, 'the resume was billed as a dropped frame');
+});
+
+test('a scene change restarts the tracker without switching it off', () => {
+    const h = statsAt(10);
+    runFrames(h, 200, 1);
+    runLateFrames(h, 5);
+
+    h.stats.restart();
+    const cleared = h.stats.snapshot();
+    assert.strictEqual(cleared.enabled, true, 'restart switched the tracker off');
+    assert.strictEqual(cleared.frames, 0);
+    assert.strictEqual(cleared.overruns, 0);
+    assert.strictEqual(cleared.worstFrameMs, 0);
+    assert.strictEqual(cleared.latePercent, null);
+
+    // The window has to go with it: the new scene's late frames must read as
+    // its own rate, not be diluted by the 205 healthy ones before the switch.
+    // 9 of 10, because a restart re-anchors — the first tick after it has no
+    // predecessor to measure a gap against, exactly as at start-up.
+    runLateFrames(h, 10);
+    const snap = h.stats.snapshot();
+    assert.strictEqual(snap.windowFrames, 10);
+    assert.strictEqual(snap.lateFrames, 9);
 });
 
 test('resuming after an idle stretch is a discontinuity, not a dropped frame', () => {
