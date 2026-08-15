@@ -13,11 +13,6 @@ export function formatAmps(milliamps) {
   return milliamps < 1000 ? `${Math.round(milliamps)} mA` : `${(milliamps / 1000).toFixed(1)} A`;
 }
 
-export function formatVolts(volts) {
-  if (volts === null || volts === undefined) return '–';
-  return `${volts.toFixed(2)} V`;
-}
-
 /*
  * state is one of:
  *   'wait'     — no reading yet
@@ -29,18 +24,13 @@ export function formatVolts(volts) {
  *   'limiting' — frames are being pulled back right now
  *   'floored'  — the budget is below what the panel draws doing nothing, so
  *                dimming cannot reach it. A misconfiguration, not a load.
- *
- * The headline is volts when the rail has been calibrated and amps when it
- * has not: on a panel whose real constraint is IR drop, "4.72 V" is the
- * number that means something and "9.1 A" is not.
  */
 export function describePower(snap) {
   if (!snap) {
     return { state: 'wait', label: '…', detail: '', title: 'Panel power draw' };
   }
 
-  const { milliamps, budgetMilliamps, railVolts } = snap;
-  const calibrated = railVolts !== null && railVolts !== undefined;
+  const { milliamps, budgetMilliamps } = snap;
 
   let state;
   if (snap.floored) state = 'floored';
@@ -50,13 +40,9 @@ export function describePower(snap) {
   else if (budgetMilliamps > 0 && milliamps / budgetMilliamps > NEAR_FRACTION) state = 'near';
   else state = 'ok';
 
-  let label;
-  if (state === 'wait') label = '…';
-  else if (calibrated) label = formatVolts(railVolts);
-  else label = formatAmps(milliamps);
+  const label = state === 'wait' ? '…' : formatAmps(milliamps);
 
   const detail = [];
-  if (calibrated && milliamps !== null && milliamps !== undefined) detail.push(formatAmps(milliamps));
   if (state === 'limiting') detail.push('limited');
   else if (state === 'idle') detail.push('idle');
   else if (state === 'floored') detail.push('budget too low');
@@ -71,11 +57,7 @@ export function describePower(snap) {
     snap.requestedMilliamps > milliamps
       ? `The scene is asking for ${formatAmps(snap.requestedMilliamps)}; frames are being scaled back to fit.`
       : '',
-    snap.boundBy === 'rail'
-      ? `Limited by supply sag, not by the PSU: the rail reaches ${formatVolts(snap.rail && snap.rail.floorVolts)}`
-        + ` before the ${formatAmps(snap.maxMilliamps)} supply runs out.`
-      : `Limited by the ${formatAmps(snap.maxMilliamps)} supply, less ${formatAmps(snap.overheadMilliamps)} reserved for the Pi.`,
-    calibrated ? `Predicted voltage at the panel: ${formatVolts(railVolts)}.` : 'Rail not calibrated — run tools/power-sweep.js on the Pi.',
+    `Limited by the ${formatAmps(snap.maxMilliamps)} supply, less ${formatAmps(snap.overheadMilliamps)} reserved for the Pi.`,
     snap.idle ? 'Idle: no scene is rendering, so these are the last figures taken.' : '',
     snap.floored ? 'The budget is below the panel’s idle draw — dimming cannot reach it. Check the configuration.' : '',
     !snap.limit ? 'Measuring only: the limiter is switched off, so frames are not being scaled.' : '',

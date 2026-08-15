@@ -1,19 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { describePower, formatAmps, formatVolts } from './power';
+import { describePower, formatAmps } from './power';
 
-// An ordinary scene on the calibrated panel: well inside a rail-bound budget.
+// An ordinary scene, well inside the PSU-bound budget.
 const healthy = {
   limit: true,
   maxMilliamps: 20000,
   overheadMilliamps: 1200,
   budgetMilliamps: 8800,
-  boundBy: 'rail',
-  rail: { openCircuitVolts: 5.15, ohms: 0.04, floorVolts: 4.75 },
   idle: false,
   milliamps: 2400,
   requestedMilliamps: 2400,
   peakMilliamps: 2600,
-  railVolts: 5.006,
   limiting: false,
   scale: 1,
   floored: false,
@@ -27,22 +24,14 @@ describe('formatAmps', () => {
 
   it('renders a missing figure rather than NaN', () => {
     expect(formatAmps(null)).toBe('–');
-    expect(formatVolts(undefined)).toBe('–');
   });
 });
 
 describe('describePower', () => {
-  it('leads with volts once the rail is calibrated', () => {
+  it('leads with current draw', () => {
     const d = describePower(healthy);
     expect(d.state).toBe('ok');
-    expect(d.label).toBe('5.01 V');
-    expect(d.detail).toContain('2.4 A');
-  });
-
-  it('leads with current when the rail is not calibrated', () => {
-    const d = describePower({ ...healthy, railVolts: null, rail: null, boundBy: 'psu' });
     expect(d.label).toBe('2.4 A');
-    expect(d.title).toContain('not calibrated');
   });
 
   it('warns before the limiter engages, not only after', () => {
@@ -73,9 +62,8 @@ describe('describePower', () => {
     expect(d.title).toContain('dimming cannot reach it');
   });
 
-  it('distinguishes a rail-bound budget from a PSU-bound one', () => {
-    expect(describePower(healthy).title).toContain('supply sag');
-    expect(describePower({ ...healthy, boundBy: 'psu' }).title).toContain('20.0 A supply');
+  it('names the supply cap in the detail', () => {
+    expect(describePower(healthy).title).toContain('20.0 A supply');
   });
 
   it('says when it is only measuring', () => {

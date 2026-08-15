@@ -36,7 +36,7 @@ export const api = {
   setFps: (enabled) => request('PUT', '/api/fps', { enabled }),
   power: () => request('GET', '/api/power'),
   // Partial: the server merges field by field, so one control can be edited
-  // without resending (or stale-overwriting) the calibrated rail figures.
+  // without resending the rest of the config.
   setPower: (config) => request('PUT', '/api/power', config),
   scenePreviews: () => request('GET', '/api/scenes/previews'),
   scenePreview: (id) => request('GET', `/api/scenes/${id}/preview`),
