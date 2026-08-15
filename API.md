@@ -237,17 +237,22 @@ Instrumentation for the render loop, **off by default**. Both verbs return the s
   "worstRenderMs": 0.05,
   "overruns": 0,
   "frames": 1841,
+  "latePercent": 0,
+  "lateFrames": 0,
+  "windowFrames": 910,
+  "lateWindowMs": 10000,
   "uptimeMs": 20114.7,
   "virtual": false
 }
 ```
 
-`fps`, `frameMs`, `renderMs` and `tickMs` are averages over a rolling ~1 s window; `worst*`, `overruns` and `frames` are cumulative since the tracker was switched on. `renderMs` is the compositor plus the write to the pixel sink, `tickMs` the whole tick including the WebSocket broadcast — the pair says whether a shortfall is our own work or the timer.
+`fps`, `frameMs`, `renderMs` and `tickMs` are averages over a rolling ~1 s window; `latePercent` is over a longer one (`lateWindowMs`); `worst*`, `overruns` and `frames` are cumulative since the tracker last restarted. `renderMs` is the compositor plus the write to the pixel sink, `tickMs` the whole tick including the WebSocket broadcast — the pair says whether a shortfall is our own work or the timer.
 
-Four things the numbers do *not* mean:
+Five things the numbers do *not* mean:
 
-- **`targetFps` is nominal, not a goal that gets hit.** The loop is a 10 ms `setInterval`, which clamps: a perfectly healthy loop reports around 91 FPS. Judge it on `frameMs` against the 10 ms target and on `overruns`, not on equality with `targetFps`.
-- **`overruns` counts tick gaps of ≥2× the target** — `setInterval` coalescing, or something blocking past the interval. A gap over 500 ms is treated as the loop having been idle instead, and is neither sampled nor counted.
+- **`targetFps` is nominal, not a goal that gets hit.** The loop is a 10 ms `setInterval`, which clamps: a perfectly healthy loop reports around 91 FPS. Judge it on `frameMs` against the 10 ms target and on `latePercent`, not on equality with `targetFps`.
+- **`overruns` counts tick gaps of ≥2× the target** — `setInterval` coalescing, or something blocking past the interval. A gap over 500 ms is treated as the loop having been idle instead, and is neither sampled nor counted. It is a running total, so it answers "has this ever stumbled", not "is it stumbling"; **`latePercent` is the live figure** — the same overruns as a share of `windowFrames`, the frames actually rendered in the last `lateWindowMs`, so a stall ages out and the number falls back to zero on its own. Seconds in which nothing rendered contribute no frames, and so never dilute it.
+- **Everything is scoped to the active scene.** Render cost is largely a property of the scene, so changing it restarts the tracker — cumulative counters back to zero, window cleared, `uptimeMs` re-based. Switching *off* does not: coming back to the same scene resumes the same soak.
 - **`idle: true` means nothing is rendering**, normally because no scene is active — the loop renders one black frame and then fast-exits, which is correct behaviour, not 0 FPS. The other fields hold the last figures taken.
 - **This is the panel's frame rate, not the preview stream's**, which is separately throttled to ~30 FPS (~15 for layer frames).
 

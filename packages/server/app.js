@@ -150,10 +150,22 @@ app.listen(3000, function () {
 // Render loop. When no scene is active ("off"), render one black frame,
 // push it to WS clients, then idle.
 var offRendered = false;
+var statsSceneId = null;
 
 function tick() {
     var scene = store.activeScene();
     if (scene) {
+        // Frame stats are per scene: cost varies by what is being rendered,
+        // and a switch is continuous, so without this a heavy scene's late
+        // frames would be read as the light one you moved to. Checked here
+        // rather than in the route because every path that changes what
+        // renders — activation, an import, deleting the active scene — comes
+        // through this one comparison. Going "off" deliberately does not
+        // clear it: coming back to the same scene resumes the same soak.
+        if (scene.id !== statsSceneId) {
+            statsSceneId = scene.id;
+            frameStats.restart();
+        }
         // begin() returns 0 while the tracker is off, which makes every
         // other call here an early return — the instrumentation costs a
         // boolean test on the path that matters.

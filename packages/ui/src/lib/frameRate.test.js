@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { describeFrameRate, formatMs } from './frameRate';
+import { describeFrameRate, formatMs, formatLatePercent } from './frameRate';
 
 // A healthy dev-machine reading: setInterval(10) clamps to ~11ms, so ~91 fps
 // with the render itself taking almost none of the budget.
@@ -15,6 +15,10 @@ const healthy = {
   worstRenderMs: 0.05,
   overruns: 0,
   frames: 1200,
+  latePercent: 0,
+  lateFrames: 0,
+  windowFrames: 910,
+  lateWindowMs: 10000,
 };
 
 describe('formatMs', () => {
@@ -30,6 +34,22 @@ describe('formatMs', () => {
   it('renders a missing figure rather than NaN', () => {
     expect(formatMs(null)).toBe('–');
     expect(formatMs(undefined)).toBe('–');
+  });
+});
+
+describe('formatLatePercent', () => {
+  it('keeps a real stall visible instead of rounding it to zero', () => {
+    expect(formatLatePercent(0.04)).toBe('<0.1%');
+    expect(formatLatePercent(0)).toBe('0%');
+  });
+
+  it('loses the decimal once the loop is in real trouble', () => {
+    expect(formatLatePercent(4.23)).toBe('4.2%');
+    expect(formatLatePercent(31.6)).toBe('32%');
+  });
+
+  it('renders a missing figure rather than NaN', () => {
+    expect(formatLatePercent(null)).toBe('–');
   });
 });
 
@@ -67,6 +87,18 @@ describe('describeFrameRate', () => {
     expect(d.detail).toBe('8.2 ms');
   });
 
+  it('flags a loop dropping frames in bursts that the average absorbs', () => {
+    // 91.6 fps and a 0.02ms render: both other tests say healthy. One frame
+    // in twelve is still being dropped, and on a phone the colour is the only
+    // place that can show.
+    const d = describeFrameRate({ ...healthy, latePercent: 8.3, lateFrames: 76 }, false);
+    expect(d.state).toBe('slow');
+  });
+
+  it('does not go red over the odd coalesced tick', () => {
+    expect(describeFrameRate({ ...healthy, latePercent: 0.4, lateFrames: 4 }, false).state).toBe('ok');
+  });
+
   it('shows idle rather than a rate when nothing is rendering', () => {
     // "Off" is one black frame and then an idle loop — correct behaviour,
     // and it must not read as a stalled panel.
@@ -78,7 +110,29 @@ describe('describeFrameRate', () => {
 
   it('surfaces dropped frames in the detail line, and only when there are any', () => {
     expect(describeFrameRate(healthy, false).detail).not.toContain('late');
-    expect(describeFrameRate({ ...healthy, overruns: 7 }, false).detail).toContain('7 late');
+    expect(describeFrameRate({ ...healthy, latePercent: 4.2, lateFrames: 38 }, false).detail)
+      .toContain('4.2% late');
+  });
+
+  it('reports lateness as a rate, so a recovered loop stops showing it', () => {
+    // The cumulative count is still non-zero — it always will be, once the
+    // loop has ever stumbled — but nothing is late *now*, and the pill is
+    // what says so.
+    const recovered = { ...healthy, overruns: 7, latePercent: 0, lateFrames: 0 };
+    expect(describeFrameRate(recovered, false).detail).not.toContain('late');
+  });
+
+  it('names the window and the scene scope in the tooltip', () => {
+    const d = describeFrameRate({ ...healthy, latePercent: 4.2, lateFrames: 38 }, false);
+    // A bare percentage is a share of an unstated denominator.
+    expect(d.title).toContain('over the last 10s');
+    expect(d.title).toContain('38 of 910');
+    expect(d.title).toContain('since this scene became active');
+  });
+
+  it('drops the window line rather than showing a share of nothing', () => {
+    const fresh = { ...healthy, latePercent: null, lateFrames: 0, windowFrames: 0 };
+    expect(describeFrameRate(fresh, false).title).not.toContain('over the last');
   });
 
   it('labels dev mode so a fast laptop reading is not mistaken for the panel', () => {
