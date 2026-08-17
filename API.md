@@ -69,7 +69,9 @@ Returns every available effect with its parameter schema and defaults — enough
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `text` (a string, with `maxLength` and an optional `hint`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
+
+`text` is the only entry whose value is a string, and the only entry type added since the UI's editor was written — which makes it the exception to "a new effect needs nothing in the UI". A new *effect* is free; a new *entry type* needs a control, and an older UI against a newer server renders an unrecognised entry as nothing at all rather than erroring, so the layer is editable except for that one param.
 
 A `group` entry carries only a `label` and no `key`: it is a **flat separator**, not a container, so the schema stays a list and an effect opts into sections simply by dropping one between its params. Only `emitter` uses them so far — sixteen params in one panel is where a flat list stops scanning. Params before the first `group` render in an unnamed section at the top of the panel, alongside blend and opacity.
 
@@ -90,7 +92,7 @@ An effect may also carry `presets`: an array of `{ id, name, params }`. These ar
 
 An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only** chrome — a dashed box around the handle, for an emitter whose particles are born over an area rather than at a point. It is edited by its own Width/Height controls; the pad only shows it, because pressing anywhere on the pad places the handle and a second grab target would break that.
 
-Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`. `emitter`'s presets are where the look of the old `embers`/`candy_sparkler` effects live now; a stored or imported layer using either of those types, or the old combined `gradient`, renders nothing — they are not resolvable effect types.
+Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`, `text`. `emitter`'s presets are where the look of the old `embers`/`candy_sparkler` effects live now; a stored or imported layer using either of those types, or the old combined `gradient`, renders nothing — they are not resolvable effect types.
 
 ---
 
@@ -342,6 +344,65 @@ The `planewave` effect is the far-field limit of `wavelet`: parallel wavefronts 
 | `max`    | number  | Maximum intensity |
 
 An outward `wavelet` at distance `D` and a `planewave` at `angle = atan2(y, x) + 180` (waves move away from their source) render identically once `D` is large, because the `D/lambda` term the approximation drops is a constant phase offset that folds into `delta`. An inward one is the same identity with both signs flipped: the angle is the bearing *of* the source, and the dropped distance is a phase lag instead of a lead.
+
+## Text parameters
+
+The `text` effect renders one line of type on the panel — static or scrolling, with clock tokens resolved inside the string.
+
+| Field        | Type   | Description |
+|--------------|--------|-------------|
+| `text`       | string | The line, up to 256 characters. Clock tokens are resolved in place (see below) |
+| `font`       | string | `"regular"`, `"bold"`, `"heavy"` or `"round"` |
+| `color`      | string | Hex colour of the type |
+| `background` | string | Hex colour behind it. `"#000000"` means "type only" |
+| `level`      | number | Scales the whole layer, ink and ground alike |
+| `softness`   | number | Extra blur in glyph cells, 0–1.5. 0 is plain interpolation, which is already sub-pixel |
+| `tracking`   | number | Blank columns between glyphs, 0–4 |
+| `scroll`     | number | Columns per second, signed. Positive reads right-to-left; 0 is static and centred |
+| `gap`        | number | Blank columns between the end of the line and its next repeat while scrolling |
+
+**There are no position params.** The line is centred: the case that wants placing is one narrower than the panel, and there is exactly one sensible place for it. A line wider than 30 columns shows its middle standing still, and a scroll is how you read the rest of it.
+
+### Clock tokens
+
+Tokens live *in the text* rather than behind a mode, so `{HH}:{mm}` and `It is {h}:{mm}{a}` are the same effect doing the same thing and no control changes meaning when a scene happens to be telling the time.
+
+`{HH}` `{H}` `{hh}` `{h}` hours (24h then 12h) · `{mm}` `{m}` minutes · `{ss}` `{s}` seconds · `{a}` `{A}` am/pm · `{DD}` `{D}` day · `{MM}` `{M}` month · `{YYYY}` `{YY}` year. Case-sensitive, as everywhere else that spells dates: `MM` is the month and `mm` the minutes. An unrecognised brace is ordinary text, so nothing is stolen from a line that happens to contain one.
+
+Tokens resolve against the millis the render loop passes, never the wall clock, which is what lets a filmstrip render a 4-second loop in 40 renders. It also means **a clock's scene card is frozen**: previews are rendered at a fixed time base, so an inactive card shows one arbitrary time until the scene is made active.
+
+### Fonts
+
+Four faces, all in an 8-row cell. `regular` covers printable ASCII including lowercase; the other three are caps-only and fold lowercase up rather than boxing it.
+
+| Face | Cell | Notes |
+|---|---|---|
+| `regular` | 5×7 caps, descenders on row 8 | The face to read as type. ~5 characters on the panel |
+| `bold` | 6×7 caps, two-column stems | For a layer feeding a blend — a one-LED stroke all but vanishes under a multiply |
+| `heavy` | 6×8, two-column stems **and two-row arms** | Fills the cell, so it is the one face centred by construction |
+| `round` | `heavy` with its curves in partial cells | Glyph cells carry coverage, not a bit, so a corner can be ¾ and ¼ |
+
+A character with no glyph in the chosen face renders as a hollow box — visible, rather than silently missing. Every digit within a face is the same width, so a clock does not reflow when the minute rolls 19 → 20.
+
+### Using it as a negative mask
+
+`background` is what lets the layer *remove* something rather than only add to it. The layer renders `background + coverage × (colour − background)` — a lerp, not a scale — so:
+
+- black background (the default) draws nothing but the letters, exactly as scaling the ink alone would;
+- white background with black ink makes the layer a **negative**, and a `multiply` blend punches the letters out of everything below it.
+
+The lerp is the point: a partial coverage cell lands between the two colours, so the punch-out inherits the same antialiased edge the type has.
+
+**The punch is only as deep as the coverage is complete**, which ties it to `softness` and to the face. At softness 0 every stroke reaches full coverage; above it, a stroke reaches full coverage only if it is wide enough to have a neighbour on both sides. The share of the layer below that survives inside the letters:
+
+| face | softness 0 | 0.1 | 0.2 | 0.35 | 0.5 |
+|---|---|---|---|---|---|
+| `heavy` / `round` | 0.0% | 0.6% | 1.6% | 2.9% | 4.0% |
+| `regular` | 0.0% | 8.9% | 15.6% | 22.9% | 28.0% |
+
+So: **for a negative mask, use a bold face and keep softness low** — which is the same argument the bold faces exist for, arriving from the other direction. The `punchout` preset ships that pairing; set the layer's blend to Multiply to see it.
+
+An unparseable `background` falls back to **black**, not white as `color` does: a typo in a colour should degrade to ordinary type, never light the whole panel.
 
 ## WebSocket pixel stream
 
