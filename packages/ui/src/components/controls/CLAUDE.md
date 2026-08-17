@@ -6,6 +6,14 @@ Why these controls are the way they are. The root [CLAUDE.md](../../../../../CLA
 
 Every control row ends with a value column (`.control-num` + the row gap = `--value-col`), so the controls that would otherwise fill the row — the pad and the gradient strip — reserve it as `margin-right` and share the sliders' right-hand edge. Range inputs carry `margin: 0` to cancel the UA's 2px, which is what makes that arithmetic exact.
 
+## `TextControl.jsx`
+
+The only control whose value is a string, and deliberately **not** a `DraftField`. A draft field holds an edit back until it parses and abandons it if it does not — right for a hex or a number, wrong for prose, where every intermediate state is valid and the panel should show what you are typing as you type it. So this writes through on each keystroke: the store's optimistic update keeps the input showing the character just typed (nothing writes the server's response back over it), and the 80ms trailing throttle coalesces a burst into one PUT.
+
+`onCommit` fires on blur and on Enter, **not** per keystroke — unlike DraftField, which has no other flush. Here the throttle's trailing edge already lands the value; what `onCommit` adds is a filmstrip re-render of the whole scene, which is far too expensive to do once a letter.
+
+The clock tokens are written in the schema's `hint` and rendered under the field, because that is the only place in the UI they appear at all.
+
 ## `DraftField.jsx`
 
 The typed escape hatch beside every drag control, wrapped by `NumField` (NumberControl, RangeControl, XYPad, AngleDial) and used directly with `formatHex`/`parseHex` for the colour hex (ColorControl, GradientStopsEditor). It commits through a **ref, not state**: Escape clears the draft and blurs on the same tick, and a `setState` isn't visible to the blur handler that runs next. It also calls `onCommit` itself — a typed edit has no pointer-up, so nothing else would flush the store's 80ms throttle. `parse` returning `null` abandons the edit, which is how an unreadable hex reverts. Numbers are **not clamped to the schema's min/max**: presets carry values no slider can reach (`lambda` runs 0.001–10000 against a 0.05–2 slider), so typing is the only way to restore one after a stray drag.
