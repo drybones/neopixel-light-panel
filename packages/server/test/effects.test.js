@@ -823,8 +823,8 @@ function renderText(params, millis, ctx) {
 // bottom — and checks the two ends separately.
 test('a glyph renders the way up it was drawn', () => {
     const ctx = panelCtx();
-    const out = renderText({ text: 'L', font: 'heavy', softness: 0, color: '#ffffff' }, 12345, ctx);
-    const L = require('../engine/text-font').FONTS.heavy.glyph('L');
+    const out = renderText({ text: 'L', font: 'bold', softness: 0, color: '#ffffff' }, 12345, ctx);
+    const L = require('../engine/text-font').FONTS.bold.glyph('L');
     const origin = Math.round((TEXT_COLS - L.width) / 2);
 
     // Top row: the stem only, on the left of the glyph.
@@ -841,17 +841,17 @@ test('a glyph renders the way up it was drawn', () => {
 
 test('a line sits horizontally centred', () => {
     const ctx = panelCtx();
-    const out = renderText({ text: 'I', font: 'heavy', softness: 0, color: '#ffffff' }, 12345, ctx);
+    const out = renderText({ text: 'I', font: 'bold', softness: 0, color: '#ffffff' }, 12345, ctx);
     const lit = [];
     for (let c = 0; c < TEXT_COLS; c++) if (textCell(out, 3, c) > 0) lit.push(c);
-    // The heavy I is two columns; centred on 30 they are 14 and 15.
+    // The bold I is two columns; centred on 30 they are 14 and 15.
     assert.deepStrictEqual(lit, [14, 15]);
 });
 
 test('positive scroll reads right-to-left', () => {
     const ctx = panelCtx();
     const centroid = (millis) => {
-        const out = renderText({ text: 'I', font: 'heavy', softness: 0, scroll: 10, color: '#ffffff' }, millis, ctx);
+        const out = renderText({ text: 'I', font: 'bold', softness: 0, scroll: 10, color: '#ffffff' }, millis, ctx);
         let sum = 0, weight = 0;
         for (let c = 0; c < TEXT_COLS; c++) {
             const v = textCell(out, 3, c);
@@ -917,8 +917,8 @@ test('a black background renders identically to scaling the ink alone', () => {
 
 test('a white background with black ink inverts the layer', () => {
     const ctx = panelCtx();
-    const normal = renderText({ text: 'PLAY', font: 'heavy', color: '#ffffff', background: '#000000', softness: 0 }, 12345, ctx);
-    const negative = renderText({ text: 'PLAY', font: 'heavy', color: '#000000', background: '#ffffff', softness: 0 }, 12345, ctx);
+    const normal = renderText({ text: 'PLAY', font: 'bold', color: '#ffffff', background: '#000000', softness: 0 }, 12345, ctx);
+    const negative = renderText({ text: 'PLAY', font: 'bold', color: '#000000', background: '#ffffff', softness: 0 }, 12345, ctx);
     for (let i = 0; i < normal.length; i++) {
         assert.ok(Math.abs(normal[i] + negative[i] - 255) < 1e-3,
             `pixel ${i}: ${normal[i]} + ${negative[i]} should be 255`);
@@ -927,7 +927,7 @@ test('a white background with black ink inverts the layer', () => {
 
 test('coverage 0 lands exactly on the background, not near it', () => {
     const ctx = panelCtx();
-    const out = renderText({ text: 'I', font: 'heavy', color: '#000000', background: '#204080', softness: 0 }, 12345, ctx);
+    const out = renderText({ text: 'I', font: 'bold', color: '#000000', background: '#204080', softness: 0 }, 12345, ctx);
     // Column 0 is nowhere near the centred I.
     assert.strictEqual(out[0], 0x20);
     assert.strictEqual(out[1], 0x40);

@@ -4,45 +4,33 @@ const assert = require('node:assert');
 const textFont = require('../engine/text-font');
 
 const FACES = Object.keys(textFont.FONTS);
-const LEVELS = Object.keys(textFont.LEVELS).map(k => textFont.LEVELS[k]);
 
 // Requiring the module at all compiles every glyph of every face — compile()
-// throws on a ragged row, a wrong row count or a character off the ramp — so
-// these tests are about the invariants compile() cannot see.
+// throws on a ragged row, a wrong row count or a character that is neither `.`
+// nor `#` — so these tests are about the invariants compile() cannot see.
 
-test('every glyph is a rectangle of its declared width and its face height', () => {
+test('every glyph is one byte per column of its declared width', () => {
     for (const face of FACES) {
         const font = textFont.FONTS[face];
         for (const ch of Object.keys(font.glyphs)) {
             const g = font.glyphs[ch];
             assert.ok(g.width >= 1, `${face} '${ch}' has width ${g.width}`);
-            assert.strictEqual(g.cells.length, g.width * font.height,
-                `${face} '${ch}' has ${g.cells.length} cells for ${g.width}x${font.height}`);
-            assert.strictEqual(g.ink.length, g.width);
+            assert.strictEqual(g.cols.length, g.width,
+                `${face} '${ch}' has ${g.cols.length} columns for width ${g.width}`);
         }
     }
 });
 
-test('no glyph carries coverage outside its face height', () => {
+// A column is a byte, so a face taller than eight rows would silently lose its
+// bottom row rather than failing — hence the assertion on the height itself.
+test('no face is taller than a column byte can hold', () => {
     for (const face of FACES) {
         const font = textFont.FONTS[face];
-        assert.strictEqual(font.height, textFont.CELL_ROWS);
+        assert.ok(font.height <= textFont.CELL_ROWS, `${face} is ${font.height} rows`);
         for (const ch of Object.keys(font.glyphs)) {
-            const g = font.glyphs[ch];
-            // The storage cannot express a row past the height, so what this
-            // really pins is that the height is the one the face was drawn at:
-            // an art table edited to 9 rows would throw in compile() instead.
-            assert.strictEqual(g.cells.length % font.height, 0, `${face} '${ch}'`);
-        }
-    }
-});
-
-test('every cell value is on the authoring ramp', () => {
-    for (const face of FACES) {
-        const font = textFont.FONTS[face];
-        for (const ch of Object.keys(font.glyphs)) {
-            for (const v of font.glyphs[ch].cells) {
-                assert.ok(LEVELS.indexOf(v) !== -1, `${face} '${ch}' has cell value ${v}`);
+            for (const byte of font.glyphs[ch].cols) {
+                assert.ok(byte >> font.height === 0,
+                    `${face} '${ch}' has a bit set below row ${font.height - 1}`);
             }
         }
     }
@@ -59,22 +47,6 @@ test('every digit in a face is the same width', () => {
             widths.add(font.glyphs[d].width);
         }
         assert.strictEqual(widths.size, 1, `${face} digit widths: ${[...widths].join(', ')}`);
-    }
-});
-
-test('an ink flag is set exactly for the columns that carry coverage', () => {
-    for (const face of FACES) {
-        const font = textFont.FONTS[face];
-        for (const ch of Object.keys(font.glyphs)) {
-            const g = font.glyphs[ch];
-            for (let c = 0; c < g.width; c++) {
-                let any = 0;
-                for (let r = 0; r < font.height; r++) {
-                    if (g.cells[c * font.height + r] > 0) any = 1;
-                }
-                assert.strictEqual(g.ink[c], any, `${face} '${ch}' column ${c}`);
-            }
-        }
     }
 });
 
@@ -107,7 +79,7 @@ test('an unknown character renders as the box rather than nothing', () => {
         const font = textFont.FONTS[face];
         const g = font.glyph('中');
         assert.strictEqual(g, font.tofu, `${face} should answer tofu for an unknown character`);
-        assert.ok(g.ink.some(v => v === 1), `${face} tofu must be visible`);
+        assert.ok(Array.from(g.cols).some(v => v !== 0), `${face} tofu must be visible`);
     }
 });
 
@@ -128,29 +100,17 @@ test('get falls back to the default face for an unknown key', () => {
     assert.strictEqual(textFont.get(undefined), textFont.FONTS[textFont.DEFAULT_FONT]);
 });
 
-// The rounded face is the reason cells are bytes rather than bits: it is only
-// different from `heavy` in the cells that are neither empty nor full.
-test('round carries partial coverage and heavy does not', () => {
-    const partial = (font) => {
-        let count = 0;
-        for (const ch of Object.keys(font.glyphs)) {
-            for (const v of font.glyphs[ch].cells) if (v > 0 && v < 255) count++;
+// Every caps-only face carries the same marks, so changing face never makes a
+// character that was on the panel vanish.
+test('the caps-only faces agree on their coverage', () => {
+    const marks = ' 0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!"%\'()+,-.:=?/';
+    for (const face of FACES) {
+        const font = textFont.FONTS[face];
+        if (!font.fold) continue;
+        for (const ch of marks) {
+            assert.ok(font.glyphs[ch], `${face} is missing '${ch}'`);
         }
-        return count;
-    };
-    assert.strictEqual(partial(textFont.FONTS.heavy), 0);
-    assert.strictEqual(partial(textFont.FONTS.bold), 0);
-    assert.strictEqual(partial(textFont.FONTS.regular), 0);
-    assert.ok(partial(textFont.FONTS.round) > 20, 'round should be drawn with partial cells');
-});
-
-// Flat-sided letters have nothing to round, and softening them would only lose
-// contrast — so they are the same art in both faces.
-test('round leaves the flat-sided letters identical to heavy', () => {
-    for (const ch of 'EFHILT') {
-        assert.deepStrictEqual(
-            Array.from(textFont.FONTS.round.glyphs[ch].cells),
-            Array.from(textFont.FONTS.heavy.glyphs[ch].cells),
-            `'${ch}' should not differ between heavy and round`);
+        assert.strictEqual(Object.keys(font.glyphs).length, marks.length,
+            `${face} carries something the others do not`);
     }
 });

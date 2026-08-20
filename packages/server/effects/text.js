@@ -10,8 +10,9 @@
  * There are no position params. The line is centred — the case that wants
  * placing is a line narrower than the panel, and there is exactly one sensible
  * place for it; a line wider than the panel shows its middle standing still and
- * a scroll is how you read the rest. Every face fills the 8-row cell, so there
- * is nothing to place vertically either.
+ * a scroll is how you read the rest. Vertically a face is centred in the panel's
+ * eight rows, which is a whole-row offset for the six-row faces and nothing at
+ * all for the rest — no face has anything hanging below its baseline.
  *
  * `background` is what makes the layer able to *remove* something. It renders
  * `background + coverage * (colour - background)` — a lerp, not a scale — so
@@ -21,7 +22,7 @@
  * a partial coverage cell lands *between* the two colours, so the punch-out
  * inherits the same antialiased edge the type has. Note the punch is only as
  * deep as the coverage is complete — a one-column stroke never reaches 1, so a
- * negative mask wants a bold face and a low softness (see API.md).
+ * negative mask wants a two-column-stem face and a low softness (see API.md).
  *
  * Cost is about 0.007ms a frame against a 10ms tick, and the per-frame path
  * allocates nothing: the mask is rebuilt only when the *resolved* string
@@ -107,11 +108,11 @@ module.exports = {
             color: '#ffb84d', background: '#000000',
             level: 1, softness: 0.25, tracking: 1, scroll: 12, gap: 8 } },
         { id: 'banner', name: 'Bold banner', params: {
-            text: 'NOW PLAYING', font: 'round', color: '#4fd0ff', background: '#000000',
+            text: 'NOW PLAYING', font: 'bold', color: '#4fd0ff', background: '#000000',
             level: 1, softness: 0.3, tracking: 1, scroll: 10, gap: 10 } },
         // Set this layer's blend to Multiply to see what it is for.
         { id: 'punchout', name: 'Punch-out mask', params: {
-            text: 'PLAY', font: 'heavy', color: '#000000', background: '#ffffff',
+            text: 'PLAY', font: 'bold', color: '#000000', background: '#ffffff',
             level: 1, softness: 0.1, tracking: 1, scroll: 0, gap: 8 } },
     ],
 
@@ -190,8 +191,9 @@ module.exports = {
                 // smeared across two columns at half brightness, which reads as
                 // a soft font rather than as an off-by-half-a-cell.
                 var originCol = Math.round((grid.cols - mask.width) / 2) - phase;
-                // Every face fills the cell, so this is 0 today; it is the
-                // general form for a shorter one.
+                // Rounded to a whole row: the six-row faces sit one row down,
+                // and a half-row offset would smear every line across two rows
+                // the way a half-column one smears it across two columns.
                 var originRow = Math.round((grid.rows - mask.rows) / 2);
 
                 var cov = raster.sample(sampler, mask, period, originCol, originRow, p.softness);

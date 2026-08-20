@@ -5,8 +5,8 @@ const raster = require('../engine/text-raster');
 const textFont = require('../engine/text-font');
 
 const REGULAR = textFont.FONTS.regular;
-const HEAVY = textFont.FONTS.heavy;
-const ROUND = textFont.FONTS.round;
+const BOLD = textFont.FONTS.bold;
+const COMPACT = textFont.FONTS.compact;
 
 // A fixed instant to resolve tokens against: 2026-08-17 15:04:05 local, so the
 // hour is unambiguous in both 24h and 12h and every field is two digits.
@@ -90,10 +90,10 @@ test('a line is the sum of its glyphs plus tracking between them, never after', 
     }
 });
 
-test('an empty line has no width and no cells', () => {
+test('an empty line has no width and no columns', () => {
     const mask = raster.layoutLine(REGULAR, '', 1);
     assert.strictEqual(mask.width, 0);
-    assert.strictEqual(mask.cells.length, 0);
+    assert.strictEqual(mask.cols.length, 0);
     assert.strictEqual(mask.rows, REGULAR.height);
 });
 
@@ -103,13 +103,13 @@ test('layout truncates at MAX_TEXT rather than sizing a buffer off user input', 
 });
 
 test('the glyphs land in the order they were typed', () => {
-    const mask = raster.layoutLine(HEAVY, 'IL', 0);
-    const I = HEAVY.glyph('I');
-    const L = HEAVY.glyph('L');
+    const mask = raster.layoutLine(BOLD, 'IL', 0);
+    const I = BOLD.glyph('I');
+    const L = BOLD.glyph('L');
     assert.strictEqual(mask.width, I.width + L.width);
     // The narrow I is first, so the wide L's columns start after it.
-    assert.deepStrictEqual(Array.from(mask.cells.slice(0, I.width * mask.rows)), Array.from(I.cells));
-    assert.deepStrictEqual(Array.from(mask.cells.slice(I.width * mask.rows)), Array.from(L.cells));
+    assert.deepStrictEqual(Array.from(mask.cols.slice(0, I.width)), Array.from(I.cols));
+    assert.deepStrictEqual(Array.from(mask.cols.slice(I.width)), Array.from(L.cols));
 });
 
 test('the wrap period never shows a fitting line twice, and clamps its gap', () => {
@@ -138,11 +138,11 @@ test('the grid comes off the model, top row first', () => {
 // --- sampling ---------------------------------------------------------------
 
 test('softness 0 on a whole column reproduces the mask exactly', () => {
-    const { at, mask, grid } = coverageOf(HEAVY, 'L', { softness: 0 });
+    const { at, mask, grid } = coverageOf(BOLD, 'L', { softness: 0 });
     const originCol = Math.round((grid.cols - mask.width) / 2);
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < mask.width; c++) {
-            const expected = mask.cells[c * mask.rows + r] / 255;
+            const expected = (mask.cols[c] >> r) & 1;
             assert.ok(Math.abs(at(r, originCol + c) - expected) < 1e-6,
                 `cell ${r},${c}: ${at(r, originCol + c)} vs ${expected}`);
         }
@@ -150,8 +150,8 @@ test('softness 0 on a whole column reproduces the mask exactly', () => {
 });
 
 test('a half-column offset splits a stroke evenly across two columns', () => {
-    const whole = coverageOf(HEAVY, 'I', { softness: 0, originCol: 10 });
-    const half = coverageOf(HEAVY, 'I', { softness: 0, originCol: 10.5 });
+    const whole = coverageOf(BOLD, 'I', { softness: 0, originCol: 10 });
+    const half = coverageOf(BOLD, 'I', { softness: 0, originCol: 10.5 });
     // The I is a 2-column block, so whole lands on 10 and 11 at full coverage.
     assert.ok(Math.abs(whole.at(3, 10) - 1) < 1e-6);
     assert.ok(Math.abs(whole.at(3, 11) - 1) < 1e-6);
@@ -163,24 +163,21 @@ test('a half-column offset splits a stroke evenly across two columns', () => {
     assert.ok(Math.abs(half.at(3, 12) - 0.5) < 1e-6, `${half.at(3, 12)}`);
 });
 
-test('partial glyph cells carry through the tent proportionally', () => {
-    // The rounded face's corner cells are the whole reason coverage is a byte.
-    const { at, mask, grid } = coverageOf(ROUND, 'O', { softness: 0 });
-    const originCol = Math.round((grid.cols - mask.width) / 2);
-    const authored = [];
-    const rendered = [];
-    for (let c = 0; c < mask.width; c++) {
-        const v = mask.cells[c * mask.rows + 0];
-        if (v > 0 && v < 255) {
-            authored.push(v / 255);
-            rendered.push(at(0, originCol + c));
-        }
-    }
-    assert.ok(authored.length >= 2, 'the O should have partial cells on its top row');
-    for (let i = 0; i < authored.length; i++) {
-        assert.ok(Math.abs(rendered[i] - authored[i]) < 1e-6,
-            `partial cell ${i}: rendered ${rendered[i]} for authored ${authored[i]}`);
-    }
+// A six-row face is centred in the panel's eight rows by a whole row, so its
+// art lands on rows 1..6 with a blank row above and below.
+test('a six-row face is centred a whole row down', () => {
+    const grid = raster.makeGrid(gridCtx(30, 8));
+    const sampler = raster.createSampler(grid.cols, grid.rows, 8);
+    const mask = raster.layoutLine(COMPACT, 'I', 0);
+    assert.strictEqual(mask.rows, 6);
+    const originRow = Math.round((grid.rows - mask.rows) / 2);
+    assert.strictEqual(originRow, 1);
+    const cov = raster.sample(sampler, mask, 30, 14, originRow, 0);
+    const at = (r, c) => cov[r * grid.cols + c];
+    assert.strictEqual(at(0, 14), 0, 'the top row stays dark');
+    assert.strictEqual(at(7, 14), 0, 'and so does the bottom');
+    assert.strictEqual(at(1, 15), 1, 'the art starts on row 1');
+    assert.strictEqual(at(6, 15), 1, 'and ends on row 6');
 });
 
 // Normalising over only the covered cells would scale a sliver of weight back up
@@ -198,29 +195,29 @@ test('the tent normalises over cells outside the glyph too, so softness dims', (
         `blurring should conserve light: ${total(soft.cov)} vs ${total(sharp.cov)}`);
 });
 
-// The measurement behind "use a bold face for a negative mask": a punch-out is
-// only as deep as the coverage is complete, and how complete that gets is set by
-// how many cells wide the run is against the tent's radius. At softness 0.2 a
-// six-wide bar reaches 0.98, a two-column stem 0.88 and a one-column stroke 0.77
-// — so the same mask leaves a quarter of the layer below showing through
-// `regular` and a fiftieth through `heavy`.
-test('coverage completes on a wide run and falls short on a thin stroke', () => {
+// The measurement behind "use a two-column face for a negative mask": a
+// punch-out is only as deep as the coverage is complete, and how complete that
+// gets is set by how many cells wide the stroke is against the tent's radius.
+// At softness 0.2 a two-column stem reaches 0.88 and a one-column stroke 0.77 —
+// so the same mask leaves a quarter of the layer below showing through the
+// light faces and an eighth through the heavy ones.
+test('a thicker stroke holds more coverage under the blur', () => {
     const peak = (c) => Math.max.apply(null, Array.from(c.cov));
-    const bar = peak(coverageOf(HEAVY, 'L', { softness: 0.2 }));
-    const stem = peak(coverageOf(HEAVY, 'I', { softness: 0.2 }));
+    const thick = peak(coverageOf(BOLD, 'I', { softness: 0.2 }));
     const thin = peak(coverageOf(REGULAR, 'l', { softness: 0.2 }));
-    assert.ok(bar > stem && stem > thin, `expected bar > stem > thin, got ${bar}, ${stem}, ${thin}`);
-    assert.ok(bar > 0.95, `a six-wide bar should all but complete: ${bar}`);
-    assert.ok(thin < 0.8, `a one-column stroke cannot: ${thin}`);
-    // At softness 0 every one of them is exact — the shortfall is the blur, not
-    // the font, which is why the punch-out preset carries a low softness.
+    assert.ok(thick > thin, `expected the 2px stem above the 1px one, got ${thick} and ${thin}`);
+    assert.ok(thick > 0.85 && thick < 1, `two-column stem: ${thick}`);
+    assert.ok(thin < 0.8, `one-column stroke: ${thin}`);
+    // At softness 0 both are exact — the shortfall is the blur, not the face,
+    // which is why the punch-out preset carries a low softness.
     assert.strictEqual(peak(coverageOf(REGULAR, 'l', { softness: 0 })), 1);
+    assert.strictEqual(peak(coverageOf(BOLD, 'I', { softness: 0 })), 1);
 });
 
 test('the line wraps at the period and repeats identically', () => {
     const grid = raster.makeGrid(gridCtx(30, 8));
     const sampler = raster.createSampler(grid.cols, grid.rows, 8);
-    const mask = raster.layoutLine(HEAVY, 'AB', 1);
+    const mask = raster.layoutLine(BOLD, 'AB', 1);
     const period = raster.wrapPeriod(mask.width, grid.cols, 8);
     const a = Array.from(raster.sample(sampler, mask, period, 3, 0, 0));
     const b = Array.from(raster.sample(sampler, mask, period, 3 - period, 0, 0));
@@ -229,7 +226,7 @@ test('the line wraps at the period and repeats identically', () => {
 
 test('rows off the top or bottom of the panel are gone, not wrapped', () => {
     // Vertical has no period: a glyph pushed off the top must not reappear below.
-    const shifted = coverageOf(HEAVY, 'L', { softness: 0, originRow: -4 });
+    const shifted = coverageOf(BOLD, 'L', { softness: 0, originRow: -4 });
     for (let c = 0; c < 30; c++) {
         for (let r = 4; r < 8; r++) {
             assert.strictEqual(shifted.at(r, c), 0, `row ${r} should be empty`);
@@ -243,6 +240,6 @@ test('sampling an empty line leaves the panel dark', () => {
 });
 
 test('an absurd softness is clamped rather than sizing an unbounded loop', () => {
-    const { cov } = coverageOf(HEAVY, 'A', { softness: 1e9 });
+    const { cov } = coverageOf(BOLD, 'A', { softness: 1e9 });
     assert.ok(Array.from(cov).every(v => Number.isFinite(v) && v >= 0 && v <= 1));
 });

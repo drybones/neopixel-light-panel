@@ -95,10 +95,10 @@ function resolveTokens(text, millis) {
 }
 
 /*
- * One line of type as cells: `cells[c * rows + r]` is the coverage of row r in
- * column c, and `ink[c]` says whether column c has any at all. `tracking` is the
- * gap *between* glyphs and never after the last one, so a line's width does not
- * depend on which end you measure from.
+ * One line of type as column bytes: bit r of `cols[c]` is row r of column c, and
+ * a zero column is an empty one. `tracking` is the gap *between* glyphs and never
+ * after the last one, so a line's width does not depend on which end you measure
+ * from.
  */
 function layoutLine(font, text, tracking) {
     var t = tracking > 0 ? Math.round(tracking) : 0;
@@ -110,17 +110,15 @@ function layoutLine(font, text, tracking) {
         if (i > 0) width += t;
         width += font.glyph(chars[i]).width;
     }
-    var cells = new Uint8Array(width * rows);
-    var ink = new Uint8Array(width);
+    var cols = new Uint8Array(width);
     var at = 0;
     for (i = 0; i < chars.length; i++) {
         if (i > 0) at += t;
         var g = font.glyph(chars[i]);
-        cells.set(g.cells, at * rows);
-        ink.set(g.ink, at);
+        cols.set(g.cols, at);
         at += g.width;
     }
-    return { cells: cells, ink: ink, width: width, rows: rows };
+    return { cols: cols, width: width, rows: rows };
 }
 
 /*
@@ -223,16 +221,10 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
             w = 1 - Math.abs(m - u) / R;
             if (w <= 0) continue;
             wsum += w;
-            var mm = maskColumn(mask, m, period);
-            if (mm < 0) continue;
-            // A glyph cell carries coverage, not a bit — the `round` face draws
-            // its curves in partial cells, and the tent multiplies through them
-            // exactly as it does through a whole one.
-            var src = mm * rows;
-            var ww = w / 255;
+            var bits = maskColumn(mask, m, period);
+            if (bits === 0) continue;
             for (r = 0; r < rows; r++) {
-                var v = mask.cells[src + r];
-                if (v !== 0) temp[r * gridCols + c] += ww * v;
+                if ((bits >> r) & 1) temp[r * gridCols + c] += w;
             }
         }
         if (wsum > 0 && wsum !== 1) {
@@ -263,12 +255,13 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
     return cov;
 }
 
-// The mask column a tap lands on, or -1 for one that is off the end of the line
-// or entirely empty — the early-out that keeps spaces and the wrap gap cheap.
+// The column a tap lands on, as its byte — 0 for a column that is empty, off the
+// end of the line, or in the wrap gap, which is the early-out that keeps a space
+// and the gap between repeats cheap.
 function maskColumn(mask, m, period) {
     var mm = m % period;
     if (mm < 0) mm += period;
-    return mm < mask.width && mask.ink[mm] !== 0 ? mm : -1;
+    return mm < mask.width ? mask.cols[mm] : 0;
 }
 
 module.exports = {

@@ -352,7 +352,7 @@ The `text` effect renders one line of type on the panel — static or scrolling,
 | Field        | Type   | Description |
 |--------------|--------|-------------|
 | `text`       | string | The line, up to 256 characters. Clock tokens are resolved in place (see below) |
-| `font`       | string | `"regular"`, `"bold"`, `"heavy"` or `"round"` |
+| `font`       | string | One of `"micro"`, `"compact"`, `"regular"`, `"grotesk"`, `"terminal"`, `"bold"` |
 | `color`      | string | Hex colour of the type |
 | `background` | string | Hex colour behind it. `"#000000"` means "type only" |
 | `level`      | number | Scales the whole layer, ink and ground alike |
@@ -373,16 +373,18 @@ Tokens resolve against the millis the render loop passes, never the wall clock, 
 
 ### Fonts
 
-Four faces, all in an 8-row cell. `regular` covers printable ASCII including lowercase; the other three are caps-only and fold lowercase up rather than boxing it.
+Six faces, light to heavy. All of them are pure binary bitmaps — a glyph cell is on or off — stored as one byte per column, and none has anything hanging below its baseline except `regular`, the one face with lowercase. A face shorter than the panel is centred by a whole row.
 
-| Face | Cell | Notes |
-|---|---|---|
-| `regular` | 5×7 caps, descenders on row 8 | The face to read as type. ~5 characters on the panel |
-| `bold` | 6×7 caps, two-column stems | For a layer feeding a blend — a one-LED stroke all but vanishes under a multiply |
-| `heavy` | 6×8, two-column stems **and two-row arms** | Fills the cell, so it is the one face centred by construction |
-| `round` | `heavy` with its curves in partial cells | Glyph cells carry coverage, not a bit, so a corner can be ¾ and ¼ |
+| Face | Cell | Fits | Notes |
+|---|---|---|---|
+| `micro` | 4×6, 1px stems | ~6 chars | The smallest caps that still read |
+| `compact` | 5×6, 1px stems | ~5 chars | Wider counters, still six rows |
+| `regular` | 5×7 + descender row | ~5 chars | The only face with lowercase, and complete for ASCII 32–126 |
+| `grotesk` | 5×8, 1px stems | ~5 chars | `regular`'s skeleton over eight rows: no extra weight, rounder bowls |
+| `terminal` | 6×8, 1px stems | ~4 chars | Legibility bought with width rather than weight |
+| `bold` | 6×8, 2px stems | ~4 chars | The only weight above one pixel — the face for a layer feeding a blend |
 
-A character with no glyph in the chosen face renders as a hollow box — visible, rather than silently missing. Every digit within a face is the same width, so a clock does not reflow when the minute rolls 19 → 20.
+The caps-only faces fold lowercase up rather than boxing it, and all five carry the same marks — space, `0–9`, `A–Z` and `! " % ' ( ) + , - . : = ? /` — so changing face never makes a character that was on the panel vanish. Anything outside that renders as a hollow box: visible, rather than silently missing. Every digit within a face is the same width, so a clock does not reflow when the minute rolls 19 → 20.
 
 ### Using it as a negative mask
 
@@ -393,14 +395,14 @@ A character with no glyph in the chosen face renders as a hollow box — visible
 
 The lerp is the point: a partial coverage cell lands between the two colours, so the punch-out inherits the same antialiased edge the type has.
 
-**The punch is only as deep as the coverage is complete**, which ties it to `softness` and to the face. At softness 0 every stroke reaches full coverage; above it, a stroke reaches full coverage only if it is wide enough to have a neighbour on both sides. The share of the layer below that survives inside the letters:
+**The punch is only as deep as the coverage is complete**, which ties it to `softness` and to the face. At softness 0 every stroke reaches full coverage; above it, a stroke's peak coverage is set by how many columns wide it is against the tent's radius. The share of the layer below that survives inside the letters:
 
 | face | softness 0 | 0.1 | 0.2 | 0.35 | 0.5 |
 |---|---|---|---|---|---|
-| `heavy` / `round` | 0.0% | 0.6% | 1.6% | 2.9% | 4.0% |
-| `regular` | 0.0% | 8.9% | 15.6% | 22.9% | 28.0% |
+| `bold` (2px stems) | 0.0% | 1.2% | 3.1% | 5.8% | 8.0% |
+| every 1px face | 0.0% | 8.9% | 15.6% | 22.9% | 28.0% |
 
-So: **for a negative mask, use a bold face and keep softness low** — which is the same argument the bold faces exist for, arriving from the other direction. The `punchout` preset ships that pairing; set the layer's blend to Multiply to see it.
+So: **for a negative mask, use a two-column face and keep softness low** — which is the same argument `bold` exists for, arriving from the other direction. The `punchout` preset ships that pairing; set the layer's blend to Multiply to see it.
 
 An unparseable `background` falls back to **black**, not white as `color` does: a typo in a colour should degrade to ordinary type, never light the whole panel.
 
