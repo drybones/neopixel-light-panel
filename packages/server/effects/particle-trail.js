@@ -7,6 +7,10 @@
 var color = require('../engine/color');
 var particles = require('../engine/particles');
 
+// The pool size. The count stops one short of it throughout because pool[0] is
+// the head particle and the trail fills pool[1..count], so the render below
+// hands over count + 1 slots. The -1 is that head, not a fencepost to tidy
+// away: emitter.js has no head and deliberately does not carry one.
 var MAX_PARTICLES = 80;
 
 module.exports = {

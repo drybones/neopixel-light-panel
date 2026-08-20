@@ -35,6 +35,16 @@ var color = require('../engine/color');
 var particles = require('../engine/particles');
 var panel = require('../engine/panel');
 
+// The pool size and the top of the Density slider, which are the same number:
+// every slot is a particle the emitter can spawn into, pool[0..count-1]. The
+// sibling particle_trail stops one short of its pool because pool[0] is its
+// head and the trail hangs off it; there is no head here, so a -1 copied from
+// there would only shorten the slider. Note the schema max is a real cap and
+// not merely a slider hint — prepare() clamps to it, so the unclamped typed
+// field cannot reach past the pool either. What binds the constant is render
+// cost: engine/particles walks 240 pixels per particle, linear in this, and a
+// scene can stack several emitter layers into one 10ms tick. It is deliberately
+// not derived from the panel's pixel count for that reason.
 var MAX_PARTICLES = 80;
 
 // The panel is 30x8 on a square pitch, so it is 4.1x wider than it is tall.
@@ -97,7 +107,7 @@ module.exports = {
         { key: 'extY', type: 'number', label: 'Height', min: 0, max: MAX_EXT_Y, step: 0.05, scale: 'linear', modulatable: true },
 
         { type: 'group', label: 'Emission' },
-        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
+        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES, step: 1, scale: 'linear', modulatable: true },
         // How many and how big sit together: they are the two knobs you trade
         // against each other to fill the panel. A radius in world units — the
         // LED pitch is 0.25, so 0.25 is one LED across. Log because 1/size^2
@@ -190,7 +200,7 @@ module.exports = {
             speedSpread: params.speedSpread,
             ax: params.grav * Math.cos(ga) * X_STRETCH,
             az: params.grav * Math.sin(ga),
-            count: Math.min(MAX_PARTICLES - 1, Math.max(1, params.count | 0)),
+            count: Math.min(MAX_PARTICLES, Math.max(1, params.count | 0)),
             // Seconds in, milliseconds out — the render loop works in millis.
             life: params.life * 1000,
             lifeSpread: params.lifeSpread,
