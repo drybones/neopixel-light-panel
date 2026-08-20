@@ -67,6 +67,31 @@ body {
   gap: 10px;
 }
 
+/* The two readout pills, grouped so they read as a pair: tighter to each
+   other than to the title on one side and the brightness slider on the
+   other, which is the header's own 20px column gap. They sit outside
+   .app-header-brand for that reason — inside it they inherited the brand's
+   10px and the title looked like part of the group. */
+.app-header-readouts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* A collapsed pill draws no border and no background, so its own padding
+   stops being part of a pill and starts reading as gap — the two words
+   drift apart by 14px exactly when the header is at its tightest. Pull the
+   box back in by what it insets its text by (6px padding + 1px border), so
+   what you can see is spaced the same whether the pills are folded or not.
+   The padding stays rather than going to zero: the hover border needs to
+   sit off the letters, since collapsed is when the pill most needs to look
+   like something you can click. */
+.frame-rate--off,
+.power-meter--off {
+  margin-left: -7px;
+  margin-right: -7px;
+}
+
 /* Shared brightness control lives in the header, identical on both views.
    Grows to fill the row on desktop; wraps to its own full-width row when
    the brand and slider no longer fit side by side. */
