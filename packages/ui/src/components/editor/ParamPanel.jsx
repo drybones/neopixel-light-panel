@@ -6,6 +6,7 @@ import ColorControl from '../controls/ColorControl';
 import XYPad from '../controls/XYPad';
 import AngleDial from '../controls/AngleDial';
 import GradientStopsEditor from '../controls/GradientStopsEditor';
+import TextControl from '../controls/TextControl';
 import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 
 const BLEND_OPTIONS = [
@@ -68,6 +69,18 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
             label={entry.label}
             value={layer.params[entry.key]}
             onChange={(hex) => setParams({ [entry.key]: hex })}
+            onCommit={onCommit}
+          />
+        );
+      // The only string-valued param. Writes through on each keystroke and
+      // commits on blur — see TextControl for why it is not a DraftField.
+      case 'text':
+        return (
+          <TextControl
+            key={entry.key}
+            entry={entry}
+            value={layer.params[entry.key]}
+            onChange={(v) => setParams({ [entry.key]: v })}
             onCommit={onCommit}
           />
         );

@@ -682,6 +682,30 @@ label.settings-row { cursor: pointer; }
   color: var(--text);
 }
 
+/* Text control — the line the text effect renders. Full width rather than the
+   value column's width: a marquee is a sentence, and the hint under it is the
+   only place the clock tokens are written down. */
+.control-row--text { align-items: flex-start; }
+.text-control { flex: 1; min-width: 160px; display: flex; flex-direction: column; gap: 4px; }
+.text-control-input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 9px;
+}
+.text-control-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.text-control-hint {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Colour control */
 .color-swatches { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .color-swatch {

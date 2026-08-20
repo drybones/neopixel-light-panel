@@ -17,6 +17,7 @@ var modules = [
     require('./particle-trail'),
     require('./noise'),
     require('./twinkle'),
+    require('./text'),
 ];
 
 var byType = {};
