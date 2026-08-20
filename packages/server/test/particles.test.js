@@ -74,6 +74,24 @@ test('param changes do not reset particle state', () => {
     assert.ok(out.every(v => Number.isFinite(v)));
 });
 
+// The emitter has no head particle, so its Density reaches every slot in the
+// pool — the -1 that particle_trail needs for pool[0] would only shorten the
+// slider here. The cap is enforced in prepare(), not just hinted at by the
+// schema, because the typed field beside the slider is deliberately unclamped.
+test('the emitter clamps Density to its schema max, and that is the whole pool', () => {
+    const emitter = effects.get('emitter');
+    const max = emitter.schema.find(s => s.key === 'count').max;
+    assert.strictEqual(emitter.prepare({ ...emitter.defaults, count: 1e6 }).count, max);
+
+    // Every one of those slots must be reachable: renderParticles walks
+    // pool[0..count-1], so a count past the pool reads undefined and throws.
+    const instance = emitter.createInstance(ctx);
+    const prepared = emitter.prepare({ ...emitter.defaults, count: max, life: 0.5 });
+    const out = new Float32Array(ctx.numPixels * 3);
+    for (let t = 0; t < 4000; t += 100) instance.render(out, t, prepared);
+    assert.ok(out.some(v => v > 0));
+});
+
 test('particle effects render without allocation errors at max density', () => {
     for (const type of ['emitter', 'particle_trail']) {
         const mod = effects.get(type);
