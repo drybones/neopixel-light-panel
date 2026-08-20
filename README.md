@@ -25,11 +25,9 @@ If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL
 
 ### Power
 
-240 WS2812B at full white is about **13.4 A at 5 V**, and almost nothing else comes close — Fadecandy's gamma curve means a mid-grey frame draws roughly a fifth of that, so ordinary scenes sit far below the worst case.
-
-Sizing the supply for 13.4 A is not the whole story, though. The constraint that can bite first is **voltage, not current**: everything downstream of the supply's terminals shares a resistance (regulation droop, leads, connectors), so the rail falls under load. A very ordinary 40 mΩ costs half a volt at 14 A, which is enough to push a Pi sharing that supply below its ~4.63 V undervoltage trip — on a supply rated for 20 A, with 6 A to spare on paper. If a solid-white test scene browns out the Pi while every real scene is fine, this is why, and thicker leads or power injection help more than a bigger PSU does.
-
-The server estimates the draw and can hold frames inside a budget (`GET|PUT /api/power`, and the "Power budget" panel in the UI). The budget is a plain cap on the PSU's rating, less what's reserved for the Pi and Fadecandy — an earlier version fit a tighter, IR-drop-aware cap from a real voltage reading, but that reading turned out to depend on a PMIC ADC (`vcgencmd pmic_read_adc` / `EXT5V_V`) that Raspberry Pi Ltd's own documentation scopes to CM4 only, not a standard Pi 4 Model B. If your board does expose that ADC, or you can measure the rail some other way, wiring a tighter cap back in is a reasonable extension — this project just isn't carrying dead code for a measurement it can't take on its own hardware.
+- **Current.** 240 WS2812B at full white is about **13.4 A at 5 V**, and almost nothing else comes close — Fadecandy's gamma curve means a mid-grey frame draws roughly a fifth of that, so ordinary scenes sit far below the worst case.
+- **Voltage sag.** If the Pi runs off the same supply, a solid-white frame can drop the rail far enough to trip its undervoltage detection, even on a PSU with amps to spare — the resistance of leads and connectors bites before the current rating does. Thicker leads or power injection help more than a bigger PSU.
+- **Current limiting.** The server estimates the draw and can hold frames inside a configurable budget (`GET|PUT /api/power`, and the "Power budget" panel in the UI settings).
 
 ## Prerequisites
 
