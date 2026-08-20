@@ -15,6 +15,10 @@ export function formatAmps(milliamps) {
 
 /*
  * state is one of:
+ *   'off'      — collapsed by the user, the same resting shape as the
+ *                frame-rate pill's 'off'. Display only: the server measures
+ *                unconditionally and the limiter runs either way, so nothing
+ *                here reaches /api/power.
  *   'wait'     — no reading yet
  *   'idle'     — nothing has rendered lately. With no scene active the loop
  *                renders one black frame and stops, so the figures are the
@@ -25,7 +29,16 @@ export function formatAmps(milliamps) {
  *   'floored'  — the budget is below what the panel draws doing nothing, so
  *                dimming cannot reach it. A misconfiguration, not a load.
  */
-export function describePower(snap) {
+export function describePower(snap, shown = true) {
+  // Collapse is absolute — a folded pill says nothing, not even that the
+  // limiter is engaged. The alternative was to let 'limiting' and 'floored'
+  // push it back open, which would have kept the poll running while
+  // collapsed, i.e. the whole cost the collapse saves. The budget is set
+  // once against a supply chosen to cover most scenes; the expanded pill is
+  // for finding the extreme ones and tuning it, and can be put away after.
+  if (!shown) {
+    return { state: 'off', label: 'power', detail: '', title: 'Show the panel’s power draw' };
+  }
   if (!snap) {
     return { state: 'wait', label: '…', detail: '', title: 'Panel power draw' };
   }

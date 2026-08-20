@@ -9,6 +9,11 @@
   --accent: #4f8bff;
   --accent-dim: #2b4a85;
   --danger: #e24b4a;
+  /* The graded readouts — the power pill and the frame-rate pill — say the
+     same three things with the same three colours, so they name them here
+     rather than each carrying its own hex for a third pill to copy. */
+  --ok: #3dd68c;
+  --warn: #e8b339;
   --radius: 10px;
   /* The value column every slider row ends with: .control-num plus the row's
      gap. Controls that would otherwise fill the row stop short of it, so the
@@ -62,6 +67,31 @@ body {
   gap: 10px;
 }
 
+/* The two readout pills, grouped so they read as a pair: tighter to each
+   other than to the title on one side and the brightness slider on the
+   other, which is the header's own 20px column gap. They sit outside
+   .app-header-brand for that reason — inside it they inherited the brand's
+   10px and the title looked like part of the group. */
+.app-header-readouts {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* A collapsed pill draws no border and no background, so its own padding
+   stops being part of a pill and starts reading as gap — the two words
+   drift apart by 14px exactly when the header is at its tightest. Pull the
+   box back in by what it insets its text by (6px padding + 1px border), so
+   what you can see is spaced the same whether the pills are folded or not.
+   The padding stays rather than going to zero: the hover border needs to
+   sit off the letters, since collapsed is when the pill most needs to look
+   like something you can click. */
+.frame-rate--off,
+.power-meter--off {
+  margin-left: -7px;
+  margin-right: -7px;
+}
+
 /* Shared brightness control lives in the header, identical on both views.
    Grows to fill the row on desktop; wraps to its own full-width row when
    the brand and slider no longer fit side by side. */
@@ -113,9 +143,24 @@ body {
   border-color: var(--border);
   background: var(--surface-2);
 }
-.frame-rate:not(.frame-rate--off) .frame-rate-value { color: var(--text); }
-.frame-rate--ok .frame-rate-value { color: #3dd68c; }
+/* The state rules below have to outrank this, so it is one class on its own
+   and the :not() above is left to the border and background. :not() takes the
+   specificity of its argument, so putting the white there made it three
+   classes and no state colour ever applied. */
+.frame-rate-value { color: var(--text); }
+.frame-rate--ok .frame-rate-value { color: var(--ok); }
+.frame-rate--near .frame-rate-value { color: var(--warn); }
 .frame-rate--slow .frame-rate-value { color: var(--danger); }
+/* Nothing having rendered lately is not a fault, and nor is not having read
+   yet — grey, like the power pill's equivalents. "off" is grey for a third
+   reason: it is the resting state of a diagnostic that costs something to
+   run, and it needs saying explicitly now that the white above is a base
+   rule rather than something only the switched-on pill picked up. */
+.frame-rate--idle .frame-rate-value,
+.frame-rate--wait .frame-rate-value,
+.frame-rate--off .frame-rate-value { color: var(--text-dim); }
+/* Grey in every state: colouring the headline number is the whole signal, and
+   a pill that changed colour all over would drown it. */
 .frame-rate-detail { color: var(--text-dim); }
 .frame-rate-mode {
   color: var(--text-dim);
@@ -127,33 +172,54 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* Power readout — always lit, unlike the frame-rate pill: the measurement is
-   unconditional on the server, and this is the only place the limiter is
-   visible at all (the previews are pre-fader and never dim). Not a button,
-   so no hover affordance; the settings live in the switcher. */
+/* Power readout — same collapse as the frame-rate pill, and for the same
+   reason on a phone, where the header has room for two figures and little
+   else. What it costs is worth writing down: this is the only place the
+   limiter is visible at all, since the previews stream the pre-brightness
+   composite by design and a limited panel looks exactly like an unlimited
+   one. Collapsed, the pill therefore hides "the panel is being pulled back"
+   as well — accepted rather than let 'limiting' and 'floored' push it open
+   on their own, which would mean polling on while collapsed for a case that
+   is a one-off misconfiguration, easily diagnosed once. Unlike that pill,
+   this toggle is display only and never reaches the server. */
 .power-meter {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 2px 6px;
   color: var(--text-dim);
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
-  cursor: default;
+  cursor: pointer;
 }
+.power-meter:hover { border-color: var(--border); }
+/* Anything but "off" is the expanded look. */
+.power-meter:not(.power-meter--off) {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+/* One class, so every --state rule below outranks it — see the note on
+   .frame-rate-value for what happens when it is written any other way. */
 .power-meter-value { color: var(--text); }
-.power-meter--ok .power-meter-value { color: #3dd68c; }
-.power-meter--near .power-meter-value { color: #e8b339; }
-/* Amber, not red: limiting is the system working, not a fault. */
-.power-meter--limiting { border-color: #e8b339; }
-.power-meter--limiting .power-meter-value { color: #e8b339; }
+.power-meter--ok .power-meter-value { color: var(--ok); }
+.power-meter--near .power-meter-value { color: var(--warn); }
+/* Amber, not red: limiting is the system working, not a fault. The border is
+   tinted too, which the frame-rate pill has no equivalent of — the limiter is
+   something being done to the panel, not just a reading of it. Three classes
+   deliberately: it has to outrank both the expanded look and :hover, each of
+   which is two and also sets border-color. This is the same trap that kept
+   the frame-rate pill's state colours from ever applying, one level up. */
+.power-meter.power-meter--limiting:not(.power-meter--off) { border-color: var(--warn); }
+.power-meter--limiting .power-meter-value { color: var(--warn); }
 .power-meter--floored .power-meter-value { color: var(--danger); }
 .power-meter--idle .power-meter-value,
-.power-meter--wait .power-meter-value { color: var(--text-dim); }
+.power-meter--wait .power-meter-value,
+.power-meter--off .power-meter-value { color: var(--text-dim); }
 .power-meter-detail { color: var(--text-dim); }
 
 /* Header cog. Sits outside .app-header-brand so it lands at the far end of

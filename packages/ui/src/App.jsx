@@ -72,9 +72,13 @@ export default function App() {
             className={`ws-dot${wsConnected ? ' ws-dot--on' : ''}`}
             title={wsConnected ? 'Live preview connected' : 'Live preview disconnected'}
           />
-          {loaded && <PowerMeter />}
-          {loaded && <FrameRate />}
         </div>
+        {loaded && (
+          <div className="app-header-readouts">
+            <PowerMeter />
+            <FrameRate />
+          </div>
+        )}
         {loaded && <BrightnessSlider />}
         {loaded && (
           <button

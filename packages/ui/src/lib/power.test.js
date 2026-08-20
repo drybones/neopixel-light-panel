@@ -79,4 +79,22 @@ describe('describePower', () => {
     expect(describePower(null).state).toBe('wait');
     expect(describePower({ ...healthy, milliamps: null }).state).toBe('wait');
   });
+
+  // Collapse is a display choice and nothing else: the server measures
+  // unconditionally and the limiter runs regardless, so a folded pill is
+  // only a pill that has stopped being read.
+  it('collapses to a word with nothing to say', () => {
+    const d = describePower(healthy, false);
+    expect(d.state).toBe('off');
+    expect(d.label).toBe('power');
+    expect(d.detail).toBe('');
+    expect(d.title).toContain('Show');
+  });
+
+  // The states that would most justify reappearing on their own, pinned as
+  // deliberately not doing so.
+  it('stays collapsed even while limiting, and even when floored', () => {
+    expect(describePower({ ...healthy, limiting: true }, false).state).toBe('off');
+    expect(describePower({ ...healthy, floored: true }, false).state).toBe('off');
+  });
 });
