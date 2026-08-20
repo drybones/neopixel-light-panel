@@ -127,9 +127,13 @@ body {
 .frame-rate--near .frame-rate-value { color: var(--warn); }
 .frame-rate--slow .frame-rate-value { color: var(--danger); }
 /* Nothing having rendered lately is not a fault, and nor is not having read
-   yet — grey, like the power pill's equivalents. */
+   yet — grey, like the power pill's equivalents. "off" is grey for a third
+   reason: it is the resting state of a diagnostic that costs something to
+   run, and it needs saying explicitly now that the white above is a base
+   rule rather than something only the switched-on pill picked up. */
 .frame-rate--idle .frame-rate-value,
-.frame-rate--wait .frame-rate-value { color: var(--text-dim); }
+.frame-rate--wait .frame-rate-value,
+.frame-rate--off .frame-rate-value { color: var(--text-dim); }
 /* Grey in every state: colouring the headline number is the whole signal, and
    a pill that changed colour all over would drown it. */
 .frame-rate-detail { color: var(--text-dim); }
@@ -143,35 +147,54 @@ body {
   letter-spacing: 0.04em;
 }
 
-/* Power readout — always lit, unlike the frame-rate pill: the measurement is
-   unconditional on the server, and this is the only place the limiter is
-   visible at all (the previews are pre-fader and never dim). Not a button,
-   so no hover affordance; the settings live in the switcher. */
+/* Power readout — same collapse as the frame-rate pill, and for the same
+   reason on a phone, where the header has room for two figures and little
+   else. What it costs is worth writing down: this is the only place the
+   limiter is visible at all, since the previews stream the pre-brightness
+   composite by design and a limited panel looks exactly like an unlimited
+   one. Collapsed, the pill therefore hides "the panel is being pulled back"
+   as well — accepted rather than let 'limiting' and 'floored' push it open
+   on their own, which would mean polling on while collapsed for a case that
+   is a one-off misconfiguration, easily diagnosed once. Unlike that pill,
+   this toggle is display only and never reaches the server. */
 .power-meter {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 2px 6px;
   color: var(--text-dim);
+  font-family: inherit;
   font-size: 12px;
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
-  cursor: default;
+  cursor: pointer;
 }
+.power-meter:hover { border-color: var(--border); }
+/* Anything but "off" is the expanded look. */
+.power-meter:not(.power-meter--off) {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+/* One class, so every --state rule below outranks it — see the note on
+   .frame-rate-value for what happens when it is written any other way. */
 .power-meter-value { color: var(--text); }
 .power-meter--ok .power-meter-value { color: var(--ok); }
 .power-meter--near .power-meter-value { color: var(--warn); }
 /* Amber, not red: limiting is the system working, not a fault. The border is
    tinted too, which the frame-rate pill has no equivalent of — the limiter is
-   something being done to the panel, not just a reading of it. */
-.power-meter--limiting { border-color: var(--warn); }
+   something being done to the panel, not just a reading of it. Three classes
+   deliberately: it has to outrank both the expanded look and :hover, each of
+   which is two and also sets border-color. This is the same trap that kept
+   the frame-rate pill's state colours from ever applying, one level up. */
+.power-meter.power-meter--limiting:not(.power-meter--off) { border-color: var(--warn); }
 .power-meter--limiting .power-meter-value { color: var(--warn); }
 .power-meter--floored .power-meter-value { color: var(--danger); }
 .power-meter--idle .power-meter-value,
-.power-meter--wait .power-meter-value { color: var(--text-dim); }
+.power-meter--wait .power-meter-value,
+.power-meter--off .power-meter-value { color: var(--text-dim); }
 .power-meter-detail { color: var(--text-dim); }
 
 /* Header cog. Sits outside .app-header-brand so it lands at the far end of
