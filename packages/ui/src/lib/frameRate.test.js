@@ -99,6 +99,32 @@ describe('describeFrameRate', () => {
     expect(describeFrameRate({ ...healthy, latePercent: 0.4, lateFrames: 4 }, false).state).toBe('ok');
   });
 
+  // The amber band exists so the colour can warn before anything is wrong,
+  // which on a phone is the only warning there is — the detail line is
+  // hidden under 640px and a touch device cannot hover the tooltip.
+  it('warns in amber while the loop is drifting but still keeping up', () => {
+    expect(describeFrameRate({ ...healthy, fps: 85, frameMs: 11.8 }, false).state).toBe('near');
+    expect(describeFrameRate({ ...healthy, fps: 75, frameMs: 13.4 }, false).state).toBe('slow');
+  });
+
+  it('warns in amber while our own work is filling the budget', () => {
+    expect(describeFrameRate({ ...healthy, renderMs: 6.2, tickMs: 6.5 }, false).state).toBe('near');
+    expect(describeFrameRate({ ...healthy, renderMs: 8.2, tickMs: 8.5 }, false).state).toBe('slow');
+  });
+
+  it('warns in amber while the loop is slipping the odd frame', () => {
+    expect(describeFrameRate({ ...healthy, latePercent: 2.4, lateFrames: 22 }, false).state).toBe('near');
+    expect(describeFrameRate({ ...healthy, latePercent: 6.1, lateFrames: 55 }, false).state).toBe('slow');
+  });
+
+  // The regression the late-rate band exists to avoid, and the reason it is
+  // not tighter: setInterval(10) clamps to ~91 fps, so one late frame a
+  // second is 1.1% and a healthy loop would otherwise sit amber for good.
+  it('stays green through one late frame a second on a clamped timer', () => {
+    const clamped = { ...healthy, latePercent: 1.1, lateFrames: 10, windowFrames: 910 };
+    expect(describeFrameRate(clamped, false).state).toBe('ok');
+  });
+
   it('shows idle rather than a rate when nothing is rendering', () => {
     // "Off" is one black frame and then an idle loop — correct behaviour,
     // and it must not read as a stalled panel.

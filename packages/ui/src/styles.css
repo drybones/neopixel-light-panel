@@ -9,6 +9,11 @@
   --accent: #4f8bff;
   --accent-dim: #2b4a85;
   --danger: #e24b4a;
+  /* The graded readouts — the power pill and the frame-rate pill — say the
+     same three things with the same three colours, so they name them here
+     rather than each carrying its own hex for a third pill to copy. */
+  --ok: #3dd68c;
+  --warn: #e8b339;
   --radius: 10px;
   /* The value column every slider row ends with: .control-num plus the row's
      gap. Controls that would otherwise fill the row stop short of it, so the
@@ -113,9 +118,20 @@ body {
   border-color: var(--border);
   background: var(--surface-2);
 }
-.frame-rate:not(.frame-rate--off) .frame-rate-value { color: var(--text); }
-.frame-rate--ok .frame-rate-value { color: #3dd68c; }
+/* The state rules below have to outrank this, so it is one class on its own
+   and the :not() above is left to the border and background. :not() takes the
+   specificity of its argument, so putting the white there made it three
+   classes and no state colour ever applied. */
+.frame-rate-value { color: var(--text); }
+.frame-rate--ok .frame-rate-value { color: var(--ok); }
+.frame-rate--near .frame-rate-value { color: var(--warn); }
 .frame-rate--slow .frame-rate-value { color: var(--danger); }
+/* Nothing having rendered lately is not a fault, and nor is not having read
+   yet — grey, like the power pill's equivalents. */
+.frame-rate--idle .frame-rate-value,
+.frame-rate--wait .frame-rate-value { color: var(--text-dim); }
+/* Grey in every state: colouring the headline number is the whole signal, and
+   a pill that changed colour all over would drown it. */
 .frame-rate-detail { color: var(--text-dim); }
 .frame-rate-mode {
   color: var(--text-dim);
@@ -146,11 +162,13 @@ body {
   cursor: default;
 }
 .power-meter-value { color: var(--text); }
-.power-meter--ok .power-meter-value { color: #3dd68c; }
-.power-meter--near .power-meter-value { color: #e8b339; }
-/* Amber, not red: limiting is the system working, not a fault. */
-.power-meter--limiting { border-color: #e8b339; }
-.power-meter--limiting .power-meter-value { color: #e8b339; }
+.power-meter--ok .power-meter-value { color: var(--ok); }
+.power-meter--near .power-meter-value { color: var(--warn); }
+/* Amber, not red: limiting is the system working, not a fault. The border is
+   tinted too, which the frame-rate pill has no equivalent of — the limiter is
+   something being done to the panel, not just a reading of it. */
+.power-meter--limiting { border-color: var(--warn); }
+.power-meter--limiting .power-meter-value { color: var(--warn); }
 .power-meter--floored .power-meter-value { color: var(--danger); }
 .power-meter--idle .power-meter-value,
 .power-meter--wait .power-meter-value { color: var(--text-dim); }
