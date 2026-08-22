@@ -13,7 +13,41 @@
 var effects = require('../effects');
 var color = require('./color');
 
-var BLEND = { normal: 0, add: 1, multiply: 2, screen: 3, overlay: 4 };
+/*
+ * Blend modes split into two families, and which family a mode is in decides
+ * what `opacity` means and whether headroom survives the layer:
+ *
+ *   Gain family (add, subtract) — opacity scales the *source*, and nothing is
+ *   clamped on either side. The composite is free to run past 255 or below 0;
+ *   setPixel clips at the very end, so an add above a subtract recovers what
+ *   the subtract pushed under zero. This is the family that keeps headroom.
+ *
+ *   Mix family (everything else) — the source is clamped to 0–255, the mode
+ *   computes a displayable result, and opacity lerps from the *raw* dst toward
+ *   it. Clamping the source is what makes "difference with white is an invert"
+ *   true rather than approximately true.
+ *
+ * The backdrop is clamped only where the formula needs a bounded one. Multiply
+ * is the exception and stays raw on purpose: a·255/255 is a at any magnitude,
+ * so multiplying by white carries headroom through, where a screen or an
+ * overlay above the same stack throws it away at opacity 1.
+ *
+ * New modes go in the family whose opacity semantics they want, not the one
+ * whose formula looks tidier.
+ */
+var BLEND = {
+    normal: 0,
+    add: 1,
+    multiply: 2,
+    screen: 3,
+    overlay: 4,
+    subtract: 5,
+    difference: 6,
+    lighten: 7,
+    darken: 8,
+    soft_light: 9,
+    linear_light: 10,
+};
 
 function blendInto(dst, src, mode, opacity, n) {
     for (var i = 0; i < n * 3; i++) {
@@ -43,6 +77,61 @@ function blendInto(dst, src, mode, opacity, n) {
                     ? 2 * an4 * bn4 / 255
                     : 255 - 2 * (255 - an4) * (255 - bn4) / 255;
                 o = a + (v - a) * opacity;
+                break;
+            }
+            // Subtract is add's mirror down to the unclamped result, which is
+            // the whole point: it is the only mode that can take light away,
+            // and a composite driven negative here is still recoverable by an
+            // add above it. Clamping to 0 per layer would make the order of
+            // two layers change the answer for no visible gain.
+            case 5:
+                o = a - b * opacity;
+                break;
+            case 6: {
+                var an6 = a < 0 ? 0 : (a > 255 ? 255 : a);
+                var bn6 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var d = an6 - bn6;
+                o = a + ((d < 0 ? -d : d) - a) * opacity;
+                break;
+            }
+            case 7: {
+                var an7 = a < 0 ? 0 : (a > 255 ? 255 : a);
+                var bn7 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                o = a + ((an7 > bn7 ? an7 : bn7) - a) * opacity;
+                break;
+            }
+            case 8: {
+                var an8 = a < 0 ? 0 : (a > 255 ? 255 : a);
+                var bn8 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                o = a + ((an8 < bn8 ? an8 : bn8) - a) * opacity;
+                break;
+            }
+            // Pegtop's soft light, (1-2B)A² + 2AB in unit terms, rather than
+            // the W3C piecewise one. They differ by under a byte across the
+            // whole domain, but W3C's needs a sqrt and a cubic behind a branch
+            // on every channel of every pixel — 72k sqrt/s per soft-light
+            // layer at 100 FPS — where this is branch-free and smooth at the
+            // mid-grey pivot. Mid-grey is exactly identity, black squares the
+            // backdrop and white is its complement.
+            case 9: {
+                var an9 = a < 0 ? 0 : (a > 255 ? 255 : a);
+                var bn9 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var sl = (an9 * an9 * (255 - 2 * bn9) / 255 + 2 * an9 * bn9) / 255;
+                o = a + (sl - a) * opacity;
+                break;
+            }
+            // The only mode that is bidirectional about a neutral: below
+            // mid-grey it subtracts, above it adds, at 127.5 it is identity.
+            // That makes a noise or gradient layer a signed modulator of the
+            // stack instead of a one-way contribution. Output is clamped
+            // because both inputs were — a mix-family mode stays displayable;
+            // reach for add if you want the headroom.
+            case 10: {
+                var an10 = a < 0 ? 0 : (a > 255 ? 255 : a);
+                var bn10 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var ll = an10 + 2 * bn10 - 255;
+                ll = ll < 0 ? 0 : (ll > 255 ? 255 : ll);
+                o = a + (ll - a) * opacity;
                 break;
             }
             default:

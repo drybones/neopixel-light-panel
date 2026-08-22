@@ -43,6 +43,41 @@ test('blend math matches hand-computed values', () => {
         { mode: BLEND.overlay, a: 0, b: 200, op: 1.0, expect: 0 },
         { mode: BLEND.overlay, a: 255, b: 50, op: 1.0, expect: 255 },
         { mode: BLEND.overlay, a: 64, b: 128, op: 1.0, expect: 2 * 64 * 128 / 255 },
+
+        // Subtract mirrors add: opacity is a source gain, not a mix, and the
+        // result is left unclamped so an add above it can bring it back.
+        { mode: BLEND.subtract, a: 200, b: 50, op: 1.0, expect: 150 },
+        { mode: BLEND.subtract, a: 200, b: 50, op: 0.5, expect: 175 },
+        { mode: BLEND.subtract, a: 100, b: 200, op: 1.0, expect: -100 },
+
+        // Difference with white is an invert — the property that makes this
+        // the cheap route to a mask, and the reason `a` is clamped first.
+        { mode: BLEND.difference, a: 200, b: 255, op: 1.0, expect: 55 },
+        { mode: BLEND.difference, a: 60, b: 200, op: 1.0, expect: 140 },
+        { mode: BLEND.difference, a: 200, b: 60, op: 1.0, expect: 140 },
+        { mode: BLEND.difference, a: 90, b: 90, op: 1.0, expect: 0 },
+
+        { mode: BLEND.lighten, a: 100, b: 200, op: 1.0, expect: 200 },
+        { mode: BLEND.lighten, a: 200, b: 100, op: 1.0, expect: 200 },
+        { mode: BLEND.lighten, a: 100, b: 200, op: 0.5, expect: 150 },
+        { mode: BLEND.darken, a: 100, b: 200, op: 1.0, expect: 100 },
+        { mode: BLEND.darken, a: 200, b: 100, op: 1.0, expect: 100 },
+
+        // Soft light pivots on mid-grey: 127.5 is identity, black squares the
+        // backdrop, white is its complement. Both rails stay put.
+        { mode: BLEND.soft_light, a: 160, b: 127.5, op: 1.0, expect: 160 },
+        { mode: BLEND.soft_light, a: 160, b: 0, op: 1.0, expect: 160 * 160 / 255 },
+        { mode: BLEND.soft_light, a: 160, b: 255, op: 1.0, expect: 2 * 160 - 160 * 160 / 255 },
+        { mode: BLEND.soft_light, a: 0, b: 200, op: 1.0, expect: 0 },
+        { mode: BLEND.soft_light, a: 255, b: 40, op: 1.0, expect: 255 },
+
+        // Linear light is signed about the same pivot, and clamps because a
+        // mix-family mode has to stay displayable.
+        { mode: BLEND.linear_light, a: 128, b: 127.5, op: 1.0, expect: 128 },
+        { mode: BLEND.linear_light, a: 128, b: 160, op: 1.0, expect: 193 },
+        { mode: BLEND.linear_light, a: 128, b: 100, op: 1.0, expect: 73 },
+        { mode: BLEND.linear_light, a: 100, b: 255, op: 1.0, expect: 255 },
+        { mode: BLEND.linear_light, a: 100, b: 0, op: 1.0, expect: 0 },
     ];
     for (const c of cases) {
         const dst = new Float32Array([c.a, c.a, c.a]);
@@ -53,16 +88,97 @@ test('blend math matches hand-computed values', () => {
     }
 });
 
-test('negative source values are clamped for multiply/screen/overlay but pass through add', () => {
-    for (const mode of [BLEND.multiply, BLEND.screen, BLEND.overlay]) {
+const MIX_MODES = [
+    BLEND.multiply, BLEND.screen, BLEND.overlay, BLEND.difference,
+    BLEND.lighten, BLEND.darken, BLEND.soft_light, BLEND.linear_light,
+];
+const GAIN_MODES = [BLEND.add, BLEND.subtract];
+
+test('negative source values are clamped by the mix family but pass through the gain family', () => {
+    for (const mode of MIX_MODES) {
         const dst = new Float32Array([100, 100, 100]);
         const src = new Float32Array([-50, -50, -50]);
         blendInto(dst, src, mode, 1.0, 1);
         assert.ok(dst[0] >= 0, `mode ${mode} produced negative output ${dst[0]}`);
     }
+    const add = new Float32Array([100, 100, 100]);
+    blendInto(add, new Float32Array([-50, -50, -50]), BLEND.add, 1.0, 1);
+    assert.strictEqual(add[0], 50);
+    const sub = new Float32Array([100, 100, 100]);
+    blendInto(sub, new Float32Array([-50, -50, -50]), BLEND.subtract, 1.0, 1);
+    assert.strictEqual(sub[0], 150);
+});
+
+// Multiply is the one mix-family mode that does not clamp the backdrop, and
+// that is deliberate: a*255/255 is a at any magnitude, so multiplying by white
+// carries headroom through where every other mix mode discards it. Pinning
+// both halves here so neither gets "tidied" into the other.
+test('multiply alone carries headroom through the mix family', () => {
+    const keep = new Float32Array([400, 400, 400]);
+    blendInto(keep, new Float32Array([255, 255, 255]), BLEND.multiply, 1.0, 1);
+    assert.ok(Math.abs(keep[0] - 400) < 1e-3, `multiply by white gave ${keep[0]}, want 400`);
+
+    for (const mode of MIX_MODES.filter((m) => m !== BLEND.multiply)) {
+        const dst = new Float32Array([400, 400, 400]);
+        blendInto(dst, new Float32Array([180, 180, 180]), mode, 1.0, 1);
+        assert.ok(dst[0] >= 0 && dst[0] <= 255,
+            `mode ${mode} left ${dst[0]} outside 0-255 from an over-range backdrop`);
+    }
+});
+
+test('every mode is a no-op at opacity 0', () => {
+    for (const mode of Object.values(BLEND)) {
+        const dst = new Float32Array([137, 137, 137]);
+        blendInto(dst, new Float32Array([211, 211, 211]), mode, 0, 1);
+        assert.strictEqual(dst[0], 137, `mode ${mode} moved the composite at opacity 0`);
+    }
+});
+
+// The gain family is what keeps headroom recoverable: a subtract that drives
+// the composite under zero must not have destroyed the light an add above it
+// puts back. This is the one behaviour that would silently regress if
+// subtract were ever "tidied up" to clamp at 0 per layer.
+test('subtract below add round-trips through negative territory', () => {
     const dst = new Float32Array([100, 100, 100]);
-    blendInto(dst, new Float32Array([-50, -50, -50]), BLEND.add, 1.0, 1);
-    assert.strictEqual(dst[0], 50);
+    blendInto(dst, new Float32Array([180, 180, 180]), BLEND.subtract, 1.0, 1);
+    assert.strictEqual(dst[0], -80);
+    blendInto(dst, new Float32Array([180, 180, 180]), BLEND.add, 1.0, 1);
+    assert.strictEqual(dst[0], 100);
+});
+
+// Soft light and linear light both pivot on mid-grey, and a layer sitting
+// exactly there must leave the stack alone at any backdrop level. A pivot
+// off by even half a byte reads as a whole-panel tint.
+test('soft light and linear light are identity at mid-grey', () => {
+    for (const mode of [BLEND.soft_light, BLEND.linear_light]) {
+        for (const a of [0, 40, 128, 200, 255]) {
+            const dst = new Float32Array([a, a, a]);
+            blendInto(dst, new Float32Array([127.5, 127.5, 127.5]), mode, 1.0, 1);
+            assert.ok(Math.abs(dst[0] - a) < 1e-3,
+                `mode ${mode} shifted ${a} to ${dst[0]} against a mid-grey source`);
+        }
+    }
+});
+
+// Channels are independent for every mode — no mode may read one channel to
+// decide another, which is exactly the property that rules out hue/saturation
+// modes being added to this switch.
+test('blend modes treat channels independently', () => {
+    for (const mode of Object.values(BLEND)) {
+        const together = new Float32Array([30, 150, 240]);
+        blendInto(together, new Float32Array([200, 90, 12]), mode, 0.7, 1);
+        const apart = [
+            [30, 200], [150, 90], [240, 12],
+        ].map(([a, b]) => {
+            const d = new Float32Array([a, a, a]);
+            blendInto(d, new Float32Array([b, b, b]), mode, 0.7, 1);
+            return d[0];
+        });
+        for (let c = 0; c < 3; c++) {
+            assert.ok(Math.abs(together[c] - apart[c]) < 1e-3,
+                `mode ${mode} channel ${c}: ${together[c]} vs ${apart[c]} in isolation`);
+        }
+    }
 });
 
 test('solid layer renders through compositor to the client', () => {

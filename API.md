@@ -9,7 +9,7 @@ All endpoints use JSON for request/response bodies unless noted. CORS is enabled
 The panel plays one **scene** at a time. A scene is an ordered stack of **layers**; each layer is an instance of an **effect** with its own parameters, blend mode and opacity. Layers composite bottom→top (`layers[0]` is the bottom of the stack), like image-editor layers.
 
 - Scene and layer IDs are 8-character hex strings (the first segment of a UUID v4). Generate them yourself when creating layers client-side.
-- Blend modes: `normal`, `add`, `multiply`, `screen`, `overlay`. Opacity is `0..1`, applied after the blend.
+- Blend modes: `normal`, `add`, `screen`, `lighten`, `subtract`, `multiply`, `darken`, `difference`, `overlay`, `soft_light`, `linear_light` — see [Blend modes](#blend-modes). Opacity is `0..1`. An unknown mode is stored as `normal`.
 - `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render.
 - "Off" is not a scene: set the active scene to `null`.
 
@@ -308,6 +308,65 @@ Three things worth knowing before trusting the numbers:
 Previews are unaffected: the WebSocket stream serialises the compositor's composite, which is pre-brightness and pre-limiter, so the UI stays a pre-fader meter and only the panel dims.
 
 ---
+
+## Blend modes
+
+Each layer blends into the composite of everything below it, per channel, in
+gamma-encoded 0–255 space (`fcserver.json` applies `gamma: 2.5` afterwards, so
+these are *encoded* arithmetic, not linear light mixing). The composite starts
+at black, which is what makes the "bottom of the stack" column below matter.
+
+The modes fall into two families, and the family decides what `opacity` means:
+
+- **Gain** (`add`, `subtract`) — opacity scales the layer, and nothing is
+  clamped. The composite may run past 255 or below 0; only `setPixel` clips, at
+  the very end. An `add` above a `subtract` recovers what the subtract buried.
+- **Mix** (everything else) — opacity lerps from the composite toward the
+  blended result. A mix layer at opacity 1 discards headroom below it
+  (`multiply` excepted: ×white is identity at any magnitude).
+
+`A` is the composite below, `B` the layer, both as 0–1:
+
+| Mode | Result | No-op when the layer is | At the bottom of a stack |
+|---|---|---|---|
+| `normal` | `B` | — | the layer |
+| `add` | `A + B` | black | the layer |
+| `screen` | `1 − (1−A)(1−B)` | black | the layer |
+| `lighten` | `max(A, B)` | black | the layer |
+| `subtract` | `A − B` | black | **black** — nothing to take light from |
+| `multiply` | `A·B` | white | **black** |
+| `darken` | `min(A, B)` | white | **black** |
+| `difference` | `\|A − B\|` | black | the layer |
+| `overlay` | `A<½: 2AB`, else `1−2(1−A)(1−B)` | mid-grey | **black** |
+| `soft_light` | `(1−2B)A² + 2AB` | mid-grey | **black** |
+| `linear_light` | `A + 2B − 1`, clamped | mid-grey | the layer's top half only |
+
+Notes on the ones that are easy to reach for wrongly:
+
+- **`add` vs `screen` vs `lighten`** are three different unions. `add` is the
+  only one that keeps headroom, and the only one that blows out. `screen`
+  saturates smoothly toward white and never exceeds it. `lighten` is the one
+  that combines two layers without either brightening the other at all — the
+  right choice when two effects overlap and you want each to keep its own
+  colour in the region it wins.
+- **`subtract`** is the only mode that removes light, and the only reason a
+  layer can act as a shadow. Because it is unclamped, an over-subtracted region
+  is still recoverable by an `add` above it; it is *not* recoverable by a mix
+  mode, which clamps the negative away.
+- **`difference` against white is an invert**, which is the cheapest route to a
+  mask this stack has: a `text` layer with white ink on a black ground, on
+  `difference` at the top, punches its letters out as a negative without the
+  layer needing a `background` param of its own (contrast the
+  [negative-mask recipe](#using-it-as-a-negative-mask), which needs both).
+- **`linear_light`** is the signed modulator. Below mid-grey it subtracts,
+  above it adds, at mid-grey it does nothing — so a `noise` layer with a ramp
+  from black to white becomes a bidirectional brightness wobble over the stack
+  rather than a one-way contribution. This is the mode most worth trying on a
+  layer you would otherwise have set to `add` at low opacity.
+- **`overlay` and `soft_light` want a lit backdrop.** Both pivot on mid-grey,
+  and LED scenes are mostly near-black, so on a dark stack both branches
+  collapse toward zero and the layer reads as doing nothing. They earn their
+  place above a `solid` or a bright `gradient`, not above an `emitter`.
 
 ## Wavelet parameters
 
