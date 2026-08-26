@@ -163,17 +163,30 @@ module.exports = {
         var mask = null;
         var resolved = '';
         var resolvedAt = null;
+        var resolvedFrom = null;
 
         return {
             render(out, millis, p) {
-                if (p.tokenMs === 0) {
-                    resolved = p.text;
-                } else {
-                    var bucket = Math.floor(millis / p.tokenMs);
-                    if (bucket !== resolvedAt) {
-                        resolved = raster.resolveTokens(p.text, millis);
-                        resolvedAt = bucket;
-                    }
+                // The resolution cache is keyed on the *source* string as well
+                // as the clock bucket, and both halves are load-bearing. The
+                // bucket alone is what a clock needs — {ss} re-resolves once a
+                // second and {HH} once a minute — but it makes the source
+                // string invisible to the cache, so a keystroke landing inside
+                // the bucket a token last resolved in never re-resolves and the
+                // layer keeps rendering the old line. tokenPeriod() is a minute
+                // for every token but {ss}/{s}, so that is up to 60s of typing
+                // into a panel that does not change and then catches up all at
+                // once, which reads as a flaky layer rather than a stale cache.
+                // The source string alone is not enough either: it is the same
+                // string every frame while a clock ticks. Note the bucket has to
+                // be reset on the token-free path too — otherwise removing a
+                // token and putting it back inside one minute leaves a stale
+                // bucket matching, and the layer renders neither string.
+                var bucket = p.tokenMs === 0 ? 0 : Math.floor(millis / p.tokenMs);
+                if (bucket !== resolvedAt || p.text !== resolvedFrom) {
+                    resolved = p.tokenMs === 0 ? p.text : raster.resolveTokens(p.text, millis);
+                    resolvedAt = bucket;
+                    resolvedFrom = p.text;
                 }
                 var key = p.font + '|' + p.tracking + '|' + resolved;
                 if (key !== maskKey) {

@@ -902,6 +902,56 @@ test('static text allocates no new mask once it is laid out', () => {
     assert.notDeepStrictEqual(Array.from(out), first, 'a changed string must rebuild the mask');
 });
 
+// The regression the resolution cache's source-string key defends against.
+// Keying it on the clock bucket alone made an edit invisible for as long as the
+// bucket lasted — a minute for every token but {ss}/{s} — so the layer sat on
+// the line it resolved first while the text kept being typed, then caught up in
+// one jump when the minute rolled over.
+test('an edit to a string holding a clock token takes effect immediately', () => {
+    const ctx = panelCtx();
+    const instance = text.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+    const at = new Date(2026, 7, 17, 10, 15, 0).getTime();
+    const render = (s, millis) => {
+        instance.render(out, millis, text.prepare({ ...text.defaults, text: s, softness: 0 }));
+        return Array.from(out);
+    };
+
+    // {DD} is a minute-period token, so all three renders share one bucket.
+    const day = render('{DD}', at);
+    assert.notDeepStrictEqual(render('{DD} X', at + 50), day,
+        'a keystroke inside the token period must re-resolve');
+    assert.notDeepStrictEqual(render('{DD} XYZ', at + 100), day);
+
+    // And the resolved value is still the right one, not merely a different
+    // one: it must match what a fresh instance renders for the same string.
+    const fresh = new Float32Array(ctx.numPixels * 3);
+    text.createInstance(ctx).render(fresh,
+        at + 100, text.prepare({ ...text.defaults, text: '{DD} XYZ', softness: 0 }));
+    assert.deepStrictEqual(render('{DD} XYZ', at + 100), Array.from(fresh));
+});
+
+// The nastier half of the same bug: the token-free path used to leave the bucket
+// behind, so a token removed and put back inside one minute matched a stale
+// bucket and the layer rendered the string in between — not a prefix of what was
+// typed, but arbitrary earlier content.
+test('a clock token removed and restored inside its period still re-resolves', () => {
+    const ctx = panelCtx();
+    const instance = text.createInstance(ctx);
+    const out = new Float32Array(ctx.numPixels * 3);
+    const at = new Date(2026, 7, 17, 10, 15, 0).getTime();
+    const render = (s, millis) => {
+        instance.render(out, millis, text.prepare({ ...text.defaults, text: s, softness: 0 }));
+        return Array.from(out);
+    };
+
+    const clock = render('{HH}', at);
+    const plain = render('HELLO', at + 50);
+    assert.notDeepStrictEqual(plain, clock);
+    assert.deepStrictEqual(render('{HH}', at + 100), clock,
+        'restoring the token must render the clock again, not the string it replaced');
+});
+
 // The compatibility guarantee for every layer already stored: the background
 // lerp has to reduce to exactly what scaling the ink alone used to produce.
 test('a black background renders identically to scaling the ink alone', () => {
