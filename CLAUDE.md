@@ -36,7 +36,7 @@ npm run dev            # alias for VIRTUAL=1 node app.js
 npm test               # node:test suite (node --test)
 ```
 
-The deployed Raspberry Pi runs **Node 14** (`lightpanel.service`) — keep server runtime code to ES2019 (no `?.`/`??` in `packages/server/` outside tests).
+The deployed Raspberry Pi runs **Node 24** on Raspberry Pi OS (Debian 13/Trixie, 64-bit) via `lightpanel.service`, reprovisioned from the old Node 14/Buster setup in 2026-08 — server runtime code is no longer restricted to ES2019.
 
 ## Server Architecture (`packages/server/`)
 

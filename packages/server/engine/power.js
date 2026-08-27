@@ -35,8 +35,6 @@
  *   k = s^(1/gamma). WLED's linear rescale would over-dim hard here: needing
  *   66% of the current means k = 0.845 (white at byte ~215), where a linear
  *   factor would drop it to ~168.
- *
- * Node 14 on the Pi: ES2019 only, no ?. or ?? in here.
  */
 
 // Same line frame-stats draws for "nothing has rendered lately". It is the

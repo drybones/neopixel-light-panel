@@ -31,7 +31,7 @@ If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL
 
 ## Prerequisites
 
-- Node.js 16+ (14 is supported but 16+ recommended)
+- Node.js 18+ (the deployed Pi runs Node 24; the old Node 14 constraint no longer applies)
 - npm 7+ (for workspace support)
 
 For hardware mode only:
