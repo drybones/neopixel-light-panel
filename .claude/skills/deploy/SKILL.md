@@ -1,9 +1,11 @@
 ---
 name: deploy
-description: Resync and deploy the light panel to the Raspberry Pi (blinky) — builds and rsyncs the UI, pulls server changes, restarts the service, verifies, then offers to clean up stale branches. Use when the user asks to "deploy", "resync and deploy", "push to the pi/panel", or similar.
+description: Deploy the light panel to the Raspberry Pi (blinky) — pulls, builds the UI on the Pi, restarts the service, verifies, then offers to clean up stale branches. Use when the user asks to "deploy", "resync and deploy", "push to the pi/panel", or similar.
 ---
 
-Deploy both the UI and server to the Pi (`blinky`). Run the steps below directly instead of re-deriving the process — this sequence has been rehearsed and verified end-to-end.
+Deploy the light panel to the Pi (`blinky`). Run the steps below directly instead of re-deriving the process — this sequence has been rehearsed and verified end-to-end.
+
+The UI and server deploy the same way now: the Pi does `git pull` against `origin/master` and builds the UI itself (blinky moved off Node 14/Buster to Node 24/Trixie in 2026-08 — see `CLAUDE.md`). There's no Mac-side build or rsync step anymore, so nothing here can drift from what's on GitHub.
 
 ## 0. Bail out if not running from the CLI
 
@@ -17,15 +19,18 @@ If `CLAUDE_CODE_ENTRYPOINT=cli`, proceed.
 
 ## 1. Check local branch status
 
-`npm run deploy` builds the UI from whatever's on disk locally, but the server is updated separately via `git pull` on the Pi against `origin/master` — the two are not guaranteed to match. Check before building:
+The Pi builds only from `origin/master`, so anything not pushed and merged there simply won't deploy. Check before running:
 
 ```
 git status --short
 git branch --show-current
 ```
 
-- **Uncommitted changes**: STOP and ask the user before proceeding. The build would bake them in, but they aren't on GitHub and can't be reproduced later.
-- **On `master`**: proceed straight to the build.
+- **Uncommitted changes**: STOP and tell the user — deploying now won't include them; they'd need to commit and push (and merge, per this repo's PR workflow) first.
+- **On `master`**: make sure it's up to date before deploying:
+  ```
+  git fetch origin && git pull
+  ```
 - **On a feature branch**: check whether it's fully merged —
 
   ```
@@ -33,37 +38,18 @@ git branch --show-current
   git merge-base --is-ancestor HEAD origin/master && echo merged || echo unmerged
   ```
 
-  - **Merged** (exit 0 / `merged`): no unique work sits on the branch, so switch and build without waiting for confirmation:
-    ```
-    git checkout master && git pull
-    ```
-  - **Unmerged** (`unmerged`): the branch has commits not yet in `master`. STOP and ask the user before proceeding — deploying would build UI from code the server's `git pull` won't have, and switching to `master` on your say-so would leave unmerged work behind silently.
+  - **Merged** (exit 0 / `merged`): no unique work sits on the branch — deploying `origin/master` is equivalent, proceed.
+  - **Unmerged** (`unmerged`): the branch has commits not yet in `origin/master`. STOP and ask the user before proceeding — deploying right now would build whatever's currently on `origin/master`, not this branch.
 
-## 2. Build UI and rsync to the Pi
+## 2. Deploy
 
 ```
 npm run deploy
 ```
 
-Run from the repo root. This builds `packages/ui` and rsyncs `dist/` to the Pi. **This is the only thing the deploy script covers** — it does not touch the server.
+Run from the repo root. This runs `scripts/deploy-pi.sh`, which SSHes to the Pi (passwordless via the `blinky` SSH host alias) and does the whole thing: `git pull`, `npm install`, `npm run build --workspace=packages/ui`, then `sudo systemctl restart lightpanel`. The restart briefly interrupts whatever's live on the physical panel — it runs anyway without pausing to confirm; the user has explicitly said not to ask about that step.
 
-## 3. Pull server-side changes on the Pi
-
-```
-ssh blinky "cd /home/pi/github/neopixel-light-panel && git pull"
-```
-
-Passwordless via the `blinky` SSH host alias.
-
-## 4. Restart the server
-
-```
-ssh blinky "sudo systemctl restart lightpanel"
-```
-
-This briefly interrupts whatever's live on the physical panel — restart anyway without pausing to confirm; the user has explicitly said not to ask about this step.
-
-## 5. Verify
+## 3. Verify
 
 Don't just trust that the commands above exited cleanly — check the running state:
 
@@ -75,7 +61,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://blinky.local:3000/   # expect 20
 
 Report the results (hardware mode, active scene, UI status code) to the user.
 
-## 6. Check for stale branches and offer cleanup
+## 4. Check for stale branches and offer cleanup
 
 After the deploy is verified, check for branches that are safe to delete:
 
