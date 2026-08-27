@@ -1,7 +1,9 @@
 {
   "name": "neopixel-light-panel",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently -n server,ui \"npm run dev --workspace=packages/server\" \"npm start --workspace=packages/ui\"",
     "start": "npm start --workspace=packages/server",
@@ -9,9 +11,5 @@
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
-  },
-  "overrides": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
   }
 }

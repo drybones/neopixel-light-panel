@@ -57,6 +57,16 @@ function makeContext(canvas) {
       if (!methods.has(key)) {
         methods.set(key, (...args) => {
           calls.push({ name: key, args, state: { ...props } });
+          // The gradient factories hand back an object the caller then calls
+          // addColorStop on — returning undefined would throw inside the
+          // component rather than record anything. Its stops are recorded too,
+          // since for the `bands` dial they are the drawing.
+          if (key === 'createLinearGradient' || key === 'createRadialGradient'
+            || key === 'createConicGradient') {
+            const stops = [];
+            calls.push({ name: `${key}:stops`, args: stops, state: { ...props } });
+            return { addColorStop: (offset, color) => stops.push([offset, color]) };
+          }
           // createImageData/getImageData would need real pixels; nothing in
           // the components under test reads one back.
           return undefined;
