@@ -8,7 +8,7 @@
     "deploy": "bash scripts/deploy-pi.sh"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0"
+    "concurrently": "^10.0.5"
   },
   "overrides": {
     "react": "^18.3.1",
