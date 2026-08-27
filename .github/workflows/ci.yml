@@ -7,6 +7,7 @@ on:
     branches: [master]
 
 jobs:
+  # Fast signal: replays the lockfile verbatim and runs the suites.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -22,5 +23,59 @@ jobs:
       - run: npm test --workspace=packages/server
 
       - run: npm test --workspace=packages/ui
+
+      - run: npm run build --workspace=packages/ui
+
+  # What `test` cannot answer. It runs `npm ci` on linux-x64; the Pi runs
+  # `npm install` on linux-arm64 (scripts/deploy-pi.sh). Those differ in both
+  # axes that have bitten:
+  #
+  #   - `npm ci` replays a lockfile verbatim, `npm install` re-resolves it. A
+  #     lockfile that is internally inconsistent passes `npm ci` and can still
+  #     change shape on the Pi — the state Dependabot's #70 would have merged.
+  #   - native binaries are per-platform, so nothing about rolldown/oxc or
+  #     lightningcss on aarch64 (#81) is visible from an x64 job at all.
+  #
+  # arm64 runners are free for public repos, so mirroring the deploy path costs
+  # one job. Ubuntu 24.04 is glibc 2.39 against the Pi's Debian 13 / glibc 2.41
+  # — the conservative direction, since a binary that links here also links
+  # there. Close, not identical: this is a pre-deploy signal, not a substitute
+  # for `npm run deploy`.
+  pi-path:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # Node 24 bundles npm 11.x, as the Pi runs (11.19.0) — so the allowScripts
+      # policy that leaves esbuild's postinstall unrun applies in both places.
+      - run: npm install --no-audit --no-fund
+
+      - name: Lockfile must survive a re-resolve
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            echo "::error file=package-lock.json::npm install re-resolved the lockfile. It is committed in a state npm does not agree with, so the Pi would install a different tree than CI tested. Run 'npm install' locally and commit the result."
+            git diff --stat -- package-lock.json
+            git diff -- package-lock.json | head -100
+            exit 1
+          fi
+          echo "Lockfile unchanged by npm install."
+
+      # #78 installed three copies of vite and went green; npm ci had no reason
+      # to complain, and nothing else would have noticed.
+      - name: Exactly one copy of vite
+        run: |
+          copies=$(find . -type d -path '*/node_modules/vite' | sort)
+          n=$(printf '%s' "$copies" | grep -c '^' || true)
+          if [ "$n" -ne 1 ]; then
+            echo "::error::expected exactly one node_modules/vite, found $n:"
+            printf '%s\n' "$copies"
+            exit 1
+          fi
+          printf 'One copy of vite: %s\n' "$copies"
 
       - run: npm run build --workspace=packages/ui
