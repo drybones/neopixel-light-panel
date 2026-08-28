@@ -65,6 +65,18 @@ var color = require('./color');
  * and the pair compose: an add above a subtract recovers exactly what the
  * subtract buried. For every other mode it lerps from the raw accumulator
  * toward the blended result.
+ *
+ * Two modes are worth knowing by behaviour rather than by formula. `difference`
+ * against white is an invert, which is the cheapest mask this stack has. And
+ * `overlay`/`soft_light` pivot on mid-grey, so over the near-black backdrops
+ * LED scenes actually have, both collapse toward zero and read as doing
+ * nothing — they belong above a `solid`, not above an `emitter`.
+ *
+ * THE MODE LIST IS DUPLICATED, unlike effects, which the UI discovers from
+ * /api/effects: this map and BLEND_GROUPS in the UI's ParamPanel.jsx. A mode
+ * missing from that list is simply unreachable from the UI with nothing to
+ * tell you, and a mode listed there that this map lacks falls back to
+ * `normal` on write.
  */
 
 var BLEND = {
@@ -120,6 +132,8 @@ function blendInto(dst, src, mode, opacity, n) {
             case 5:
                 o = a - b * opacity;
                 break;
+            // Against white this is an invert — the cheapest mask available
+            // here, and the reason the mode earns its case.
             case 6: {
                 var an6 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn6 = b < 0 ? 0 : (b > 255 ? 255 : b);
