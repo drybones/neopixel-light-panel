@@ -748,6 +748,31 @@ label.settings-row { cursor: pointer; }
   color: var(--text);
 }
 
+/* Multi-row segmented control (blend modes). One flex item beside the label,
+   so the first row lands in the same column as every other param's control
+   rather than being wrapped below it; min-width: 0 lets it shrink and wrap
+   inside that column instead of pushing the row over. */
+.segmented-groups {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+/* The label sits against the FIRST row, not centred on the block — centred,
+   it drifts down the taller the control gets and stops reading as the label
+   of the row it starts. min-height is one segmented item's own height (a
+   12px line box, 5px padding and a 1px border, top and bottom), so the label
+   centres on that row and the two text baselines meet however many rows
+   follow. */
+.control-row--groups { align-items: flex-start; }
+.control-row--groups .control-label {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+}
+
 /* Text control — the line the text effect renders. Full width rather than the
    value column's width: a marquee is a sentence, and the hint under it is the
    only place the clock tokens are written down. */

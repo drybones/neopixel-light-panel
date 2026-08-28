@@ -93,6 +93,24 @@ test('walks the schema and renders a control for every entry type', () => {
   expect(container.querySelector('.xy-pad')).toBeTruthy();
 });
 
+test('the blend modes render as grouped rows inside the control column', () => {
+  // The eleven modes on one flat row overflowed .control-row's wrap, which
+  // dropped the whole control below its label and back to the page margin.
+  // Rows are what keep the first group beside the label, so the count of
+  // rows matters as much as the count of modes: a group emptied or merged by
+  // a later edit is exactly the regression.
+  const { container } = renderPanel();
+  const groups = container.querySelector('.segmented-groups');
+  expect(groups).toBeTruthy();
+  const rows = [...groups.children];
+  expect(rows.length).toBe(3);
+  expect(rows.every((r) => r.classList.contains('segmented'))).toBe(true);
+  expect(rows.every((r) => r.children.length > 0)).toBe(true);
+  expect(groups.querySelectorAll('.segmented-item').length).toBe(11);
+  // the selected mode still reads back, wherever in the groups it sits
+  expect(screen.getByText('Add').classList.contains('segmented-item--on')).toBe(true);
+});
+
 test('the pad inside the panel acquires a context', () => {
   // The pad is the one control that paints, and it is wired to the stream
   // through the panel rather than directly — so mounting it this way is what
