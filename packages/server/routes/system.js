@@ -64,7 +64,7 @@ function createRouter(deps) {
 
     /*
      * Power meter and limiter. The estimate lives in the pixel sink alongside
-     * global brightness — the one place values are post-brightness, clamped, and
+     * global brightness — the one place values are clamped, post-brightness, and
      * about to become the bytes Fadecandy receives — so, like brightness, it is
      * configured on the client rather than plumbed through the compositor.
      *

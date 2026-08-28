@@ -104,9 +104,21 @@ class OPC {
         // Bytes taken once and reused, so the power estimate is summed over
         // exactly the values Fadecandy receives. `| 0` is what writeUInt8
         // would have done to the float anyway.
-        var rb = Math.max(0, Math.min(255, (r | 0) * this.brightness)) | 0;
-        var gb = Math.max(0, Math.min(255, (g | 0) * this.brightness)) | 0;
-        var bb = Math.max(0, Math.min(255, (b | 0) * this.brightness)) | 0;
+        //
+        // THE CLAMP COMES FIRST, then brightness (issue #92). Multiplying
+        // first would leave the over-range values in play and let the fader
+        // pull them back down into range, so a region the compositor left at
+        // 510 would sit pinned at full white until brightness dropped below
+        // 0.5 while its neighbours scaled from the start — the fader acting
+        // as an exposure control over an HDR buffer rather than as a level.
+        // Clamping first discards the headroom here, where it stops being
+        // light and starts being bytes, so brightness is a linear scale on
+        // the finished frame. The product needs no second clamp: the value
+        // is already in range and brightness is clamped to 0–1 on both ways
+        // in (routes/system.js and SettingsStore.load).
+        var rb = (Math.max(0, Math.min(255, r | 0)) * this.brightness) | 0;
+        var gb = (Math.max(0, Math.min(255, g | 0)) * this.brightness) | 0;
+        var bb = (Math.max(0, Math.min(255, b | 0)) * this.brightness) | 0;
 
         this.pixelBuffer.writeUInt8(rb, offset);
         this.pixelBuffer.writeUInt8(gb, offset + 1);

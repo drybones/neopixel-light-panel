@@ -10,6 +10,11 @@
  * client.pixelBuffer also sidesteps the 4-byte OPC header that hardware
  * buffers carry and virtual ones don't.)
  *
+ * Since #92 the sink clamps before it multiplies, which makes that meter
+ * exact rather than merely useful: clamp255 here and the sink's ceiling
+ * are the same operation, so the panel is this preview scaled by the
+ * fader, and nothing appears on one that cannot appear on the other.
+ *
  * v1 protocol (default): bare [[r,g,b], ...] JSON frames of the
  * composite, throttled to ~30 fps. New connections get the last frame
  * immediately so the UI never shows a stale canvas (e.g. after "off").

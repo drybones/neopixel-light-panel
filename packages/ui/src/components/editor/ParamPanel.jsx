@@ -9,12 +9,26 @@ import GradientStopsEditor from '../controls/GradientStopsEditor';
 import TextControl from '../controls/TextControl';
 import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 
+// Mirrors BLEND in the server's engine/compositor.js. Unlike effects, blend
+// modes are not discovered from the API, so this list has to be kept in step
+// by hand — a mode missing here is simply unreachable from the UI, and a mode
+// listed here that the server doesn't know falls back to `normal` on write.
+// Ordered by what the mode does to the stack, not by the server's ids: the
+// ones that only add light, the ones that only remove it, then the ones that
+// go both ways. The list wraps onto as many lines as the panel's width needs;
+// nothing here decides where the breaks fall.
 const BLEND_OPTIONS = [
   { value: 'normal', label: 'Normal' },
   { value: 'add', label: 'Add' },
-  { value: 'multiply', label: 'Multiply' },
   { value: 'screen', label: 'Screen' },
+  { value: 'lighten', label: 'Lighten' },
+  { value: 'subtract', label: 'Subtract' },
+  { value: 'multiply', label: 'Multiply' },
+  { value: 'darken', label: 'Darken' },
+  { value: 'difference', label: 'Difference' },
   { value: 'overlay', label: 'Overlay' },
+  { value: 'soft_light', label: 'Soft Light' },
+  { value: 'linear_light', label: 'Linear Light' },
 ];
 
 // Schema-driven editor for the selected layer. Every effect gets blend +

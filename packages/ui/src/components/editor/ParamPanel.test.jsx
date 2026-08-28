@@ -93,6 +93,23 @@ test('walks the schema and renders a control for every entry type', () => {
   expect(container.querySelector('.xy-pad')).toBeTruthy();
 });
 
+test('the blend modes render as one wrapping row in the control column', () => {
+  // Eleven modes on a flat row overflowed .control-row's wrap, which dropped
+  // the whole control below its label and back to the page margin. The
+  // modifier class is what keeps the wrapping inside the control column, so
+  // it is the part worth pinning — where the lines break is the panel's
+  // width's business and jsdom lays nothing out.
+  const { container } = renderPanel();
+  const row = container.querySelector('.control-row--enum .segmented[aria-label="Blend"]');
+  expect(row).toBeTruthy();
+  const items = [...row.querySelectorAll('.segmented-item')];
+  expect(items.length).toBe(11);
+  // ordered by what the mode does to the stack: adds light, removes it, both
+  expect(items.slice(0, 4).map((b) => b.textContent)).toEqual(['Normal', 'Add', 'Screen', 'Lighten']);
+  expect(items[10].textContent).toBe('Linear Light');
+  expect(screen.getByText('Add').classList.contains('segmented-item--on')).toBe(true);
+});
+
 test('the pad inside the panel acquires a context', () => {
   // The pad is the one control that paints, and it is wired to the stream
   // through the panel rather than directly — so mounting it this way is what

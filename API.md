@@ -9,7 +9,7 @@ All endpoints use JSON for request/response bodies unless noted. CORS is enabled
 The panel plays one **scene** at a time. A scene is an ordered stack of **layers**; each layer is an instance of an **effect** with its own parameters, blend mode and opacity. Layers composite bottom→top (`layers[0]` is the bottom of the stack), like image-editor layers.
 
 - Scene and layer IDs are 8-character hex strings (the first segment of a UUID v4). Generate them yourself when creating layers client-side.
-- Blend modes: `normal`, `add`, `multiply`, `screen`, `overlay`. Opacity is `0..1`, applied after the blend.
+- Blend modes: `normal`, `add`, `screen`, `lighten`, `subtract`, `multiply`, `darken`, `difference`, `overlay`, `soft_light`, `linear_light` — see [Blend modes](#blend-modes). Opacity is `0..1`. An unknown mode is stored as `normal`.
 - `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render.
 - "Off" is not a scene: set the active scene to `null`.
 
@@ -162,6 +162,8 @@ PUT /api/brightness/:value
 
 Global brightness, applied on top of all scenes. The UI maps sliders through an arctangent curve for perceptual uniformity, but the API value is linear.
 
+It is a **level control, not an exposure control**. The composite is unbounded (see [Blend modes](#blend-modes)), and the sink clamps each channel to 0–255 *before* multiplying by brightness — so a region a stack left at 510 is the same white as one at 255 and both scale together. The panel is therefore exactly the pre-fader preview, dimmed; brightness never changes how a scene looks relative to itself, only how bright it is.
+
 ---
 
 ### Export / import
@@ -308,6 +310,105 @@ Three things worth knowing before trusting the numbers:
 Previews are unaffected: the WebSocket stream serialises the compositor's composite, which is pre-brightness and pre-limiter, so the UI stays a pre-fader meter and only the panel dims.
 
 ---
+
+## Blend modes
+
+Each layer blends into the composite of everything below it, per channel, in
+gamma-encoded 0–255 space (`fcserver.json` applies `gamma: 2.5` afterwards, so
+these are *encoded* arithmetic, not linear light mixing). The composite starts
+at black, which is what makes the "bottom of the stack" column below matter.
+
+### The accumulator is unbounded
+
+The composite is **not** clamped between layers. Clamping to 0–255 is the pixel
+sink's job and only the sink's job. The over-range values are real accumulated
+light: `emitter` reaches ~765 and `particle_trail` ~1104 at their own defaults,
+because both sum every particle's contribution into the pixel without a ceiling.
+A three-particle overlap and a single hit genuinely differ, and a later
+`multiply` or partial-opacity layer can still recover that gradation.
+
+Headroom is invisible everywhere else: the sink clamps before it applies
+brightness (see [Brightness](#brightness)), so dimming the panel never reveals
+it, and previews clip at the same 255. A later layer reading the accumulator is
+the only thing that brings it back.
+
+The rule every mode obeys:
+
+> A blend may clamp its **source** operand where its formula needs a bounded
+> domain. No blend may clamp the **accumulator**.
+
+Whether a mode needs a guard at all is decided by one question: does its
+identity element still behave like one off the end of the range? Screening with
+black and multiplying by white are no-ops by definition, and a mode that turns
+one into a truncation would let a layer that is merely dark over part of the
+panel silently flatten everything beneath it.
+
+| | modes | why |
+|---|---|---|
+| **Unguarded** | `normal`, `add`, `subtract`, `multiply`, `linear_light` | identity holds at any magnitude — `a·255/255` is `a`, `a+0` is `a` |
+| **Guarded** | `screen`, `overlay`, `difference`, `lighten`, `darken`, `soft_light` | identity breaks off the end, so the formula needs a bounded domain |
+
+A guarded mode splits the accumulator into the part its formula is defined on
+(`an`, the clamped value) and the excess (`ex`, signed), blends the first and
+lets the second ride through untouched. This is a **strict no-op for an
+in-range accumulator**, so a scene that never overflowed is unaffected.
+
+`opacity` means two different things, deliberately. For the two gain modes
+(`add`, `subtract`) it scales the source and nothing is clamped, so the pair
+compose: an `add` above a `subtract` recovers exactly what the subtract buried.
+For every other mode it lerps from the accumulator toward the blended result.
+
+### The modes
+
+`A` is the composite below, `B` the layer, both as 0–1:
+
+| Mode | Result | No-op when the layer is | At the bottom of a stack |
+|---|---|---|---|
+| `normal` | `B` | — | the layer |
+| `add` | `A + B` | black | the layer |
+| `screen` | `1 − (1−A)(1−B)` | black | the layer |
+| `lighten` | `max(A, B)` | black | the layer |
+| `subtract` | `A − B` | black | **black** — nothing to take light from |
+| `multiply` | `A·B` | white | **black** |
+| `darken` | `min(A, B)` | white | **black** |
+| `difference` | `\|A − B\|` | black | the layer |
+| `overlay` | `A<½: 2AB`, else `1−2(1−A)(1−B)` | mid-grey | **black** |
+| `soft_light` | `(1−2B)A² + 2AB` | mid-grey | **black** |
+| `linear_light` | `A + 2B − 1` | mid-grey | the layer's top half only |
+
+Notes on the ones that are easy to reach for wrongly:
+
+- **`add` vs `screen` vs `lighten`** are three different unions. `add` is the
+  only one that builds headroom. `screen` saturates smoothly toward white and
+  never exceeds it. `lighten` is the one that combines two layers without
+  either brightening the other at all — the right choice when two effects
+  overlap and you want each to keep its own colour in the region it wins.
+- **`subtract`** is the only mode that removes light, and the only reason a
+  layer can act as a shadow. Because it is unclamped, an over-subtracted region
+  is still recoverable by an `add` above it.
+- **`difference` against white is an invert**, which is the cheapest route to a
+  mask this stack has: a `text` layer with white ink on a black ground, on
+  `difference` at the top, punches its letters out as a negative without the
+  layer needing a `background` param of its own (contrast the
+  [negative-mask recipe](#using-it-as-a-negative-mask), which needs both).
+- **`darken` caps the displayable part, not the headroom.** Over an accumulator
+  of 510, `darken` with a source of 100 gives 355, not 100 — the excess rides
+  through as it does for every guarded mode. It still clips to white at the
+  sink; the difference only shows if a later layer pulls it back into range.
+- **`linear_light`** is the signed modulator, and the only guarded-looking mode
+  that isn't: it adds `2B − 1` and never reads the accumulator at all, so below
+  mid-grey it subtracts, above it adds, and at mid-grey it does nothing. That
+  makes a `noise` layer ramped black-to-white a bidirectional brightness wobble
+  over the stack. It is the mode most worth trying on a layer you would
+  otherwise have set to `add` at low opacity.
+- **No hex colour sits exactly on the pivot.** `overlay`, `soft_light` and
+  `linear_light` are identity at 127.5, and `#808080` is 128 — so a "neutral
+  grey" solid on `linear_light` adds 1 per channel rather than nothing. Use
+  opacity, or a `solid` at `level` 0.5 of white, if an exact no-op matters.
+- **`overlay` and `soft_light` want a lit backdrop.** Both pivot on mid-grey,
+  and LED scenes are mostly near-black, so on a dark stack both branches
+  collapse toward zero and the layer reads as doing nothing. They earn their
+  place above a `solid` or a bright `gradient`, not above an `emitter`.
 
 ## Wavelet parameters
 
