@@ -93,21 +93,20 @@ test('walks the schema and renders a control for every entry type', () => {
   expect(container.querySelector('.xy-pad')).toBeTruthy();
 });
 
-test('the blend modes render as grouped rows inside the control column', () => {
-  // The eleven modes on one flat row overflowed .control-row's wrap, which
-  // dropped the whole control below its label and back to the page margin.
-  // Rows are what keep the first group beside the label, so the count of
-  // rows matters as much as the count of modes: a group emptied or merged by
-  // a later edit is exactly the regression.
+test('the blend modes render as one wrapping row in the control column', () => {
+  // Eleven modes on a flat row overflowed .control-row's wrap, which dropped
+  // the whole control below its label and back to the page margin. The
+  // modifier class is what keeps the wrapping inside the control column, so
+  // it is the part worth pinning — where the lines break is the panel's
+  // width's business and jsdom lays nothing out.
   const { container } = renderPanel();
-  const groups = container.querySelector('.segmented-groups');
-  expect(groups).toBeTruthy();
-  const rows = [...groups.children];
-  expect(rows.length).toBe(3);
-  expect(rows.every((r) => r.classList.contains('segmented'))).toBe(true);
-  expect(rows.every((r) => r.children.length > 0)).toBe(true);
-  expect(groups.querySelectorAll('.segmented-item').length).toBe(11);
-  // the selected mode still reads back, wherever in the groups it sits
+  const row = container.querySelector('.control-row--enum .segmented[aria-label="Blend"]');
+  expect(row).toBeTruthy();
+  const items = [...row.querySelectorAll('.segmented-item')];
+  expect(items.length).toBe(11);
+  // ordered by what the mode does to the stack: adds light, removes it, both
+  expect(items.slice(0, 4).map((b) => b.textContent)).toEqual(['Normal', 'Add', 'Screen', 'Lighten']);
+  expect(items[10].textContent).toBe('Linear Light');
   expect(screen.getByText('Add').classList.contains('segmented-item--on')).toBe(true);
 });
 

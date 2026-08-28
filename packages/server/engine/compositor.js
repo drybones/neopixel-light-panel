@@ -73,7 +73,7 @@ var color = require('./color');
  * nothing — they belong above a `solid`, not above an `emitter`.
  *
  * THE MODE LIST IS DUPLICATED, unlike effects, which the UI discovers from
- * /api/effects: this map and BLEND_GROUPS in the UI's ParamPanel.jsx. A mode
+ * /api/effects: this map and BLEND_OPTIONS in the UI's ParamPanel.jsx. A mode
  * missing from that list is simply unreachable from the UI with nothing to
  * tell you, and a mode listed there that this map lacks falls back to
  * `normal` on write.

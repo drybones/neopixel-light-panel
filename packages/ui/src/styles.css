@@ -748,26 +748,21 @@ label.settings-row { cursor: pointer; }
   color: var(--text);
 }
 
-/* Multi-row segmented control (blend modes). One flex item beside the label,
-   so the first row lands in the same column as every other param's control
-   rather than being wrapped below it; min-width: 0 lets it shrink and wrap
-   inside that column instead of pushing the row over. */
-.segmented-groups {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  flex: 1 1 0;
-  min-width: 0;
-}
-/* The label sits against the FIRST row, not centred on the block — centred,
-   it drifts down the taller the control gets and stops reading as the label
-   of the row it starts. min-height is one segmented item's own height (a
-   12px line box, 5px padding and a 1px border, top and bottom), so the label
-   centres on that row and the two text baselines meet however many rows
-   follow. */
-.control-row--groups { align-items: flex-start; }
-.control-row--groups .control-label {
+/* A long option list wraps inside the control column rather than below it.
+   Without a flex basis the segmented box is one item whose max-content width
+   is the entire option list, so .control-row's wrap drops the whole control
+   under the label and back to the page margin — out of the column every other
+   control sits in — before shrinking is ever considered. Letting it shrink
+   instead means it wraps its own buttons, and every line keeps the indent. */
+.control-row--enum .segmented { flex: 1 1 0; min-width: 0; }
+/* The label sits against the FIRST line of buttons, not centred on the block:
+   centred, it drifts down the more lines the control wraps onto and stops
+   reading as the label of the line it starts. min-height is one segmented
+   item's own height (a 12px line box, 5px padding and a 1px border, top and
+   bottom), so the label centres on that first line — which is identical to
+   the old centring for a control that fits on one. */
+.control-row--enum { align-items: flex-start; }
+.control-row--enum .control-label {
   display: flex;
   align-items: center;
   min-height: 26px;

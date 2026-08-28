@@ -13,30 +13,22 @@ import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 // modes are not discovered from the API, so this list has to be kept in step
 // by hand — a mode missing here is simply unreachable from the UI, and a mode
 // listed here that the server doesn't know falls back to `normal` on write.
-// Grouped by what the mode does to the stack, not by the server's ids: the
+// Ordered by what the mode does to the stack, not by the server's ids: the
 // ones that only add light, the ones that only remove it, then the ones that
-// go both ways. The groups are rows in the segmented control and deliberately
-// unlabelled — eleven modes on one wrapping row pushed the whole control below
-// its label and back to the left margin, out of the column every other param
-// sits in, and three short rows keep the first one beside the label.
-const BLEND_GROUPS = [
-  [
-    { value: 'normal', label: 'Normal' },
-    { value: 'add', label: 'Add' },
-    { value: 'screen', label: 'Screen' },
-    { value: 'lighten', label: 'Lighten' },
-  ],
-  [
-    { value: 'subtract', label: 'Subtract' },
-    { value: 'multiply', label: 'Multiply' },
-    { value: 'darken', label: 'Darken' },
-  ],
-  [
-    { value: 'difference', label: 'Difference' },
-    { value: 'overlay', label: 'Overlay' },
-    { value: 'soft_light', label: 'Soft Light' },
-    { value: 'linear_light', label: 'Linear Light' },
-  ],
+// go both ways. The list wraps onto as many lines as the panel's width needs;
+// nothing here decides where the breaks fall.
+const BLEND_OPTIONS = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'add', label: 'Add' },
+  { value: 'screen', label: 'Screen' },
+  { value: 'lighten', label: 'Lighten' },
+  { value: 'subtract', label: 'Subtract' },
+  { value: 'multiply', label: 'Multiply' },
+  { value: 'darken', label: 'Darken' },
+  { value: 'difference', label: 'Difference' },
+  { value: 'overlay', label: 'Overlay' },
+  { value: 'soft_light', label: 'Soft Light' },
+  { value: 'linear_light', label: 'Linear Light' },
 ];
 
 // Schema-driven editor for the selected layer. Every effect gets blend +
@@ -220,7 +212,7 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
       )}
       <EnumSelect
         label="Blend"
-        groups={BLEND_GROUPS}
+        options={BLEND_OPTIONS}
         value={layer.blendMode}
         onChange={(v) => { onUpdate({ ...layer, blendMode: v }); onCommit(); }}
       />
