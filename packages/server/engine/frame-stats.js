@@ -30,8 +30,6 @@
  * stumbling now, and it is the one worth watching: a running total only ever
  * climbs, so one coalesced tick at start-up reads the same as a scene that is
  * genuinely too expensive. Both are scoped to the active scene; see restart().
- *
- * Node 14 on the Pi: ES2019 only, no ?. or ?? in here.
  */
 
 var performance = require('perf_hooks').performance;

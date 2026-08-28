@@ -13,6 +13,7 @@ var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
 var { FrameStats } = require('./engine/frame-stats');
 var effects = require('./effects');
 var createScenesRouter = require('./routes/scenes');
+var createSystemRouter = require('./routes/system');
 
 var compositor = new Compositor(client, model);
 
@@ -84,62 +85,12 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
-app.get('/api/virtual', function(req, res) {
-    res.json({ virtual: !!process.env.VIRTUAL });
-});
-
-app.get('/api/brightness/', function(req, res) {
-    res.send(settings.brightness.toString()); // Cast to string; a number implies an http status code
-});
-app.put('/api/brightness/:brightness', function(req, res) {
-    settings.setBrightness(Math.min(1, Math.max(0, parseFloat(req.params.brightness))));
-    client.brightness = settings.brightness;
-    res.sendStatus(200);
-});
-
-// Frame-rate tracker. The snapshot carries `virtual` because the numbers
-// mean different things per mode: the loop and the compositor are identical,
-// but virtual-opc does no hardware write, so a dev-machine rate is not
-// comparable to the Pi's and the UI has to label it as such.
-function frameStatsSnapshot() {
-    var snap = frameStats.snapshot();
-    snap.virtual = !!process.env.VIRTUAL;
-    return snap;
-}
-app.get('/api/fps', function(req, res) {
-    res.json(frameStatsSnapshot());
-});
-app.put('/api/fps', function(req, res) {
-    if (!req.body || typeof req.body.enabled !== 'boolean') {
-        return res.status(400).json({ error: 'expected {enabled: boolean}' });
-    }
-    frameStats.setEnabled(req.body.enabled);
-    settings.setFrameStatsEnabled(frameStats.enabled);
-    res.json(frameStatsSnapshot());
-});
-
-/*
- * Power meter and limiter. The estimate lives in the pixel sink alongside
- * global brightness — the one place values are post-brightness, clamped, and
- * about to become the bytes Fadecandy receives — so, like brightness, it is
- * configured on the client rather than plumbed through the compositor.
- *
- * The measurement runs unconditionally; `limit` only decides whether it acts.
- * Reading the headroom is the point of having it at all.
- */
-app.get('/api/power', function(req, res) {
-    res.json(client.power.snapshot());
-});
-app.put('/api/power', function(req, res) {
-    if (!req.body || typeof req.body !== 'object') {
-        return res.status(400).json({ error: 'expected a power config object' });
-    }
-    // The store normalises field by field against the current config, so a
-    // partial PUT (the UI edits one control at a time) is a merge, not a
-    // reset to defaults.
-    client.power.setConfig(settings.setPower(req.body));
-    res.json(client.power.snapshot());
-});
+app.use('/api', createSystemRouter({
+    settings: settings,
+    client: client,
+    frameStats: frameStats,
+    isVirtual: !!process.env.VIRTUAL,
+}));
 
 app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));
 

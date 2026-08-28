@@ -1,0 +1,44 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      # vite, vitest and @vitejs/plugin-react are peer-coupled — see #81, where
+      # vite 8 orphans plugin-react 4 and plugin-react 6 orphans vite 6, so
+      # neither is mergeable alone. Listed first so it claims them before
+      # minor-and-patch does, keeping them in one PR at every update type.
+      build-tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitejs/*"
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # The root package.json overrides pin react/react-dom to ^18.3.1, and
+      # Dependabot does not touch overrides — so a major bump can never bring
+      # the manifest and the lockfile back into sync, and the PR fails npm ci
+      # every week. Remove this block as part of #82. Minor and patch updates
+      # within 18.x keep flowing.
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - "dependencies"
+    # 10 was hit on the first run (11 npm PRs opened — security PRs are exempt
+    # from the limit but the routine queue below them was truncated).
+    open-pull-requests-limit: 15
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"

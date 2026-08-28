@@ -1,12 +1,12 @@
 [Unit]
 Description=NeoPixel Light Panel
-After=network.target
+After=network.target fcserver.service
 
 [Service]
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/github/neopixel-light-panel/packages/server
-ExecStart=/home/pi/.nvm/versions/node/v14.21.3/bin/node app.js
+ExecStart=/home/pi/.nvm/versions/node/v24.20.0/bin/node app.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

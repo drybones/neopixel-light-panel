@@ -1,17 +1,15 @@
 {
   "name": "neopixel-light-panel",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "concurrently -n server,ui \"npm run dev --workspace=packages/server\" \"npm start --workspace=packages/ui\"",
     "start": "npm start --workspace=packages/server",
-    "deploy": "npm run build --workspace=packages/ui && rsync -av --delete packages/ui/dist/ pi@blinky.local:/home/pi/github/neopixel-light-panel/packages/ui/dist/"
+    "deploy": "bash scripts/deploy-pi.sh"
   },
   "devDependencies": {
-    "concurrently": "^8.0.0"
-  },
-  "overrides": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "concurrently": "^10.0.5"
   }
 }

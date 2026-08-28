@@ -31,7 +31,7 @@ If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL
 
 ## Prerequisites
 
-- Node.js 16+ (14 is supported but 16+ recommended)
+- Node.js 18+ (the deployed Pi runs Node 24; the old Node 14 constraint no longer applies)
 - npm 7+ (for workspace support)
 
 For hardware mode only:
@@ -78,13 +78,13 @@ Then open http://\<pi-hostname\>:3000 in a browser.
 
 ### Deploying to a Pi
 
-The root `package.json` includes a deploy script that builds the UI and rsyncs it to the Pi:
+The UI and server deploy the same way: `npm run deploy` runs `scripts/deploy-pi.sh`, which SSHes to the Pi, pulls `origin/master`, installs dependencies, builds the UI, and restarts the service — no local build step, so the Pi always ends up running exactly what's on GitHub.
 
 ```bash
 npm run deploy
 ```
 
-This assumes the Pi is reachable at `pi@blinky.local` and the repo is cloned to `/home/pi/github/neopixel-light-panel/`. Edit the `deploy` script in `package.json` to match your setup.
+This assumes the Pi is reachable via an SSH host alias named `blinky` (Node 18+, since the Pi builds the UI itself now), with passwordless sudo for restarting `lightpanel.service`, and the repo cloned to `/home/pi/github/neopixel-light-panel/`. Edit `scripts/deploy-pi.sh` to match your setup.
 
 ## Configuration
 
