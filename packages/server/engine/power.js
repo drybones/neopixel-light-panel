@@ -5,7 +5,7 @@
  * what it computes.
  *
  * It sits in the pixel sink, for the same reason global brightness does: the
- * sink is the one place values are post-brightness, clamped, and about to
+ * sink is the one place values are clamped, post-brightness, and about to
  * become the bytes Fadecandy receives. The compositor knows nothing about
  * brightness and nothing about power.
  *

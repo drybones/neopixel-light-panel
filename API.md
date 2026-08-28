@@ -162,6 +162,8 @@ PUT /api/brightness/:value
 
 Global brightness, applied on top of all scenes. The UI maps sliders through an arctangent curve for perceptual uniformity, but the API value is linear.
 
+It is a **level control, not an exposure control**. The composite is unbounded (see [Blend modes](#blend-modes)), and the sink clamps each channel to 0–255 *before* multiplying by brightness — so a region a stack left at 510 is the same white as one at 255 and both scale together. The panel is therefore exactly the pre-fader preview, dimmed; brightness never changes how a scene looks relative to itself, only how bright it is.
+
 ---
 
 ### Export / import
@@ -324,6 +326,11 @@ light: `emitter` reaches ~765 and `particle_trail` ~1104 at their own defaults,
 because both sum every particle's contribution into the pixel without a ceiling.
 A three-particle overlap and a single hit genuinely differ, and a later
 `multiply` or partial-opacity layer can still recover that gradation.
+
+Headroom is invisible everywhere else: the sink clamps before it applies
+brightness (see [Brightness](#brightness)), so dimming the panel never reveals
+it, and previews clip at the same 255. A later layer reading the accumulator is
+the only thing that brings it back.
 
 The rule every mode obeys:
 

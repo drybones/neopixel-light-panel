@@ -37,9 +37,12 @@ VirtualOPC.prototype.setPixel = function(num, r, g, b)
     var offset = num * 3;
     // Bytes, not floats: the hardware buffer holds what writeUInt8 truncated
     // it to, and the power estimate is summed over the same values here.
-    var rb = Math.max(0, Math.min(255, (r | 0) * this.brightness)) | 0;
-    var gb = Math.max(0, Math.min(255, (g | 0) * this.brightness)) | 0;
-    var bb = Math.max(0, Math.min(255, (b | 0) * this.brightness)) | 0;
+    // Clamp before brightness, exactly as opc.js does and for the reason
+    // written out there (issue #92) — the two sinks have to agree byte for
+    // byte or dev stops predicting the panel.
+    var rb = (Math.max(0, Math.min(255, r | 0)) * this.brightness) | 0;
+    var gb = (Math.max(0, Math.min(255, g | 0)) * this.brightness) | 0;
+    var bb = (Math.max(0, Math.min(255, b | 0)) * this.brightness) | 0;
 
     this.pixelBuffer[offset]     = rb;
     this.pixelBuffer[offset + 1] = gb;
