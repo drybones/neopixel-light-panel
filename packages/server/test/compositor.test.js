@@ -51,7 +51,8 @@ test('blend math matches hand-computed values', () => {
         { mode: BLEND.subtract, a: 100, b: 200, op: 1.0, expect: -100 },
 
         // Difference with white is an invert — the property that makes this
-        // the cheap route to a mask, and the reason `a` is clamped first.
+        // the cheap route to a mask, and the reason the guarded form blends
+        // the in-range part rather than the raw accumulator.
         { mode: BLEND.difference, a: 200, b: 255, op: 1.0, expect: 55 },
         { mode: BLEND.difference, a: 60, b: 200, op: 1.0, expect: 140 },
         { mode: BLEND.difference, a: 200, b: 60, op: 1.0, expect: 140 },
@@ -71,13 +72,15 @@ test('blend math matches hand-computed values', () => {
         { mode: BLEND.soft_light, a: 0, b: 200, op: 1.0, expect: 0 },
         { mode: BLEND.soft_light, a: 255, b: 40, op: 1.0, expect: 255 },
 
-        // Linear light is signed about the same pivot, and clamps because a
-        // mix-family mode has to stay displayable.
+        // Linear light is a signed gain about the same pivot: it adds
+        // (2b - 255) and never reads the accumulator, so it neither clamps
+        // what is below it nor caps its own output at white.
         { mode: BLEND.linear_light, a: 128, b: 127.5, op: 1.0, expect: 128 },
         { mode: BLEND.linear_light, a: 128, b: 160, op: 1.0, expect: 193 },
         { mode: BLEND.linear_light, a: 128, b: 100, op: 1.0, expect: 73 },
-        { mode: BLEND.linear_light, a: 100, b: 255, op: 1.0, expect: 255 },
-        { mode: BLEND.linear_light, a: 100, b: 0, op: 1.0, expect: 0 },
+        { mode: BLEND.linear_light, a: 100, b: 255, op: 1.0, expect: 355 },
+        { mode: BLEND.linear_light, a: 100, b: 0, op: 1.0, expect: -155 },
+        { mode: BLEND.linear_light, a: 100, b: 255, op: 0.5, expect: 227.5 },
     ];
     for (const c of cases) {
         const dst = new Float32Array([c.a, c.a, c.a]);
@@ -88,56 +91,133 @@ test('blend math matches hand-computed values', () => {
     }
 });
 
-const MIX_MODES = [
-    BLEND.multiply, BLEND.screen, BLEND.overlay, BLEND.difference,
-    BLEND.lighten, BLEND.darken, BLEND.soft_light, BLEND.linear_light,
+// The rule from issue #93: a blend may clamp its source where the formula
+// needs a bounded domain, but no blend may clamp the accumulator. Which modes
+// need a guard at all is decided by whether their identity element still
+// behaves like one off the end of the range.
+const GUARDED_MODES = [
+    BLEND.screen, BLEND.overlay, BLEND.difference,
+    BLEND.lighten, BLEND.darken, BLEND.soft_light,
 ];
-const GAIN_MODES = [BLEND.add, BLEND.subtract];
+const UNGUARDED_MODES = [
+    BLEND.normal, BLEND.add, BLEND.subtract, BLEND.multiply, BLEND.linear_light,
+];
 
-test('negative source values are clamped by the mix family but pass through the gain family', () => {
-    for (const mode of MIX_MODES) {
-        const dst = new Float32Array([100, 100, 100]);
-        const src = new Float32Array([-50, -50, -50]);
-        blendInto(dst, src, mode, 1.0, 1);
-        assert.ok(dst[0] >= 0, `mode ${mode} produced negative output ${dst[0]}`);
+// The value that makes each mode a no-op. `normal` has none — it replaces.
+const IDENTITY = {
+    [BLEND.add]: 0,
+    [BLEND.subtract]: 0,
+    [BLEND.multiply]: 255,
+    [BLEND.screen]: 0,
+    [BLEND.overlay]: 127.5,
+    [BLEND.difference]: 0,
+    [BLEND.lighten]: 0,
+    [BLEND.darken]: 255,
+    [BLEND.soft_light]: 127.5,
+    [BLEND.linear_light]: 127.5,
+};
+
+// Every mode has to pick a side. A new one added to BLEND without being
+// classified here is one nobody has asked the identity question about, which
+// is how screen and overlay shipped truncating the accumulator in the first
+// place.
+test('every blend mode is classified as guarded or unguarded', () => {
+    const classified = new Set([...GUARDED_MODES, ...UNGUARDED_MODES]);
+    for (const [name, mode] of Object.entries(BLEND)) {
+        assert.ok(classified.has(mode), `mode ${name} is in neither family`);
     }
-    const add = new Float32Array([100, 100, 100]);
-    blendInto(add, new Float32Array([-50, -50, -50]), BLEND.add, 1.0, 1);
-    assert.strictEqual(add[0], 50);
-    const sub = new Float32Array([100, 100, 100]);
-    blendInto(sub, new Float32Array([-50, -50, -50]), BLEND.subtract, 1.0, 1);
-    assert.strictEqual(sub[0], 150);
+    assert.strictEqual(classified.size, Object.keys(BLEND).length);
 });
 
-// Multiply is the one mix-family mode that does not clamp the backdrop, and
-// that is deliberate: a*255/255 is a at any magnitude, so multiplying by white
-// carries headroom through where every other mix mode discards it. Pinning
-// both halves here so neither gets "tidied" into the other.
-test('multiply alone carries headroom through the mix family', () => {
-    const keep = new Float32Array([400, 400, 400]);
-    blendInto(keep, new Float32Array([255, 255, 255]), BLEND.multiply, 1.0, 1);
-    assert.ok(Math.abs(keep[0] - 400) < 1e-3, `multiply by white gave ${keep[0]}, want 400`);
+function blend1(a, b, mode, op) {
+    const dst = new Float32Array([a, a, a]);
+    blendInto(dst, new Float32Array([b, b, b]), mode, op, 1);
+    return dst[0];
+}
 
-    for (const mode of MIX_MODES.filter((m) => m !== BLEND.multiply)) {
-        const dst = new Float32Array([400, 400, 400]);
-        blendInto(dst, new Float32Array([180, 180, 180]), mode, 1.0, 1);
-        assert.ok(dst[0] >= 0 && dst[0] <= 255,
-            `mode ${mode} left ${dst[0]} outside 0-255 from an over-range backdrop`);
+// The load-bearing property, and the one that catches the whole class of bug:
+// screening with black, multiplying by white and darkening with white are
+// no-ops by definition, so a mode that turns one into a truncation is broken.
+// A layer merely dark over part of the panel would then silently flatten
+// everything beneath it, with nothing to surface it.
+test('a layer at a mode\'s identity value leaves any accumulator untouched', () => {
+    for (const [mode, ident] of Object.entries(IDENTITY)) {
+        for (const a of [-320, -80, 0, 100, 255, 510, 765, 1104]) {
+            const got = blend1(a, ident, Number(mode), 1.0);
+            assert.ok(Math.abs(got - a) < 1e-3,
+                `mode ${mode} with identity source ${ident} moved ${a} to ${got}`);
+        }
     }
+});
+
+test('no mode clamps the accumulator, only its own source', () => {
+    // An accumulator well past white survives every mode that is not being
+    // asked to take light away. emitter reaches ~765 and particle_trail ~1104
+    // at their own defaults, so this is the range that actually occurs.
+    for (const mode of [BLEND.screen, BLEND.overlay, BLEND.lighten, BLEND.soft_light]) {
+        for (const b of [0, 40, 127.5, 200, 255]) {
+            const got = blend1(765, b, mode, 1.0);
+            assert.ok(Math.abs(got - 765) < 1e-3,
+                `mode ${mode} with source ${b} pulled an over-range accumulator to ${got}`);
+        }
+    }
+});
+
+// The reason the accumulator is unbounded in the first place: a two-particle
+// overlap and a three-particle one must stay distinguishable through a layer,
+// so a later multiply or partial-opacity layer can still recover the gradation.
+test('headroom gradation survives every guarded mode', () => {
+    for (const mode of GUARDED_MODES) {
+        const two = blend1(510, 100, mode, 1.0);
+        const three = blend1(765, 100, mode, 1.0);
+        assert.notStrictEqual(two, three,
+            `mode ${mode} flattened 510 and 765 to the same ${two}`);
+        assert.ok(three > two, `mode ${mode} inverted the ordering of 510 and 765`);
+    }
+});
+
+// Issue #93's stated regressions, pinned verbatim.
+test('screen and overlay no longer truncate what is below them', () => {
+    assert.strictEqual(blend1(510, 0, BLEND.screen, 1.0), 510);
+    assert.strictEqual(blend1(765, 0, BLEND.screen, 1.0), 765);
+    for (const a of [300, 400, 510]) {
+        assert.strictEqual(blend1(a, 128, BLEND.screen, 1.0), a);
+        assert.strictEqual(blend1(a, 128, BLEND.overlay, 1.0), a);
+    }
+});
+
+// The recovery path the unbounded accumulator exists to protect. If any of
+// these three drift, the headroom is no longer worth carrying.
+test('a later layer can still recover headroom built by add', () => {
+    assert.strictEqual(blend1(510, 127.5, BLEND.multiply, 1.0), 255);
+    assert.ok(Math.abs(blend1(765, 85, BLEND.multiply, 1.0) - 255) < 1e-3);
+    assert.strictEqual(blend1(510, 0, BLEND.normal, 0.5), 255);
+});
+
+test('negative sources are clamped by every mode that guards its domain', () => {
+    for (const mode of GUARDED_MODES) {
+        const guarded = blend1(100, -50, mode, 1.0);
+        const atZero = blend1(100, 0, mode, 1.0);
+        assert.ok(Math.abs(guarded - atZero) < 1e-3,
+            `mode ${mode} treated a negative source differently from black`);
+    }
+    // The two gain modes read the source raw, which is what lets a negative
+    // value passed to add subtract, and keeps subtract add's exact mirror.
+    assert.strictEqual(blend1(100, -50, BLEND.add, 1.0), 50);
+    assert.strictEqual(blend1(100, -50, BLEND.subtract, 1.0), 150);
 });
 
 test('every mode is a no-op at opacity 0', () => {
     for (const mode of Object.values(BLEND)) {
-        const dst = new Float32Array([137, 137, 137]);
-        blendInto(dst, new Float32Array([211, 211, 211]), mode, 0, 1);
-        assert.strictEqual(dst[0], 137, `mode ${mode} moved the composite at opacity 0`);
+        assert.strictEqual(blend1(137, 211, mode, 0), 137,
+            `mode ${mode} moved the composite at opacity 0`);
     }
 });
 
-// The gain family is what keeps headroom recoverable: a subtract that drives
-// the composite under zero must not have destroyed the light an add above it
-// puts back. This is the one behaviour that would silently regress if
-// subtract were ever "tidied up" to clamp at 0 per layer.
+// The gain family is what keeps headroom recoverable in the other direction:
+// a subtract that drives the composite under zero must not have destroyed the
+// light an add above it puts back. This is the one behaviour that would
+// silently regress if subtract were ever "tidied up" to clamp at 0 per layer.
 test('subtract below add round-trips through negative territory', () => {
     const dst = new Float32Array([100, 100, 100]);
     blendInto(dst, new Float32Array([180, 180, 180]), BLEND.subtract, 1.0, 1);
@@ -146,16 +226,36 @@ test('subtract below add round-trips through negative territory', () => {
     assert.strictEqual(dst[0], 100);
 });
 
+// Every mode but difference is non-decreasing in the accumulator: brightening
+// what is below a layer must never darken the result. Difference is |a - b|
+// and genuinely turns over, which is the mode doing its job rather than a
+// domain guard misfiring.
+test('modes are monotone in the accumulator', () => {
+    for (const mode of Object.values(BLEND)) {
+        if (mode === BLEND.difference) continue;
+        for (const b of [0, 64, 127.5, 200, 255]) {
+            for (const op of [0.25, 0.5, 1.0]) {
+                let prev = -Infinity;
+                for (let a = -300; a <= 900; a += 12) {
+                    const got = blend1(a, b, mode, op);
+                    assert.ok(got >= prev - 1e-3,
+                        `mode ${mode} b=${b} op=${op}: a=${a} gave ${got} after ${prev}`);
+                    prev = got;
+                }
+            }
+        }
+    }
+});
+
 // Soft light and linear light both pivot on mid-grey, and a layer sitting
-// exactly there must leave the stack alone at any backdrop level. A pivot
+// exactly there must leave the stack alone at any accumulator level. A pivot
 // off by even half a byte reads as a whole-panel tint.
 test('soft light and linear light are identity at mid-grey', () => {
     for (const mode of [BLEND.soft_light, BLEND.linear_light]) {
-        for (const a of [0, 40, 128, 200, 255]) {
-            const dst = new Float32Array([a, a, a]);
-            blendInto(dst, new Float32Array([127.5, 127.5, 127.5]), mode, 1.0, 1);
-            assert.ok(Math.abs(dst[0] - a) < 1e-3,
-                `mode ${mode} shifted ${a} to ${dst[0]} against a mid-grey source`);
+        for (const a of [0, 40, 128, 200, 255, 510]) {
+            const got = blend1(a, 127.5, mode, 1.0);
+            assert.ok(Math.abs(got - a) < 1e-3,
+                `mode ${mode} shifted ${a} to ${got} against a mid-grey source`);
         }
     }
 });
@@ -169,11 +269,7 @@ test('blend modes treat channels independently', () => {
         blendInto(together, new Float32Array([200, 90, 12]), mode, 0.7, 1);
         const apart = [
             [30, 200], [150, 90], [240, 12],
-        ].map(([a, b]) => {
-            const d = new Float32Array([a, a, a]);
-            blendInto(d, new Float32Array([b, b, b]), mode, 0.7, 1);
-            return d[0];
-        });
+        ].map(([a, b]) => blend1(a, b, mode, 0.7));
         for (let c = 0; c < 3; c++) {
             assert.ok(Math.abs(together[c] - apart[c]) < 1e-3,
                 `mode ${mode} channel ${c}: ${together[c]} vs ${apart[c]} in isolation`);

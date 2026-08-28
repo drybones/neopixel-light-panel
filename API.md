@@ -316,14 +316,42 @@ gamma-encoded 0–255 space (`fcserver.json` applies `gamma: 2.5` afterwards, so
 these are *encoded* arithmetic, not linear light mixing). The composite starts
 at black, which is what makes the "bottom of the stack" column below matter.
 
-The modes fall into two families, and the family decides what `opacity` means:
+### The accumulator is unbounded
 
-- **Gain** (`add`, `subtract`) — opacity scales the layer, and nothing is
-  clamped. The composite may run past 255 or below 0; only `setPixel` clips, at
-  the very end. An `add` above a `subtract` recovers what the subtract buried.
-- **Mix** (everything else) — opacity lerps from the composite toward the
-  blended result. A mix layer at opacity 1 discards headroom below it
-  (`multiply` excepted: ×white is identity at any magnitude).
+The composite is **not** clamped between layers. Clamping to 0–255 is the pixel
+sink's job and only the sink's job. The over-range values are real accumulated
+light: `emitter` reaches ~765 and `particle_trail` ~1104 at their own defaults,
+because both sum every particle's contribution into the pixel without a ceiling.
+A three-particle overlap and a single hit genuinely differ, and a later
+`multiply` or partial-opacity layer can still recover that gradation.
+
+The rule every mode obeys:
+
+> A blend may clamp its **source** operand where its formula needs a bounded
+> domain. No blend may clamp the **accumulator**.
+
+Whether a mode needs a guard at all is decided by one question: does its
+identity element still behave like one off the end of the range? Screening with
+black and multiplying by white are no-ops by definition, and a mode that turns
+one into a truncation would let a layer that is merely dark over part of the
+panel silently flatten everything beneath it.
+
+| | modes | why |
+|---|---|---|
+| **Unguarded** | `normal`, `add`, `subtract`, `multiply`, `linear_light` | identity holds at any magnitude — `a·255/255` is `a`, `a+0` is `a` |
+| **Guarded** | `screen`, `overlay`, `difference`, `lighten`, `darken`, `soft_light` | identity breaks off the end, so the formula needs a bounded domain |
+
+A guarded mode splits the accumulator into the part its formula is defined on
+(`an`, the clamped value) and the excess (`ex`, signed), blends the first and
+lets the second ride through untouched. This is a **strict no-op for an
+in-range accumulator**, so a scene that never overflowed is unaffected.
+
+`opacity` means two different things, deliberately. For the two gain modes
+(`add`, `subtract`) it scales the source and nothing is clamped, so the pair
+compose: an `add` above a `subtract` recovers exactly what the subtract buried.
+For every other mode it lerps from the accumulator toward the blended result.
+
+### The modes
 
 `A` is the composite below, `B` the layer, both as 0–1:
 
@@ -339,30 +367,37 @@ The modes fall into two families, and the family decides what `opacity` means:
 | `difference` | `\|A − B\|` | black | the layer |
 | `overlay` | `A<½: 2AB`, else `1−2(1−A)(1−B)` | mid-grey | **black** |
 | `soft_light` | `(1−2B)A² + 2AB` | mid-grey | **black** |
-| `linear_light` | `A + 2B − 1`, clamped | mid-grey | the layer's top half only |
+| `linear_light` | `A + 2B − 1` | mid-grey | the layer's top half only |
 
 Notes on the ones that are easy to reach for wrongly:
 
 - **`add` vs `screen` vs `lighten`** are three different unions. `add` is the
-  only one that keeps headroom, and the only one that blows out. `screen`
-  saturates smoothly toward white and never exceeds it. `lighten` is the one
-  that combines two layers without either brightening the other at all — the
-  right choice when two effects overlap and you want each to keep its own
-  colour in the region it wins.
+  only one that builds headroom. `screen` saturates smoothly toward white and
+  never exceeds it. `lighten` is the one that combines two layers without
+  either brightening the other at all — the right choice when two effects
+  overlap and you want each to keep its own colour in the region it wins.
 - **`subtract`** is the only mode that removes light, and the only reason a
   layer can act as a shadow. Because it is unclamped, an over-subtracted region
-  is still recoverable by an `add` above it; it is *not* recoverable by a mix
-  mode, which clamps the negative away.
+  is still recoverable by an `add` above it.
 - **`difference` against white is an invert**, which is the cheapest route to a
   mask this stack has: a `text` layer with white ink on a black ground, on
   `difference` at the top, punches its letters out as a negative without the
   layer needing a `background` param of its own (contrast the
   [negative-mask recipe](#using-it-as-a-negative-mask), which needs both).
-- **`linear_light`** is the signed modulator. Below mid-grey it subtracts,
-  above it adds, at mid-grey it does nothing — so a `noise` layer with a ramp
-  from black to white becomes a bidirectional brightness wobble over the stack
-  rather than a one-way contribution. This is the mode most worth trying on a
-  layer you would otherwise have set to `add` at low opacity.
+- **`darken` caps the displayable part, not the headroom.** Over an accumulator
+  of 510, `darken` with a source of 100 gives 355, not 100 — the excess rides
+  through as it does for every guarded mode. It still clips to white at the
+  sink; the difference only shows if a later layer pulls it back into range.
+- **`linear_light`** is the signed modulator, and the only guarded-looking mode
+  that isn't: it adds `2B − 1` and never reads the accumulator at all, so below
+  mid-grey it subtracts, above it adds, and at mid-grey it does nothing. That
+  makes a `noise` layer ramped black-to-white a bidirectional brightness wobble
+  over the stack. It is the mode most worth trying on a layer you would
+  otherwise have set to `add` at low opacity.
+- **No hex colour sits exactly on the pivot.** `overlay`, `soft_light` and
+  `linear_light` are identity at 127.5, and `#808080` is 128 — so a "neutral
+  grey" solid on `linear_light` adds 1 per channel rather than nothing. Use
+  opacity, or a `solid` at `level` 0.5 of white, if an exact no-op matters.
 - **`overlay` and `soft_light` want a lit backdrop.** Both pivot on mid-grey,
   and LED scenes are mostly near-black, so on a dark stack both branches
   collapse toward zero and the layer reads as doing nothing. They earn their

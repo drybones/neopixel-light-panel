@@ -3,8 +3,16 @@
  *
  * Layers render bottom→top (layers[0] is the bottom) into per-layer
  * Float32 buffers in 0–255 float range, then blend into the composite.
- * The composite is written through client.setPixel(), which clamps and
+ * The composite is written through client.setPixel(), which clamps and then
  * applies global brightness — no brightness handling here.
+ *
+ * THE COMPOSITE IS UNBOUNDED LINEAR LIGHT. The sink clamps; nothing here
+ * does. The over-range values are real accumulated light rather than noise:
+ * engine/particles.js sums each particle's contribution and writes the raw
+ * total, so `emitter` reaches ~765 and `particle_trail` ~1104 at their own
+ * defaults. A three-particle overlap and a single hit genuinely differ, and
+ * flattening them to the same white here would destroy a gradation a later
+ * `multiply` or partial-opacity layer can still recover.
  *
  * All buffers and effect instances are allocated on the API write path
  * (syncScene), keyed by layer id; the per-frame path is allocation-free.
@@ -14,27 +22,51 @@ var effects = require('../effects');
 var color = require('./color');
 
 /*
- * Blend modes split into two families, and which family a mode is in decides
- * what `opacity` means and whether headroom survives the layer:
+ * The rule every mode obeys:
  *
- *   Gain family (add, subtract) — opacity scales the *source*, and nothing is
- *   clamped on either side. The composite is free to run past 255 or below 0;
- *   setPixel clips at the very end, so an add above a subtract recovers what
- *   the subtract pushed under zero. This is the family that keeps headroom.
+ *   A blend may clamp its SOURCE operand where its formula needs a bounded
+ *   domain. No blend may clamp the ACCUMULATOR.
  *
- *   Mix family (everything else) — the source is clamped to 0–255, the mode
- *   computes a displayable result, and opacity lerps from the *raw* dst toward
- *   it. Clamping the source is what makes "difference with white is an invert"
- *   true rather than approximately true.
+ * The test for whether a mode needs a guard at all is whether its identity
+ * element still behaves like one off the end of the range. Screening with
+ * black, multiplying by white, darkening with white — each is a no-op by
+ * definition, and a mode that turns one into a truncation is broken, because
+ * a layer that is merely dark over part of the panel then silently flattens
+ * everything beneath it and nothing surfaces that.
  *
- * The backdrop is clamped only where the formula needs a bounded one. Multiply
- * is the exception and stays raw on purpose: a·255/255 is a at any magnitude,
- * so multiplying by white carries headroom through, where a screen or an
- * overlay above the same stack throws it away at opacity 1.
+ *   Identity holds unbounded — no guard needed:
+ *       normal, add, subtract, multiply, linear_light
+ *   Identity breaks off the end — guarded below:
+ *       screen, overlay, difference, lighten, darken, soft_light
  *
- * New modes go in the family whose opacity semantics they want, not the one
- * whose formula looks tidier.
+ * Unclamping the guarded ones is not the fix. Screen is 1-(1-a)(1-b), so
+ * ds/db is (1-a): once a runs past 255 the derivative goes negative and the
+ * blend inverts, brightening the source darkening the result. Overlay is
+ * worse, since its mid-grey pivot has no meaning in an unbounded range. The
+ * guard is legitimate; it was simply applied to the wrong operand.
+ *
+ * So a guarded mode splits the accumulator into the part its formula is
+ * defined on and the excess, blends the first and lets the second ride:
+ *
+ *     an = clamp(a)        the part the formula is defined on
+ *     ex = a - an          headroom, signed, passed through untouched
+ *     o  = a + (v + ex - a) * opacity
+ *
+ * and since a is exactly an + ex, that last line collapses to
+ *
+ *     o  = a + (v - an) * opacity
+ *
+ * which is one subtraction more than the unguarded form and no branch. It is
+ * a strict no-op for an in-range accumulator (ex is 0, an is a), so a guarded
+ * mode is unchanged for every scene that never overflowed.
+ *
+ * `opacity` still means two different things, and that is deliberate. For the
+ * two gain modes (add, subtract) it scales the source, so nothing is clamped
+ * and the pair compose: an add above a subtract recovers exactly what the
+ * subtract buried. For every other mode it lerps from the raw accumulator
+ * toward the blended result.
  */
+
 var BLEND = {
     normal: 0,
     add: 1,
@@ -67,7 +99,7 @@ function blendInto(dst, src, mode, opacity, n) {
                 var an3 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn3 = b < 0 ? 0 : (b > 255 ? 255 : b);
                 var s = 255 - (255 - an3) * (255 - bn3) / 255;
-                o = a + (s - a) * opacity;
+                o = a + (s - an3) * opacity;
                 break;
             }
             case 4: {
@@ -76,14 +108,15 @@ function blendInto(dst, src, mode, opacity, n) {
                 var v = an4 < 128
                     ? 2 * an4 * bn4 / 255
                     : 255 - 2 * (255 - an4) * (255 - bn4) / 255;
-                o = a + (v - a) * opacity;
+                o = a + (v - an4) * opacity;
                 break;
             }
             // Subtract is add's mirror down to the unclamped result, which is
             // the whole point: it is the only mode that can take light away,
             // and a composite driven negative here is still recoverable by an
             // add above it. Clamping to 0 per layer would make the order of
-            // two layers change the answer for no visible gain.
+            // two layers change the answer for no visible gain — and would
+            // break the same identity rule from the other end.
             case 5:
                 o = a - b * opacity;
                 break;
@@ -91,19 +124,19 @@ function blendInto(dst, src, mode, opacity, n) {
                 var an6 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn6 = b < 0 ? 0 : (b > 255 ? 255 : b);
                 var d = an6 - bn6;
-                o = a + ((d < 0 ? -d : d) - a) * opacity;
+                o = a + ((d < 0 ? -d : d) - an6) * opacity;
                 break;
             }
             case 7: {
                 var an7 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn7 = b < 0 ? 0 : (b > 255 ? 255 : b);
-                o = a + ((an7 > bn7 ? an7 : bn7) - a) * opacity;
+                o = a + ((an7 > bn7 ? an7 : bn7) - an7) * opacity;
                 break;
             }
             case 8: {
                 var an8 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn8 = b < 0 ? 0 : (b > 255 ? 255 : b);
-                o = a + ((an8 < bn8 ? an8 : bn8) - a) * opacity;
+                o = a + ((an8 < bn8 ? an8 : bn8) - an8) * opacity;
                 break;
             }
             // Pegtop's soft light, (1-2B)A² + 2AB in unit terms, rather than
@@ -117,21 +150,24 @@ function blendInto(dst, src, mode, opacity, n) {
                 var an9 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn9 = b < 0 ? 0 : (b > 255 ? 255 : b);
                 var sl = (an9 * an9 * (255 - 2 * bn9) / 255 + 2 * an9 * bn9) / 255;
-                o = a + (sl - a) * opacity;
+                o = a + (sl - an9) * opacity;
                 break;
             }
             // The only mode that is bidirectional about a neutral: below
             // mid-grey it subtracts, above it adds, at 127.5 it is identity.
             // That makes a noise or gradient layer a signed modulator of the
-            // stack instead of a one-way contribution. Output is clamped
-            // because both inputs were — a mix-family mode stays displayable;
-            // reach for add if you want the headroom.
+            // stack instead of a one-way contribution.
+            //
+            // Written as a signed gain rather than a lerp, which is what the
+            // identity rule forces: a + 2b - 255 with the accumulator clamped
+            // first would make a black layer truncate a hot stack to 255, and
+            // clamping the result would cap the mode's own output at white.
+            // Neither is wanted, and dropping both leaves a mode that reads
+            // only the source — the exact mirror of add and subtract, with a
+            // mid-grey pivot instead of a black one.
             case 10: {
-                var an10 = a < 0 ? 0 : (a > 255 ? 255 : a);
                 var bn10 = b < 0 ? 0 : (b > 255 ? 255 : b);
-                var ll = an10 + 2 * bn10 - 255;
-                ll = ll < 0 ? 0 : (ll > 255 ? 255 : ll);
-                o = a + (ll - a) * opacity;
+                o = a + (2 * bn10 - 255) * opacity;
                 break;
             }
             default:
