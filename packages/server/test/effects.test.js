@@ -735,6 +735,35 @@ test('twinkle sharpness changes how much of the cycle is lit', () => {
     assert.ok(litSum(1) > litSum(12), 'sharpness must darken the duty cycle');
 });
 
+// The backglow is a floor the swell is scaled into, not a bias added on top of
+// it (issue #94). Added on top, the peak was 1 + background and the sink's
+// per-channel clamp bit red first, so the brightest moment of a star drifted
+// off the configured colour — worst exactly where it shows most.
+test('twinkle peaks at the configured colour for any backglow', () => {
+    const ctx = panelCtx();
+    const rgb = [255, 233, 196]; // #ffe9c4, the default swatch
+    for (const background of [0, 0.02, 0.1, 0.5]) {
+        // sharpness 1 is the plain sine, so a peak is reached often enough to
+        // catch within one sweep at every period in the instance's spread.
+        const p = twinkle.prepare({ ...twinkle.defaults, sharpness: 1, density: 1, background });
+        const inst = twinkle.createInstance(ctx);
+        const out = new Float32Array(ctx.numPixels * 3);
+        const peak = [0, 0, 0];
+        for (let f = 0; f < 400; f++) {
+            inst.render(out, f * 25, p);
+            for (let i = 0; i < ctx.numPixels; i++) {
+                for (let k = 0; k < 3; k++) peak[k] = Math.max(peak[k], out[i * 3 + k]);
+            }
+        }
+        for (let k = 0; k < 3; k++) {
+            assert.ok(peak[k] <= rgb[k] + 1e-4,
+                `background ${background} channel ${k} overshot: ${peak[k]} > ${rgb[k]}`);
+            assert.ok(peak[k] > rgb[k] - 0.5,
+                `background ${background} channel ${k} never reached the colour: ${peak[k]}`);
+        }
+    }
+});
+
 
 // The vertical axis inverts between param space (y up, what the pad and the
 // dials draw) and modelZ (+0.875 is the *bottom* row). Origin, travel and
