@@ -69,6 +69,15 @@ module.exports = {
             speed: params.speed,
             sharpness: params.sharpness,
             background: params.background,
+            // The swell is scaled into the headroom *above* the backglow
+            // rather than added on top of it, so a star at peak is exactly
+            // the configured colour for any backglow (issue #94). Added on
+            // top, the peak was 1 + background: at the default 0.02 only red
+            // clipped in the sink, so the brightest moment of a star was a
+            // desaturated version of the swatch. Clamped at 0 because typed
+            // entry is deliberately unclamped — a backglow past 1 is already
+            // over full, and nothing above it is left to swell into.
+            swell: Math.max(0, 1 - params.background),
         };
     },
 
@@ -94,7 +103,7 @@ module.exports = {
                         // Sharpen so pixels are dark most of the cycle.
                         // Math.pow is the price of a per-layer exponent,
                         // paid only on the lit pixels.
-                        if (s > 0) level += Math.pow(s, p.sharpness);
+                        if (s > 0) level += p.swell * Math.pow(s, p.sharpness);
                     }
 
                     var r = p.r, g = p.g, b = p.b;
