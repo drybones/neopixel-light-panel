@@ -78,7 +78,7 @@ Then open http://\<pi-hostname\>:3000 in a browser.
 
 ### Deploying to a Pi
 
-The UI and server deploy the same way: `npm run deploy` runs `scripts/deploy-pi.sh`, which SSHes to the Pi, pulls `origin/master`, installs dependencies, builds the UI, and restarts the service — no local build step, so the Pi always ends up running exactly what's on GitHub.
+The UI and server deploy the same way: `npm run deploy` runs `scripts/deploy-pi.sh`, which SSHes to the Pi, pulls `origin/main`, installs dependencies, builds the UI, and restarts the service — no local build step, so the Pi always ends up running exactly what's on GitHub.
 
 ```bash
 npm run deploy

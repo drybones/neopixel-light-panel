@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys the light panel to the Pi (blinky): pulls origin/master, builds the
+# Deploys the light panel to the Pi (blinky): pulls origin/main, builds the
 # UI there, and restarts the service. Mirrors the server's own deploy path —
 # see the `deploy` skill (.claude/skills/deploy/SKILL.md) for the full
 # checklist (branch preflight, verification, stale-branch cleanup) that
