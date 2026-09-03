@@ -14,6 +14,10 @@ import SceneLibrarySettings from './SceneLibrarySettings';
  *
  * Nothing here has a save button, matching the rest of the app: every control
  * writes through on change.
+ *
+ * `onClose` is passed on to SceneLibrarySettings as well as driving the back
+ * button: the library actions send you to the switcher on success, because
+ * that is where what they changed can be seen.
  */
 export default function SettingsPage({ onClose }) {
   return (
@@ -24,7 +28,7 @@ export default function SettingsPage({ onClose }) {
       </div>
 
       <PowerSettings />
-      <SceneLibrarySettings />
+      <SceneLibrarySettings onDone={onClose} />
     </div>
   );
 }

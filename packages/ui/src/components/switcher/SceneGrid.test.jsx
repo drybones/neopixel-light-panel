@@ -72,6 +72,7 @@ beforeEach(() => {
     scenePreviews: { s1: strip(), s2: strip() },
     previewFrames: FRAMES,
     activeSceneId: 's1',
+    libraryNotice: null,
   });
 });
 afterEach(() => { cleanup(); uninstall(); vi.clearAllMocks(); });
@@ -146,6 +147,20 @@ test('an empty library offers both ways back rather than just a gap', () => {
   expect(screen.getByRole('button', { name: 'Import scenes' })).toBeTruthy();
   // New scene is still a card, so the third way back is where it always was.
   expect(screen.getByText('New scene')).toBeTruthy();
+});
+
+test('a library notice appears above the grid, where a settings action lands', () => {
+  // The settings page's library actions navigate here on success, so this is
+  // the only confirmation they get — see LibraryNotice.
+  useStore.setState({ libraryNotice: 'Restored the 12 default scenes.' });
+  const { container } = render(<SceneGrid onEdit={() => {}} />);
+
+  const notice = container.querySelector('.library-notice');
+  expect(notice).toBeTruthy();
+  expect(notice.textContent).toContain('Restored the 12 default scenes.');
+  // Above the grid, not buried under it.
+  expect(notice.compareDocumentPosition(container.querySelector('.scene-grid')))
+    .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
 });
 
 test('a populated library shows no empty state', () => {

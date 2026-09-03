@@ -6,12 +6,15 @@ import React, { useState } from 'react';
  * disarm, so a mis-click never sits waiting to be confirmed by whatever gets
  * pressed next.
  *
- * Deliberately not window.confirm: a native dialog is unstyleable, reads as a
- * browser error rather than part of the app, and on iOS from the Home Screen
- * it throws a modal sheet over everything for a decision that belongs on the
- * control itself. The editor's delete-scene button has worked this way since
- * it was written; this is that pattern lifted out, now that the scene library
- * has three more controls that can destroy something.
+ * Deliberately not window.confirm, and the reason is correctness rather than
+ * taste: **a browser is free to refuse the dialog silently**, in which case
+ * confirm() returns false without ever appearing and the control does nothing
+ * while everything around it keeps working. Editor.handleDeleteScene carries
+ * the full account — iOS from the Home Screen, Chrome's "prevent additional
+ * dialogs" — and has worked this way since it was written; this is that
+ * pattern lifted out, now that the scene library has three more controls that
+ * can destroy something. The same hazard is why ImportScenesButton reports
+ * failures in the page instead of through window.alert.
  *
  * `armedLabel` omitted means no arming — one click fires, and the button
  * loses the danger styling with it. That is not a degenerate case:

@@ -8,6 +8,12 @@ import { setTiming } from '../lib/filmstripClock';
 // flushed on pointer-up via flushLayer().
 const layerThrottle = createKeyedThrottle(80);
 
+// "1 scene" / "4 scenes" — a count is the whole point of these messages, so
+// it must not read as "1 scenes" the one time the library holds a single one.
+function plural(n, noun) {
+  return `${n} ${noun}${n === 1 ? '' : 's'}`;
+}
+
 // The most recent write to the server, so refreshPreview() can wait for it.
 // A filmstrip is rendered from what the server holds, so asking for one while
 // the last edit of a drag is still in flight would cache the previous frame.
@@ -29,6 +35,10 @@ export const useStore = create((set, get) => ({
   isVirtual: null,
   fps: null, // last /api/fps snapshot; null until the first read succeeds
   power: null, // last /api/power snapshot; config and live figures together
+  // What the last whole-library action did, shown on the switcher. Set by the
+  // action rather than by the button, because the settings page navigates
+  // here to show it and the empty state's buttons are already here.
+  libraryNotice: null,
   loaded: false,
 
   async init() {
@@ -204,30 +214,55 @@ export const useStore = create((set, get) => ({
   // that just vanished is never read and a surviving scene keeps a usable
   // card in the meantime; blanking them would flash every card in the
   // switcher empty for the length of a round trip.
+  //
+  // It resolves as soon as the scene *list* is known, and does not wait for
+  // details or filmstrips: a reset invalidates every strip, so awaiting them
+  // would hold the button for as long as the Pi takes to render the whole
+  // library. Cards mount without a strip and fill in when it lands, which is
+  // the ordinary first paint anyway.
   async reloadLibrary() {
     const [scenes, active] = await Promise.all([api.scenes(), api.activeScene()]);
     set({ scenes, activeSceneId: active.id });
-    await Promise.all([
-      get().loadAllDetails(),
-      get().loadPreviews(),
-    ]);
+    get().loadAllDetails().catch(() => {});
+    get().loadPreviews().catch(() => {});
   },
 
+  // Each of the three composes its own message rather than leaving that to
+  // the caller: the same action fires from the settings page and from the
+  // switcher's empty state, and the two must not word it differently. Every
+  // count is known here — the file says how much came in, the reloaded list
+  // says what the library holds now.
   async clearLibrary() {
     await api.deleteAllScenes();
     set({
-      scenes: [], sceneDetails: {}, scenePreviews: {}, activeSceneId: null,
+      scenes: [],
+      sceneDetails: {},
+      scenePreviews: {},
+      activeSceneId: null,
+      libraryNotice: 'Deleted every scene. The panel is off.',
     });
   },
 
   async resetLibrary() {
     await api.resetScenes();
     await get().reloadLibrary();
+    set({ libraryNotice: `Restored the ${get().scenes.length} default scenes.` });
   },
 
   async importLibrary(payload, mode) {
+    const incoming = (payload.scenes || []).length;
     await api.importScenes(payload, mode);
     await get().reloadLibrary();
+    const total = get().scenes.length;
+    set({
+      libraryNotice: mode === 'replace'
+        ? `Replaced the library with the file's ${plural(incoming, 'scene')}.`
+        : `Imported ${plural(incoming, 'scene')}; the library now has ${total}.`,
+    });
+  },
+
+  clearLibraryNotice() {
+    set({ libraryNotice: null });
   },
 
   // Scene order — the switcher's drag. Optimistic, then the whole id list to

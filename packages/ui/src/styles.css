@@ -267,6 +267,39 @@ body {
 }
 .btn-danger-armed:hover { border-color: var(--danger); }
 
+/* ── Library notice ── */
+
+/* What the last whole-library action did, waiting on the switcher after the
+   settings page navigates here. A bar in the flow rather than a floating
+   toast: the app has no floating UI anywhere, and this one is read on arrival
+   rather than caught in passing. */
+.library-notice {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  /* The one colour it carries, on the leading edge — a fully tinted bar would
+     outshout the grid it is describing. */
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+}
+.library-notice-text { flex: 1; min-width: 0; }
+.library-notice-dismiss {
+  flex: none;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.library-notice-dismiss:hover { color: var(--text); }
+
 /* ── Scene grid / cards ── */
 
 .scene-grid {
@@ -391,6 +424,11 @@ body {
   line-height: 1.5;
 }
 .scene-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+/* ImportScenesButton brings its own .control-stack for the status line it may
+   need to show. Here the block is centred, so the button must not jump to the
+   right edge of a wide message the moment one appears. */
+.scene-empty-actions .control-stack { align-items: center; }
+.scene-empty-actions .row-status { text-align: center; }
 
 .brightness {
   display: flex;
@@ -524,6 +562,32 @@ label.settings-row { cursor: pointer; }
   text-align: right;
 }
 .settings-value--dim { color: var(--text-dim); }
+
+/* A control that reports back: the button on top, its status underneath, both
+   hung off the row's right edge. Scoped to a wrapper rather than relaxing
+   .settings-row-control, which is shared with the power number entries — let
+   that column wrap and shrink and a reading gets squeezed to fit a message
+   belonging to a different row. */
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* The line a control leaves under itself when it has something to say and
+   nowhere to navigate to: an export confirmation, an import failure. The
+   width cap is load-bearing — the control column is sized to its content, so
+   an unbounded sentence here would push the label off the row. */
+.row-status {
+  max-width: 34ch;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
+  text-align: right;
+}
+.row-status--error { color: var(--danger); }
 
 /* ── Editor ── */
 
@@ -1057,4 +1121,8 @@ label.settings-row { cursor: pointer; }
   }
   .settings-row-control { justify-content: flex-start; }
   .settings-value { text-align: left; }
+  /* Stacked rows put the control on the left, so its status line follows it
+     rather than staying hung off the right-hand edge. */
+  .control-stack { align-items: flex-start; }
+  .row-status { text-align: left; max-width: none; }
 }

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import SceneCard from './SceneCard';
 import useSceneDrag from './useSceneDrag';
+import LibraryNotice from './LibraryNotice';
 import ImportScenesButton from '../settings/ImportScenesButton';
 
 export default function SceneGrid({ onEdit }) {
@@ -33,6 +34,9 @@ export default function SceneGrid({ onEdit }) {
 
   return (
     <>
+      {/* Above the grid, because the settings page's library actions navigate
+          here on success and the confirmation has to be waiting on arrival. */}
+      <LibraryNotice />
       {/* Off and New scene share the grid but are not scenes: no drag handler,
           no data-scene-id, so they are neither draggable nor drop targets. */}
       <div className={`scene-grid${drag.settling ? ' scene-grid--settling' : ''}`} ref={gridRef}>
