@@ -135,3 +135,20 @@ test('an empty library renders the grid without any scene cards', () => {
   expect(container.querySelectorAll('[data-scene-id]').length).toBe(0);
   expect(screen.getByText('Off')).toBeTruthy();
 });
+
+test('an empty library offers both ways back rather than just a gap', () => {
+  // Reachable from settings now (delete all, replacing import), and an empty
+  // grid on its own is indistinguishable from one that failed to load.
+  useStore.setState({ scenes: [], scenePreviews: {}, activeSceneId: null });
+  render(<SceneGrid onEdit={() => {}} />);
+
+  expect(screen.getByRole('button', { name: 'Restore defaults' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Import scenes' })).toBeTruthy();
+  // New scene is still a card, so the third way back is where it always was.
+  expect(screen.getByText('New scene')).toBeTruthy();
+});
+
+test('a populated library shows no empty state', () => {
+  render(<SceneGrid onEdit={() => {}} />);
+  expect(screen.queryByRole('button', { name: 'Restore defaults' })).toBeNull();
+});

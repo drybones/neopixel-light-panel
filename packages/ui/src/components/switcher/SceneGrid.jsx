@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useStore } from '../../state/store';
 import SceneCard from './SceneCard';
 import useSceneDrag from './useSceneDrag';
+import ImportScenesButton from '../settings/ImportScenesButton';
 
 export default function SceneGrid({ onEdit }) {
   const scenes = useStore((s) => s.scenes);
@@ -11,6 +12,7 @@ export default function SceneGrid({ onEdit }) {
   const activateScene = useStore((s) => s.activateScene);
   const createScene = useStore((s) => s.createScene);
   const reorderScenes = useStore((s) => s.reorderScenes);
+  const resetLibrary = useStore((s) => s.resetLibrary);
   const gridRef = useRef(null);
   const [announcement, setAnnouncement] = useState('');
 
@@ -70,6 +72,26 @@ export default function SceneGrid({ onEdit }) {
           <div className="scene-card-name">New scene</div>
         </div>
       </div>
+      {/* An empty library is reachable now that settings can delete or
+          replace the whole thing, and an empty grid is indistinguishable
+          from one that failed to load. Both ways back sit here rather than
+          only in settings: being sent off to find them is the wrong answer
+          to "there is nothing here". Neither is armed — there is nothing
+          left to destroy. */}
+      {scenes.length === 0 && (
+        <div className="scene-empty">
+          <p className="scene-empty-text">
+            No scenes yet. Start from the built-in set, bring some in from a file,
+            or build one from scratch.
+          </p>
+          <div className="scene-empty-actions">
+            <button type="button" className="btn" onClick={() => resetLibrary()}>
+              Restore defaults
+            </button>
+            <ImportScenesButton className="btn" label="Import scenes" />
+          </div>
+        </div>
+      )}
       <p className="visually-hidden" id="scene-grid-help">
         Drag a scene card to reorder the library, or hold Shift and press an arrow key to move the
         focused scene one place.

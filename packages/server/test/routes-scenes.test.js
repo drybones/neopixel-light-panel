@@ -230,6 +230,56 @@ test('POST /api/scenes/import rejects every wrong shape with 400', async () => {
     } finally { await app.close(); }
 });
 
+test('POST /api/scenes/import in replace mode swaps the library rather than merging', async () => {
+    const { app, store } = await harness();
+    try {
+        const res = await app.post('/api/scenes/import', {
+            body: { version: 2, mode: 'replace', scenes: [{ id: 'z1', name: 'Only', layers: [] }] },
+        });
+        assert.strictEqual(res.status, 200);
+        assert.deepStrictEqual(store.scenes.map((s) => s.id), ['z1']);
+    } finally { await app.close(); }
+});
+
+test('POST /api/scenes/import rejects an unknown mode without touching the library', async () => {
+    // Validate-then-swap is the whole reason replace is a mode rather than a
+    // client-side delete-all followed by an import: a rejected body must
+    // leave the library exactly as it was.
+    const { app, store } = await harness();
+    try {
+        const res = await app.post('/api/scenes/import', {
+            body: { version: 2, mode: 'clobber', scenes: [] },
+        });
+        assert.strictEqual(res.status, 400);
+        assert.strictEqual(store.scenes.length, 2, 'a rejected import must not empty the library');
+    } finally { await app.close(); }
+});
+
+test('DELETE /api/scenes empties the library and switches the panel off', async () => {
+    const { app, store } = await harness();
+    try {
+        await app.put('/api/active_scene', { body: { id: 's1' } });
+        const res = await app.del('/api/scenes');
+        assert.strictEqual(res.status, 200);
+        assert.deepStrictEqual(res.json, []);
+        assert.strictEqual(store.scenes.length, 0);
+        assert.deepStrictEqual((await app.get('/api/active_scene')).json, { id: null });
+    } finally { await app.close(); }
+});
+
+test('POST /api/scenes/reset restores the default library, not a scene called "reset"', async () => {
+    const { app, store } = await harness();
+    try {
+        const res = await app.post('/api/scenes/reset');
+        assert.strictEqual(res.status, 200);
+        assert.ok(res.json.length > 0);
+        assert.deepStrictEqual(res.json, store.list());
+        assert.ok(!store.get('reset'), '"reset" must not have been matched as a scene id');
+        assert.ok(store.scenes.every((s) => /^default-/.test(s.id)), 'the default set has fixed ids');
+        assert.strictEqual(store.activeSceneId, null);
+    } finally { await app.close(); }
+});
+
 test('GET/PUT /api/active_scene activates, switches off, and 404s an unknown id', async () => {
     const { app, store } = await harness();
     try {

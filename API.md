@@ -130,7 +130,7 @@ PUT /api/scenes/order
 
 Body: `{ "ids": [...] }` — every scene ID exactly once, in the order the library should be listed in. Returns the reordered `GET /api/scenes` payload.
 
-Scene order *is* the array order in the stored document, and nothing else can rewrite it (create appends, `PUT /api/scenes/:id` replaces in place, import replaces by ID or appends). The whole list is sent rather than a move so a stale client cannot drop or duplicate a scene: anything that is not a permutation of the IDs the server holds is rejected whole with `400`, and nothing is applied.
+Scene order *is* the array order in the stored document, and nothing else can rewrite it (create appends, `PUT /api/scenes/:id` replaces in place, a merging import replaces by ID or appends, and a replacing import or a reset takes the incoming order wholesale). The whole list is sent rather than a move so a stale client cannot drop or duplicate a scene: anything that is not a permutation of the IDs the server holds is rejected whole with `400`, and nothing is applied.
 
 ### Update a single layer
 
@@ -170,10 +170,29 @@ It is a **level control, not an exposure control**. The composite is unbounded (
 
 ```
 GET  /api/scenes/export       →  { "version": 2, "scenes": [ ... ] }
-POST /api/scenes/import       body: same shape
+POST /api/scenes/import       body: same shape, plus an optional "mode"
 ```
 
-Import merges by scene ID: matching IDs are replaced, new IDs appended. Anything other than `version: 2` is rejected with `400`.
+Import defaults to **merging by scene ID**: matching IDs are replaced, new IDs appended, nothing is removed. Anything other than `version: 2` is rejected with `400`.
+
+`"mode": "replace"` in the body imports the file *instead of* the library: every scene not in it is deleted. The active scene survives if the incoming set still contains its ID — so re-importing your own export leaves the panel exactly as it was — and is otherwise switched off. An unrecognised `mode` is a `400`.
+
+Replace is a server mode rather than a `DELETE /api/scenes` followed by a merging import because the envelope is validated **before** the store is touched: a rejected file leaves the library alone, where the two-request version would already have thrown it away.
+
+---
+
+### Empty the library / restore the defaults
+
+```
+DELETE /api/scenes            →  []
+POST   /api/scenes/reset      →  the new GET /api/scenes payload
+```
+
+`DELETE /api/scenes` removes every scene and switches the panel off. An empty library is a real state, not a fresh install: it persists as an empty `scenes` array and reloads as zero scenes rather than re-seeding.
+
+`POST /api/scenes/reset` replaces the library with the curated default set and switches the panel off. It is a *replace*, not a merge — merging defaults into a library holding edited copies of them is the confusing case, where some scenes revert and others don't depending on whether their IDs happen to match.
+
+The default set lives in `packages/server/default-scenes.json`, in the export envelope, and is the same file a fresh install seeds from. Its scene and layer IDs are fixed (`default-sun`, not a generated one), so resetting twice is idempotent, an export taken after a reset re-imports onto itself, and a *merging* import of a defaults file updates rather than duplicates.
 
 ---
 

@@ -1,0 +1,621 @@
+{
+  "version": 2,
+  "scenes": [
+    {
+      "id": "default-warm-vignette",
+      "name": "Warm Vignette",
+      "layers": [
+        {
+          "id": "default-warm-vignette-1",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#efc89d",
+            "freq": 0,
+            "lambda": 3,
+            "delta": 0,
+            "x": 0,
+            "y": 0,
+            "direction": "outward",
+            "min": 0.2,
+            "max": 1
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-orange-and-teal",
+      "name": "Orange and Teal",
+      "layers": [
+        {
+          "id": "default-orange-and-teal-1",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#ff8800",
+            "freq": 0.2,
+            "lambda": 0.8,
+            "delta": 0,
+            "x": -0.7,
+            "y": 0,
+            "direction": "outward",
+            "min": 0,
+            "max": 0.7
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-orange-and-teal-2",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#0088ff",
+            "freq": 0.2,
+            "lambda": 0.8,
+            "delta": 3.14,
+            "x": 0.7,
+            "y": 0,
+            "direction": "outward",
+            "min": 0,
+            "max": 0.7
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-dispersion",
+      "name": "Dispersion",
+      "layers": [
+        {
+          "id": "default-dispersion-1",
+          "effectType": "planewave",
+          "params": {
+            "color": "#ff0000",
+            "freq": 0.1,
+            "lambda": 1,
+            "delta": 0.372995928071461,
+            "angle": 206.56505117707798,
+            "min": 0.12,
+            "max": 0.87
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-dispersion-2",
+          "effectType": "planewave",
+          "params": {
+            "color": "#00ff00",
+            "freq": 0.1,
+            "lambda": 1,
+            "delta": 0.27299592807155193,
+            "angle": 206.56505117707798,
+            "min": 0.12,
+            "max": 0.87
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-dispersion-3",
+          "effectType": "planewave",
+          "params": {
+            "color": "#0000ff",
+            "freq": 0.1,
+            "lambda": 1,
+            "delta": 6.256181235250956,
+            "angle": 206.56505117707798,
+            "min": 0.1,
+            "max": 0.7
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-blinky-blue-slow",
+      "name": "Blinky Blue (slow)",
+      "layers": [
+        {
+          "id": "default-blinky-blue-slow-1",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#00f9c0",
+            "freq": 0.035,
+            "lambda": 0.001,
+            "delta": 1,
+            "x": 18,
+            "y": 27,
+            "direction": "outward",
+            "min": -10.000143146707966,
+            "max": 0.2601465592634876
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-blinky-blue-slow-2",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#0023ff",
+            "freq": 0.03,
+            "lambda": 0.001,
+            "delta": 0.2,
+            "x": 15,
+            "y": 45,
+            "direction": "outward",
+            "min": -10.000143146707966,
+            "max": 0.3718580472122153
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-blinky-blue-slow-3",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#00fbff",
+            "freq": 0.04,
+            "lambda": 0.001,
+            "delta": 1,
+            "x": 13,
+            "y": -45,
+            "direction": "outward",
+            "min": -10.000143146707966,
+            "max": 0.24761882017132222
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-blinky-blue-slow-4",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#3671d0",
+            "freq": 0.05,
+            "lambda": 0.001,
+            "delta": 0.8,
+            "x": 23,
+            "y": 35,
+            "direction": "outward",
+            "min": -10.000143146707966,
+            "max": 0.6235527589784705
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-sun",
+      "name": "Sun",
+      "layers": [
+        {
+          "id": "default-sun-1",
+          "effectType": "gradient_radial",
+          "params": {
+            "stops": [
+              {
+                "position": 0.4482756763840456,
+                "color": "#fcffc6"
+              },
+              {
+                "position": 0.714714856926715,
+                "color": "#1a1c23"
+              },
+              {
+                "position": 0.5972181598102435,
+                "color": "#e08b1f"
+              },
+              {
+                "position": 0.5076526950784771,
+                "color": "#ffea73"
+              },
+              {
+                "position": 0,
+                "color": "#ffffff"
+              },
+              {
+                "position": 0.3815551141198346,
+                "color": "#ffffff"
+              }
+            ],
+            "cx": 0,
+            "cy": 0,
+            "aspect": 1,
+            "repeats": 1.5975317951257848,
+            "tiling": "hold",
+            "phase": 0,
+            "scroll": 0,
+            "travel": "outward"
+          },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-rainbowtastic",
+      "name": "Rainbowtastic",
+      "layers": [
+        {
+          "id": "default-rainbowtastic-1",
+          "effectType": "gradient_radial",
+          "params": {
+            "stops": [
+              {
+                "position": 0.1509965449669967,
+                "color": "#4d0fa4"
+              },
+              {
+                "position": 0.8376070028877888,
+                "color": "#e04f1f"
+              },
+              {
+                "position": 0.504950495049505,
+                "color": "#23a30f"
+              }
+            ],
+            "cx": -2.7606197143151814,
+            "cy": -2.465307635285397,
+            "aspect": 1,
+            "repeats": 1,
+            "tiling": "mirror",
+            "phase": 0,
+            "scroll": 0.225,
+            "travel": "inward"
+          },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-rainbowtastic-2",
+          "effectType": "wavelet",
+          "params": {
+            "color": "#ffffff",
+            "freq": 0.18,
+            "lambda": 0.5,
+            "delta": 0,
+            "x": -2.444645343440594,
+            "y": -1,
+            "direction": "outward",
+            "min": -1.3994157164516252,
+            "max": 2.219483277423282
+          },
+          "blendMode": "overlay",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-night-sky",
+      "name": "Night sky",
+      "layers": [
+        {
+          "id": "default-night-sky-1",
+          "effectType": "noise",
+          "params": {
+            "c1": "#050a1e",
+            "c2": "#12306b",
+            "scale": 0.8,
+            "speed": 0.31,
+            "min": -0.5,
+            "max": 1.5
+          },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-night-sky-2",
+          "effectType": "twinkle",
+          "params": {
+            "color": "#ffe9c4",
+            "hueSpread": 0,
+            "density": 0.2,
+            "speed": 0.8,
+            "sharpness": 4,
+            "background": 0
+          },
+          "blendMode": "screen",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-aurora-night",
+      "name": "Aurora night",
+      "layers": [
+        {
+          "id": "default-aurora-night-1",
+          "effectType": "noise",
+          "params": {
+            "c1": "#222d6b",
+            "c2": "#3fd0ff",
+            "scale": 1,
+            "speed": 0.84,
+            "min": 0,
+            "max": 1
+          },
+          "blendMode": "normal",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-aurora-night-2",
+          "effectType": "emitter",
+          "params": {
+            "color": "#ff6666",
+            "hueSpread": 1,
+            "size": 0.18257418583505536,
+            "dir": 90,
+            "spread": 360,
+            "speed": 1.1375,
+            "speedSpread": 0.14285714285714285,
+            "grav": 0,
+            "gravDir": 270,
+            "count": 66,
+            "life": 1.5,
+            "lifeSpread": 0.3333333333333333,
+            "swell": 0.25,
+            "x": 0,
+            "y": 0,
+            "extX": 0,
+            "extY": 0
+          },
+          "blendMode": "multiply",
+          "opacity": 0.8,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-dual-emitter",
+      "name": "Dual emitter",
+      "layers": [
+        {
+          "id": "default-dual-emitter-1",
+          "effectType": "emitter",
+          "params": {
+            "color": "#ffb050",
+            "hueSpread": 0.07,
+            "size": 0.183,
+            "dir": 10,
+            "spread": 60,
+            "speed": 2.6187427405779333,
+            "speedSpread": 0.2,
+            "grav": 0,
+            "gravDir": 270,
+            "count": 30,
+            "life": 0.8274773353065289,
+            "lifeSpread": 0.33,
+            "swell": 0.1,
+            "x": 0,
+            "y": 0,
+            "extX": 0,
+            "extY": 0
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-dual-emitter-2",
+          "effectType": "emitter",
+          "params": {
+            "color": "#3fd0ff",
+            "hueSpread": 0.27,
+            "size": 0.183,
+            "dir": 190,
+            "spread": 60,
+            "speed": 2.6187427405779333,
+            "speedSpread": 0.14,
+            "grav": 0,
+            "gravDir": 270,
+            "count": 30,
+            "life": 0.8274773353065289,
+            "lifeSpread": 0.33,
+            "swell": 0.2,
+            "x": 0,
+            "y": 0,
+            "extX": 0,
+            "extY": 0
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-dual-emitter-3",
+          "effectType": "gradient_radial",
+          "params": {
+            "stops": [
+              {
+                "position": 0.3418071780320149,
+                "color": "#000000"
+              },
+              {
+                "position": 1,
+                "color": "#343434"
+              }
+            ],
+            "cx": 0,
+            "cy": 0,
+            "aspect": 1,
+            "repeats": 1,
+            "tiling": "mirror",
+            "phase": 0,
+            "scroll": 0,
+            "travel": "outward"
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-purple-fire",
+      "name": "Purple Fire",
+      "layers": [
+        {
+          "id": "default-purple-fire-1",
+          "effectType": "emitter",
+          "params": {
+            "color": "#e300ff",
+            "hueSpread": 0.5,
+            "size": 0.22360679774997896,
+            "dir": 90,
+            "spread": 70,
+            "speed": 0.29250000000000004,
+            "speedSpread": 0.5,
+            "grav": 0,
+            "gravDir": 270,
+            "count": 59,
+            "life": 5.5,
+            "lifeSpread": 0.45454545454545453,
+            "swell": 0.5,
+            "x": 0,
+            "y": -1,
+            "extX": 8,
+            "extY": 2
+          },
+          "blendMode": "normal",
+          "opacity": 0.7,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-purple-fire-2",
+          "effectType": "twinkle",
+          "params": {
+            "color": "#ffe9c4",
+            "hueSpread": 0,
+            "density": 0.51,
+            "speed": 0.8,
+            "sharpness": 4,
+            "background": 0
+          },
+          "blendMode": "overlay",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-clock-bold",
+      "name": "Clock (bold)",
+      "layers": [
+        {
+          "id": "default-clock-bold-1",
+          "effectType": "text",
+          "params": {
+            "text": "{HH}:{mm}",
+            "font": "bold",
+            "color": "#ffb84d",
+            "background": "#000000",
+            "level": 1,
+            "softness": 0,
+            "tracking": 1,
+            "scroll": 0,
+            "gap": 8
+          },
+          "blendMode": "normal",
+          "opacity": 0.5,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    },
+    {
+      "id": "default-party-time",
+      "name": "Party Time",
+      "layers": [
+        {
+          "id": "default-party-time-1",
+          "effectType": "emitter",
+          "params": {
+            "color": "#2ee6a8",
+            "hueSpread": 1,
+            "size": 0.2444281666824676,
+            "dir": 90,
+            "spread": 360,
+            "speed": 2.4254517317157784,
+            "speedSpread": 0.14,
+            "grav": 0,
+            "gravDir": 270,
+            "count": 79,
+            "life": 1.5,
+            "lifeSpread": 0.33,
+            "swell": 0.25,
+            "x": 0,
+            "y": 0,
+            "extX": 7.6,
+            "extY": 0
+          },
+          "blendMode": "add",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        },
+        {
+          "id": "default-party-time-2",
+          "effectType": "text",
+          "params": {
+            "text": "Party Time!",
+            "font": "bold",
+            "color": "#ffffff",
+            "background": "#000000",
+            "level": 1,
+            "softness": 0.1,
+            "tracking": 2,
+            "scroll": 16,
+            "gap": 35
+          },
+          "blendMode": "overlay",
+          "opacity": 1,
+          "enabled": true,
+          "solo": false
+        }
+      ]
+    }
+  ]
+}

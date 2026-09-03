@@ -372,6 +372,26 @@ body {
 
 .scene-card-off-icon { font-size: 26px; line-height: 1; }
 
+/* Shown under the grid when the library is empty — Off and New scene are
+   still cards, so this explains the gap rather than replacing it. Centred and
+   capped in width because it is one sentence in a full-width column. */
+.scene-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 16px 8px;
+  text-align: center;
+}
+.scene-empty-text {
+  margin: 0;
+  max-width: 44ch;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.scene-empty-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
 .brightness {
   display: flex;
   align-items: center;

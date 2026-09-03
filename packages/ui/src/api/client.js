@@ -41,5 +41,11 @@ export const api = {
   scenePreviews: () => request('GET', '/api/scenes/previews'),
   scenePreview: (id) => request('GET', `/api/scenes/${id}/preview`),
   exportScenes: () => request('GET', '/api/scenes/export'),
-  importScenes: (payload) => request('POST', '/api/scenes/import', payload),
+  // `mode` ('merge' | 'replace') rides in the body beside the file's own
+  // {version, scenes}. Replace is a server mode rather than delete-all then
+  // import because the envelope is validated before the store is touched: a
+  // rejected file leaves the library alone instead of having already binned it.
+  importScenes: (payload, mode) => request('POST', '/api/scenes/import', mode ? { ...payload, mode } : payload),
+  deleteAllScenes: () => request('DELETE', '/api/scenes'),
+  resetScenes: () => request('POST', '/api/scenes/reset'),
 };

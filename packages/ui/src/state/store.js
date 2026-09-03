@@ -92,9 +92,19 @@ export const useStore = create((set, get) => ({
     return scene;
   },
 
+  // Optimistic, then reverted if the server refuses. It refuses for one
+  // reason — the scene isn't there — which is reachable now that the whole
+  // library can be replaced or emptied underneath a bookmarked #/edit/:id.
+  // Without the revert that PUT rejects unhandled and the header goes on
+  // claiming a scene the panel isn't playing.
   async activateScene(id) {
+    const previous = get().activeSceneId;
     set({ activeSceneId: id });
-    await api.setActiveScene(id);
+    try {
+      await api.setActiveScene(id);
+    } catch {
+      set({ activeSceneId: previous });
+    }
   },
 
   setBrightness(value) {
@@ -180,6 +190,44 @@ export const useStore = create((set, get) => ({
       };
     });
     await api.deleteScene(id);
+  },
+
+  // ---- whole-library swaps: reset, delete-all, replacing import ----
+  //
+  // One path rather than looping deleteScene: after a swap every id can have
+  // changed at once, and the server is the authority on all of it — including
+  // the active id, which a reset nulls and a replacing import may or may not
+  // have kept.
+  //
+  // Details and previews are *replaced* when they land rather than blanked
+  // first. Both maps are keyed by scene id, so a leftover entry for a scene
+  // that just vanished is never read and a surviving scene keeps a usable
+  // card in the meantime; blanking them would flash every card in the
+  // switcher empty for the length of a round trip.
+  async reloadLibrary() {
+    const [scenes, active] = await Promise.all([api.scenes(), api.activeScene()]);
+    set({ scenes, activeSceneId: active.id });
+    await Promise.all([
+      get().loadAllDetails(),
+      get().loadPreviews(),
+    ]);
+  },
+
+  async clearLibrary() {
+    await api.deleteAllScenes();
+    set({
+      scenes: [], sceneDetails: {}, scenePreviews: {}, activeSceneId: null,
+    });
+  },
+
+  async resetLibrary() {
+    await api.resetScenes();
+    await get().reloadLibrary();
+  },
+
+  async importLibrary(payload, mode) {
+    await api.importScenes(payload, mode);
+    await get().reloadLibrary();
   },
 
   // Scene order — the switcher's drag. Optimistic, then the whole id list to
