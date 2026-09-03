@@ -52,7 +52,7 @@ export default function SceneLibrarySettings() {
         />
         <SettingsRow
           label="Replace with a file"
-          hint="Imports the file instead of the library: every scene not in it is deleted. The panel keeps playing its current scene if the file still contains it."
+          hint="Imports the file instead of the library: every scene not in it is deleted."
           control={(
             <ImportScenesButton
               mode="replace"
