@@ -5,9 +5,11 @@ const os = require('os');
 const path = require('path');
 
 const { Compositor } = require('../engine/compositor');
-const { SceneStore } = require('../engine/scene-store');
+const { SceneStore, DEFAULTS_FILE } = require('../engine/scene-store');
 const jsonStore = require('../engine/json-store');
 const effects = require('../effects');
+
+const defaultDoc = JSON.parse(fs.readFileSync(DEFAULTS_FILE, 'utf8'));
 
 function makeStore() {
     const model = [{ point: [0, 0, 0] }, { point: [0.25, 0, 0] }];
@@ -177,10 +179,10 @@ test('duplicate layer ids across scenes are repaired on load', () => {
 
 // ---- load() / seeding ----
 
-test('a fresh install seeds the four built-ins in order with no NaN', async () => {
+test('a fresh install seeds the default set in order with no NaN', async () => {
     const store = makePersistedStore(tmpFile('scenes.json'));
     await store.load();
-    assert.deepStrictEqual(store.scenes.map((s) => s.name), ['Default', 'Embers', 'Particle Trail', 'Candy Sparkler']);
+    assert.deepStrictEqual(store.scenes.map((s) => s.name), defaultDoc.scenes.map((s) => s.name));
 
     const catalogTypes = effects.catalog().map((e) => e.type);
     for (const scene of store.scenes) {
@@ -192,14 +194,14 @@ test('a fresh install seeds the four built-ins in order with no NaN', async () =
     }
 });
 
-test('a second store on the same file loads four and does not re-seed', async () => {
+test('a second store on the same file loads the same set and does not re-seed', async () => {
     const file = tmpFile('scenes.json');
     const first = makePersistedStore(file);
     await first.load();
 
     const second = makePersistedStore(file);
     await second.load();
-    assert.strictEqual(second.scenes.length, 4);
+    assert.strictEqual(second.scenes.length, defaultDoc.scenes.length);
 });
 
 test('{version: 2, scenes: []} loads as zero scenes', async () => {
@@ -217,7 +219,7 @@ test('a missing/non-array scenes key is treated as fresh', async () => {
 
     const store = makePersistedStore(file);
     await store.load();
-    assert.strictEqual(store.scenes.length, 4);
+    assert.strictEqual(store.scenes.length, defaultDoc.scenes.length);
 });
 
 test('an activeSceneId naming an absent scene falls back to null', async () => {
@@ -296,4 +298,145 @@ test('reorder leaves the active scene active', () => {
     store.reorder(['c', 'b', 'a']);
     assert.strictEqual(store.activeSceneId, 'a');
     assert.strictEqual(store.activeScene().name, 'A');
+});
+
+// ---- bulk mutations: removeAll / resetToDefaults / importReplace ----
+//
+// The compositor's instance map is the thing to watch across all three: it is
+// keyed by layer id and spans every scene, so a bulk drop that forgets to
+// release leaks an instance per layer for the life of the process.
+
+function twoSceneStore() {
+    const store = makeStore();
+    store.setScenes([
+        { id: 'a', name: 'A', layers: [{ id: 'la', effectType: 'solid', params: {} }] },
+        { id: 'b', name: 'B', layers: [{ id: 'lb1', effectType: 'wavelet', params: {} }, { id: 'lb2', effectType: 'noise', params: {} }] },
+    ]);
+    return store;
+}
+
+test('removeAll empties the library, nulls the active scene and releases every layer', () => {
+    const store = twoSceneStore();
+    store.setActive('b');
+    assert.strictEqual(store.compositor.layers.size, 3);
+
+    store.removeAll();
+    assert.deepStrictEqual(store.scenes, []);
+    assert.strictEqual(store.activeSceneId, null);
+    assert.strictEqual(store.compositor.layers.size, 0, 'every layer instance must be released');
+    assert.deepStrictEqual(store.list(), []);
+});
+
+test('an empty library survives a reload rather than re-seeding the defaults', async () => {
+    // load() tells an empty scenes array apart from a missing key on purpose;
+    // getting it wrong means a delete-all silently undoes itself on the next
+    // service restart.
+    const file = tmpFile('scenes.json');
+    const store = makePersistedStore(file);
+    await store.load();
+    store.removeAll();
+    await store.flush();
+
+    const reloaded = makePersistedStore(file);
+    await reloaded.load();
+    assert.strictEqual(reloaded.scenes.length, 0);
+});
+
+test('resetToDefaults replaces the library and is idempotent', () => {
+    const store = twoSceneStore();
+    store.setActive('a');
+
+    store.resetToDefaults();
+    assert.deepStrictEqual(store.scenes.map((s) => s.id), defaultDoc.scenes.map((s) => s.id));
+    assert.strictEqual(store.activeSceneId, null, 'a reset library has no active scene');
+    const first = JSON.stringify(store.exportAll());
+
+    store.resetToDefaults();
+    assert.strictEqual(JSON.stringify(store.exportAll()), first, 'fixed ids make a second reset a no-op');
+});
+
+test('resetToDefaults releases the old layers and holds exactly the new ones', () => {
+    const store = twoSceneStore();
+    store.resetToDefaults();
+    const layerIds = store.scenes.flatMap((s) => s.layers.map((l) => l.id));
+    assert.strictEqual(store.compositor.layers.size, layerIds.length);
+    assert.ok(layerIds.every((id) => store.compositor.layers.has(id)));
+    for (const stale of ['la', 'lb1', 'lb2']) {
+        assert.ok(!store.compositor.layers.has(stale), `${stale} was not released`);
+    }
+});
+
+// Not "renders something": the harness model is two LEDs at the origin, and
+// plenty of the defaults legitimately light neither at a given instant.
+test('every default scene renders finite channels', () => {
+    const store = makeStore();
+    store.resetToDefaults();
+    for (const scene of store.scenes) {
+        store.compositor.renderFrame(scene, 2500);
+        const comp = store.compositor.composite;
+        assert.ok(comp.every(Number.isFinite), `${scene.name} rendered non-finite channels`);
+    }
+});
+
+test('importReplace swaps the whole library, not merging into it', () => {
+    const store = twoSceneStore();
+    store.importReplace([{ id: 'z', name: 'Z', layers: [{ id: 'lz', effectType: 'solid', params: {} }] }]);
+    assert.deepStrictEqual(store.scenes.map((s) => s.id), ['z']);
+    assert.strictEqual(store.compositor.layers.size, 1, 'the *old* layers are the ones to release');
+    assert.ok(store.compositor.layers.has('lz'));
+});
+
+test('importReplace keeps an active id the incoming set still contains', () => {
+    // Round-tripping your own export leaves the panel exactly as it was.
+    const store = twoSceneStore();
+    store.setActive('b');
+    store.importReplace(store.exportAll().scenes);
+    assert.strictEqual(store.activeSceneId, 'b');
+});
+
+test('importReplace nulls an active id that vanished with the old library', () => {
+    const store = twoSceneStore();
+    store.setActive('b');
+    store.importReplace([{ id: 'z', name: 'Z', layers: [] }]);
+    assert.strictEqual(store.activeSceneId, null);
+});
+
+// ---- the defaults file itself ----
+//
+// It is checked-in code rather than user data, so it is worth asserting the
+// things nothing else would tell us about: setScenes() repairs a duplicate
+// layer id *silently*, so a hand-edited file with copy-pasted ids would get
+// different ids than it says, and an unknown effectType renders as nothing at
+// all rather than erroring.
+
+test('the defaults file is a valid import envelope', () => {
+    assert.strictEqual(defaultDoc.version, 2);
+    assert.ok(Array.isArray(defaultDoc.scenes) && defaultDoc.scenes.length > 0);
+    assert.ok(defaultDoc.scenes.every((s) => s.id && s.name && Array.isArray(s.layers)));
+});
+
+test('every layer id in the defaults file is unique across the whole document', () => {
+    const ids = defaultDoc.scenes.flatMap((s) => s.layers.map((l) => l.id));
+    assert.strictEqual(new Set(ids).size, ids.length, 'duplicate layer ids would be repaired silently');
+    const sceneIds = defaultDoc.scenes.map((s) => s.id);
+    assert.strictEqual(new Set(sceneIds).size, sceneIds.length);
+});
+
+test('every effectType in the defaults file is in the catalog', () => {
+    const known = effects.catalog().map((e) => e.type);
+    for (const scene of defaultDoc.scenes) {
+        for (const layer of scene.layers) {
+            assert.ok(known.includes(layer.effectType), `${scene.name}: ${layer.effectType} is not an effect`);
+        }
+    }
+});
+
+test('the defaults load without setScenes having to repair anything', () => {
+    const store = makeStore();
+    store.setScenes(defaultDoc.scenes);
+    assert.strictEqual(store._dirty, false, 'a repair means the file does not say what the panel gets');
+    assert.deepStrictEqual(
+        store.scenes.flatMap((s) => s.layers.map((l) => l.id)),
+        defaultDoc.scenes.flatMap((s) => s.layers.map((l) => l.id)),
+    );
 });

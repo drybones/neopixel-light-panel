@@ -35,18 +35,47 @@ function createRouter(store, previewCache, effectPreviewCache) {
         res.status(201).json(scene);
     });
 
+    // Empty the library. A DELETE on the collection, so — unlike reset below
+    // — there is no id to be confused with; the store nulls the active scene
+    // and the render loop falls to its one-black-frame fast exit.
+    router.delete('/scenes', function(req, res) {
+        store.removeAll();
+        res.json(store.list());
+    });
+
     // Export/import before /scenes/:id so "export" isn't matched as an id
     router.get('/scenes/export', function(req, res) {
         res.json(store.exportAll());
     });
 
+    // `mode` defaults to "merge", which is what every existing client sends
+    // (nothing). "replace" swaps the library for the incoming set instead —
+    // worth its own mode rather than a client-side delete-all-then-import,
+    // because the envelope is validated *before* the store is touched: a
+    // rejected body leaves the library exactly as it was, where the
+    // two-request version would already have thrown it away.
     router.post('/scenes/import', function(req, res) {
         var body = req.body;
         if (!body || body.version !== 2 || !Array.isArray(body.scenes)) {
             return res.status(400).json({ error: 'Import body must be {version: 2, scenes: [...]}' });
         }
-        store.importMerge(body.scenes);
+        var mode = body.mode === undefined ? 'merge' : body.mode;
+        if (mode !== 'merge' && mode !== 'replace') {
+            return res.status(400).json({ error: 'mode must be "merge" or "replace"' });
+        }
+        if (mode === 'replace') store.importReplace(body.scenes);
+        else store.importMerge(body.scenes);
         res.sendStatus(200);
+    });
+
+    // Restore the curated starting library, replacing whatever is there —
+    // see SceneStore.resetToDefaults for why replace and not merge. Before
+    // /scenes/:id alongside export/import/order/previews: there is no POST
+    // /scenes/:id today, but the rule is the path shape, not the verb, and
+    // adding one later would silently swallow this.
+    router.post('/scenes/reset', function(req, res) {
+        store.resetToDefaults();
+        res.json(store.list());
     });
 
     // Reorder, before /scenes/:id so "order" isn't matched as a scene id.

@@ -12,11 +12,21 @@
  */
 
 var crypto = require('crypto');
+var fs = require('fs');
+var path = require('path');
 var effects = require('../effects');
 var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
 
 var SAVE_DEBOUNCE_MS = 2000;
+
+// The curated starting library, in the same {version: 2, scenes: [...]} shape
+// as an export. It lives in the *source tree*, not under data/: it is code —
+// checked in, diffable, regenerable from a curated export — while data/ is
+// gitignored and owned by whatever is running there. One file feeds both the
+// fresh-install seed and resetToDefaults(), so "what a new panel looks like"
+// has a single definition.
+var DEFAULTS_FILE = path.join(__dirname, '..', 'default-scenes.json');
 
 function newId() {
     return crypto.randomUUID().split('-')[0];
@@ -26,21 +36,23 @@ function warn(msg) {
     console.warn('Scene store: ' + msg);
 }
 
-// The four scenes a fresh install starts with. Embers and Candy Sparkler are
-// emitter presets, not effect types of their own — the picker offers them as
-// starting points, but seeding needs their full param sets up front.
-function builtinScenes() {
-    var emitter = effects.get('emitter');
-    function preset(id) {
-        var match = emitter.presets.filter(function(p) { return p.id === id; })[0];
-        return Object.assign({}, emitter.defaults, match.params);
+// Read fresh rather than require()d: require caches one object, and handing
+// the same nested params (a gradient's stops, an emitter's colour list) to two
+// resets would have both libraries sharing them. A 15KB parse on a reset is
+// nothing. Ids in the file are fixed (`default-sun`, not a fresh uuid slice),
+// which is what makes resetting twice idempotent and a merging import of a
+// defaults file update rather than duplicate.
+function defaultScenes() {
+    var doc;
+    try {
+        doc = JSON.parse(fs.readFileSync(DEFAULTS_FILE, 'utf8'));
+    } catch (err) {
+        throw new Error('Cannot read the default scene set at ' + DEFAULTS_FILE + ': ' + err.message);
     }
-    return [
-        { name: 'Default', layers: [{ effectType: 'wavelet', params: { color: '#ffffff', freq: 0.3, lambda: 0.3, min: 0.2, max: 0.4 }, blendMode: 'add' }] },
-        { name: 'Embers', layers: [{ effectType: 'emitter', params: preset('embers') }] },
-        { name: 'Particle Trail', layers: [{ effectType: 'particle_trail' }] },
-        { name: 'Candy Sparkler', layers: [{ effectType: 'emitter', params: preset('sparkler') }] },
-    ];
+    if (!doc || !Array.isArray(doc.scenes)) {
+        throw new Error('The default scene set at ' + DEFAULTS_FILE + ' is not {version: 2, scenes: [...]}');
+    }
+    return doc.scenes;
 }
 
 function stripRuntime(scene) {
@@ -134,14 +146,16 @@ class SceneStore {
         var doc = this.persistFile ? jsonStore.load(this.persistFile, warn) : null;
         // Array.isArray, not `.length` — an *empty* scenes array is someone
         // who deleted their library, not a fresh install. Only the absence
-        // of a usable scenes key means "seed the built-ins."
+        // of a usable scenes key means "seed the defaults." This is what
+        // stops DELETE /api/scenes silently undoing itself on the next
+        // service restart.
         if (doc && Array.isArray(doc.scenes)) {
             this.setScenes(doc.scenes);
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
             await this.flush();          // no-op unless setScenes repaired an id
             return;
         }
-        this.setScenes(builtinScenes());
+        this.setScenes(defaultScenes());
         this.activeSceneId = null;
         this._dirty = true;
         await this.flush();
@@ -248,6 +262,53 @@ class SceneStore {
         return true;
     }
 
+    // The compositor caches one render instance per layer id across *all*
+    // scenes, so anything that drops scenes in bulk owes the same release
+    // remove() does for one — miss it and every layer of the old library
+    // leaks an instance, permanently. Always called *before* the replacement
+    // is synced, or it releases the instances just created.
+    releaseAllLayers() {
+        var ids = [];
+        this.scenes.forEach(function(s) {
+            s.layers.forEach(function(l) { ids.push(l.id); });
+        });
+        this.compositor.releaseLayers(ids);
+    }
+
+    // Empty the library. The active id goes with it: the render loop then
+    // draws one black frame and fast-exits, and frameStats.restart() picks
+    // the change up from tick() without help. An empty library persists as
+    // an empty array, which load() deliberately tells apart from a missing
+    // scenes key — see there.
+    removeAll() {
+        this.releaseAllLayers();
+        this.scenes = [];
+        this.activeSceneId = null;
+        this.markDirty();
+    }
+
+    // Restore defaults is a *replace*, not a merge: merging them into a
+    // library holding edited copies is the confusing case, where some scenes
+    // revert and others don't depending on whether their ids happen to match.
+    resetToDefaults() {
+        this.releaseAllLayers();
+        this.setScenes(defaultScenes());
+        this.activeSceneId = null;
+        this.markDirty();
+    }
+
+    // Import *instead of* the current library rather than merged into it.
+    // The active id survives if the incoming set still contains it, so
+    // round-tripping your own export leaves the panel exactly as it was;
+    // otherwise it goes null, like a delete-all.
+    importReplace(scenes) {
+        var wasActive = this.activeSceneId;
+        this.releaseAllLayers();
+        this.setScenes(scenes);
+        this.activeSceneId = (wasActive && this.get(wasActive)) ? wasActive : null;
+        this.markDirty();
+    }
+
     // Scene order is the array order — nothing else in the API can rewrite it
     // (create appends, replace is in place, importMerge replaces or appends).
     // Takes the complete id list rather than a move, so a stale client can't
@@ -303,4 +364,4 @@ class SceneStore {
     }
 }
 
-module.exports = { SceneStore, stripRuntime, normaliseLayer, newId };
+module.exports = { SceneStore, stripRuntime, normaliseLayer, newId, defaultScenes, DEFAULTS_FILE };
