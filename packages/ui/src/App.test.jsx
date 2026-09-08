@@ -88,7 +88,7 @@ beforeEach(() => {
   window.IntersectionObserver = FakeIntersectionObserver;
   window.location.hash = '';
 });
-afterEach(() => { cleanup(); uninstall(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); uninstall(); });
 
 test('the app mounts and renders the switcher once the store has loaded', async () => {
   render(<App />);

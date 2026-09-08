@@ -27,7 +27,7 @@ const { default: ParamPanel } = await import('./ParamPanel');
 
 let uninstall;
 beforeEach(() => { uninstall = installCanvasStub(); });
-afterEach(() => { cleanup(); uninstall(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); uninstall(); });
 
 const EFFECT = {
   type: 'demo',

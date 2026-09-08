@@ -75,7 +75,7 @@ beforeEach(() => {
     libraryNotice: null,
   });
 });
-afterEach(() => { cleanup(); uninstall(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); uninstall(); });
 
 test('renders a card per scene, plus Off and New scene', () => {
   render(<SceneGrid onEdit={() => {}} />);

@@ -10,7 +10,7 @@
  */
 
 import {
-  afterEach, beforeEach, expect, test, vi,
+  beforeEach, expect, test, vi,
 } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -38,7 +38,6 @@ function serverHolds(n) {
 }
 
 beforeEach(() => { useStore.setState({ libraryNotice: null, scenes: [] }); });
-afterEach(() => { vi.clearAllMocks(); });
 
 test('delete-all says the panel went off with the scenes', async () => {
   api.deleteAllScenes.mockResolvedValue([]);
