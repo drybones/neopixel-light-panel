@@ -43,7 +43,7 @@ const { LayerRow } = await import('../editor/LayerStack');
 
 let uninstall;
 beforeEach(() => { uninstall = installCanvasStub(); });
-afterEach(() => { cleanup(); uninstall(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); uninstall(); });
 
 function dialCanvas(container) {
   return container.querySelector('canvas').getContext('2d');
