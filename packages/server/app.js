@@ -85,6 +85,16 @@ async function shutdown() {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+// Anything that escapes still exits and lets systemd restart the service, but
+// with the stores written first — their flush is synchronous inside, so this
+// is safe to call on the way out — and with the reason on the first line of
+// the journal entry. Without this a crash cost the last 2s of edits (#108).
+process.on('uncaughtException', function(err) {
+    console.error('Uncaught exception, exiting:', err);
+    try { store.flush(); settings.flush(); } catch (e) { /* already exiting */ }
+    process.exit(1);
+});
+
 app.use('/api', createSystemRouter({
     settings: settings,
     client: client,
@@ -94,8 +104,12 @@ app.use('/api', createSystemRouter({
 
 app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));
 
-app.listen(3000, function () {
+var server = app.listen(3000, function () {
     console.log('Lightpanel API server listening on port 3000');
+});
+server.on('error', function(err) {
+    console.error('Lightpanel API server: ' + err.message);
+    process.exit(1);
 });
 
 // Render loop. When no scene is active ("off"), render one black frame,
@@ -103,7 +117,25 @@ app.listen(3000, function () {
 var offRendered = false;
 var statsSceneId = null;
 
+// One bad frame drops a frame, not the service. The log is rate-limited
+// because a persistent fault would otherwise write ~90 lines a second; the
+// scene id is the datum you want, since cost and faults are per scene.
+var TICK_ERROR_LOG_MS = 5000;
+var lastTickErrorAt = 0;
+
 function tick() {
+    try {
+        renderTick();
+    } catch (err) {
+        var now = Date.now();
+        if (now - lastTickErrorAt >= TICK_ERROR_LOG_MS) {
+            lastTickErrorAt = now;
+            console.error('Render tick failed (scene ' + statsSceneId + '):', err);
+        }
+    }
+}
+
+function renderTick() {
     var scene = store.activeScene();
     if (scene) {
         // Frame stats are per scene: cost varies by what is being rendered,

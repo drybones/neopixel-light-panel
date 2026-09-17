@@ -545,3 +545,5 @@ and while that scene is active you receive, at ~15 FPS:
 ```
 
 instead of v1 frames. `composite` is pre-brightness like v1; layer frames are additionally pre-opacity (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
+
+Inbound messages are limited to 4 KB; a larger one closes that connection with code `1009`. Nothing the stream accepts is anywhere near that.
