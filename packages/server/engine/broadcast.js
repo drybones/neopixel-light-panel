@@ -35,6 +35,12 @@ var WebSocket = require('ws');
 var FRAME_INTERVAL_MS = 33;
 var LAYER_FRAME_INTERVAL_MS = 66;
 
+// The only inbound messages are the two subscribe/unsubscribe objects, a few
+// dozen bytes each. ws's default cap is 100 MiB, buffered before parsing, and
+// CORS does not reach a WebSocket — the browser sends Origin, the server has
+// to care — so this is the one limit that bounds what a stray page can cost.
+var MAX_PAYLOAD_BYTES = 4096;
+
 function clamp255(v) {
     return v < 0 ? 0 : (v > 255 ? 255 : v | 0);
 }
@@ -48,14 +54,30 @@ class Broadcaster {
         this._lastSent = 0;
         this._lastLayerSent = 0;
         this._layerArrays = new Map(); // layerId → reusable [[r,g,b],...]
+        this._layerArraysSceneId = null;
 
-        var port = (options && options.port) || 3001;
-        this.wss = new WebSocket.Server({ port: port });
-        console.log('Pixel broadcaster: WebSocket listening on port ' + port);
+        var port = options && options.port !== undefined ? options.port : 3001;
+        this.wss = new WebSocket.Server({ port: port, maxPayload: MAX_PAYLOAD_BYTES });
 
         var self = this;
+        this.wss.on('listening', function() {
+            console.log('Pixel broadcaster: WebSocket listening on port ' + self.wss.address().port);
+        });
+        // A server without its previews is not a working server, and the
+        // realistic cause (EADDRINUSE from a stale process) needs a human.
+        // Exit with the reason on one line rather than an uncaught stack.
+        this.wss.on('error', function(err) {
+            console.error('Pixel broadcaster: ' + err.message);
+            process.exit(1);
+        });
+
         this.wss.on('connection', function(socket) {
             socket._layerSceneId = null;
+            // 'close' follows and the client set drops it; the listener is
+            // here because without one ws *throws* the error, and a phone
+            // walking out of wifi range mid-frame took the render loop with
+            // it (#108). An over-size message arrives by this path too.
+            socket.on('error', function() {});
             socket.on('message', function(data) {
                 var msg;
                 try { msg = JSON.parse(data); } catch (e) { return; }
@@ -118,6 +140,14 @@ class Broadcaster {
         if (subscribers.length === 0) return;
         this._lastLayerSent = now;
 
+        // One reusable array per layer of the scene being previewed; keyed
+        // only by layer id, the map would grow by one entry per layer ever
+        // previewed and never shrink.
+        if (scene.id !== this._layerArraysSceneId) {
+            this._layerArrays.clear();
+            this._layerArraysSceneId = scene.id;
+        }
+
         var buf = this.compositor.composite;
         this._pixelArray = this._serialiseBuffer(buf, this._pixelArray);
 
@@ -133,6 +163,13 @@ class Broadcaster {
 
         var msg = JSON.stringify({ type: 'frame', composite: this._pixelArray, layers: layers });
         subscribers.forEach(function(socket) { socket.send(msg); });
+    }
+
+    // Tests only: wss.close() alone leaves connected clients open.
+    close() {
+        var wss = this.wss;
+        wss.clients.forEach(function(socket) { socket.terminate(); });
+        return new Promise(function(resolve) { wss.close(resolve); });
     }
 }
 
