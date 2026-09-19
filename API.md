@@ -8,7 +8,9 @@ All endpoints use JSON for request/response bodies unless noted. CORS is enabled
 
 The panel plays one **scene** at a time. A scene is an ordered stack of **layers**; each layer is an instance of an **effect** with its own parameters, blend mode and opacity. Layers composite bottom→top (`layers[0]` is the bottom of the stack), like image-editor layers.
 
-- Scene and layer IDs are 8-character hex strings (the first segment of a UUID v4). Generate them yourself when creating layers client-side.
+- Scene and layer IDs are 8-character hex strings (the first segment of a UUID v4). Generate them yourself when creating layers client-side. **A layer ID must be unique across the whole library**, not just its scene: the server keeps one render instance per layer ID, so on every write path (create, replace, either import) an incoming layer whose ID another scene already holds is given a fresh one. The response carries the ID the server kept.
+- **Params are coerced, not rejected.** Each param is checked against its schema entry's type — a finite number for `number`/`angle`/`xy`/`range`, a `#rrggbb` string for `color`, one of the `options` for `enum`, a string for `text`, at least `minStops` stops of `{position: number, color}` for `gradientStops` — and a value of the wrong type falls back to that param's default, leaving the rest of the layer alone. A numeric string counts as a number. Keys the schema does not declare pass through untouched. The returned layer shows what was stored.
+- Errors are `{ "error": "..." }` with a `4xx` for a request whose *shape* is wrong (a body that is not an object, `layers` that is not an array, malformed JSON) and a bare `500` for anything unexpected.
 - Blend modes: `normal`, `add`, `screen`, `lighten`, `subtract`, `multiply`, `darken`, `difference`, `overlay`, `soft_light`, `linear_light` — see [Blend modes](#blend-modes). Opacity is `0..1`. An unknown mode is stored as `normal`.
 - `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render.
 - "Off" is not a scene: set the active scene to `null`.
@@ -79,7 +81,7 @@ An `angle` entry may set `render` to pick what the dial draws inside itself: `wa
 
 `scale: log` spreads `min`/`max` over decades so equal slider travel is equal ratio — for wavelength, the speeds and the ambient glow floors, which span more range than a linear track can usefully hold. It ignores `step` (the track is integer positions). Adding `zeroable: true` reserves the bottom of the track for an exact `0`, which several params store to mean "frozen" or "no floor" and which a log scale cannot otherwise express.
 
-**Schema `min`/`max` are slider hints, not validation.** Nothing clamps params to them — `normaliseLayer` checks only `opacity` — so stored values outside the range render fine and the slider simply pins at its end. Typed entry is deliberately unclamped, which is how a preset value no slider can reach is restored.
+**Schema `min`/`max` are slider hints, not validation.** Params are coerced to their *type* (see [Concepts](#concepts)) but never clamped to a range, so stored values outside it render fine and the slider simply pins at its end. Typed entry is deliberately unclamped, which is how a preset value no slider can reach is restored.
 
 `xRange`/`yRange` are the panel's own extent (±3.625 × ±0.875, the outermost LED centres). Two optional fields add zoom steps to the editor's pad, each adding one ring of constant world-unit width on all four sides:
 
@@ -138,7 +140,9 @@ Scene order *is* the array order in the stored document, and nothing else can re
 PUT /api/scenes/:sceneId/layers/:layerId
 ```
 
-Body: a full layer object. This is the high-frequency path for parameter edits (drags) — small payload, applied immediately to the running animation. Returns the normalised layer.
+Body: the layer fields that are changing, **merged over the stored layer** — `params` merges one level down, so `{ "params": { "speed": 2 } }` is a complete request and every other param, the blend mode and the rest stay as they were. A full layer object works too, and is what the UI sends. This is the high-frequency path for parameter edits (drags) — small payload, applied immediately to the running animation. Returns the normalised layer.
+
+`effectType` cannot change here: a body naming a different one is a `400` and nothing is applied, since the stored params belong to the old effect. Change a layer's effect with a whole-scene `PUT`. A body or `params` that is not an object is also a `400`.
 
 ---
 

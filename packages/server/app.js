@@ -14,6 +14,7 @@ var { FrameStats } = require('./engine/frame-stats');
 var effects = require('./effects');
 var createScenesRouter = require('./routes/scenes');
 var createSystemRouter = require('./routes/system');
+var { errorHandler } = require('./routes/errors');
 
 var compositor = new Compositor(client, model);
 
@@ -103,6 +104,9 @@ app.use('/api', createSystemRouter({
 }));
 
 app.use('/api', createScenesRouter(store, previewCache, effectPreviewCache));
+
+// Last, so it sees every route's throw and body-parser's rejections alike.
+app.use(errorHandler);
 
 var server = app.listen(3000, function () {
     console.log('Lightpanel API server listening on port 3000');

@@ -440,3 +440,182 @@ test('the defaults load without setScenes having to repair anything', () => {
         defaultDoc.scenes.flatMap((s) => s.layers.map((l) => l.id)),
     );
 });
+
+test('no param in the defaults file needs coercing', () => {
+    // A value coerced here would mean the file says one thing and the panel
+    // renders another, the same drift the repair test above guards for ids.
+    const { coerceParams } = require('../engine/params');
+    for (const scene of defaultDoc.scenes) {
+        for (const layer of scene.layers) {
+            const effect = effects.get(layer.effectType);
+            assert.deepStrictEqual(coerceParams(effect, layer.params),
+                Object.assign({}, effect.defaults, layer.params), `${scene.name}: ${layer.id}`);
+        }
+    }
+});
+
+// ---- write-path defence (#109) ----
+
+function gradientStore() {
+    const store = makeStore();
+    store.setScenes([
+        { id: 'g', name: 'G', layers: [{ id: 'lg', effectType: 'gradient_linear', params: {} }] },
+        { id: 'o', name: 'Other', layers: [{ id: 'lo', effectType: 'solid', params: { color: '#ff0000', level: 1 } }] },
+    ]);
+    return store;
+}
+
+// A stand-in for "an effect whose prepare() throws on these params", since
+// every real one is now handed coerced params and none of them do.
+function withThrowingPrepare(type, when, fn) {
+    const effect = effects.get(type);
+    const original = effect.prepare;
+    effect.prepare = function(params) {
+        if (when(params)) throw new Error('prepare exploded');
+        return original.call(this, params);
+    };
+    try { return fn(); } finally { effect.prepare = original; }
+}
+
+function quietly(fn) {
+    const warn = console.warn;
+    console.warn = () => {};
+    try { return fn(); } finally { console.warn = warn; }
+}
+
+test('malformed gradient stops no longer wedge the scene', () => {
+    // Reproduced: stops.slice() threw after the layer was already written into
+    // scene.layers, so the scene held an unprepared layer and every later edit
+    // to it threw too.
+    const store = gradientStore();
+    for (const stops of [null, 'red', 7, []]) {
+        const layer = store.replaceLayer('g', 'lg', { params: { stops } });
+        assert.deepStrictEqual(layer.params.stops, effects.get('gradient_linear').defaults.stops);
+    }
+    const after = store.replaceLayer('g', 'lg', { params: { phase: 0.5 } });
+    assert.strictEqual(after.params.phase, 0.5, 'the scene still takes edits');
+    assert.ok(store.get('g').layers[0]._prepared.lut, 'and the layer is prepared');
+});
+
+test('a prepare() that throws renders the defaults instead of leaving the layer unprepared', () => {
+    const store = makeStore();
+    store.setScenes([{ id: 's', name: 'S', layers: [{ id: 'l', effectType: 'solid', params: { color: '#ff0000', level: 1 } }] }]);
+    quietly(() => withThrowingPrepare('solid', (p) => p.level === 0.5, () => {
+        store.replaceLayer('s', 'l', { params: { level: 0.5 } });
+    }));
+    const layer = store.get('s').layers[0];
+    assert.strictEqual(layer.params.level, 0.5, 'the params stay as sent, so the editor shows them');
+    assert.deepStrictEqual(layer._prepared, effects.get('solid').prepare(effects.get('solid').defaults));
+});
+
+test('a partial layer PUT merges over the stored layer', () => {
+    const store = makeStore();
+    store.setScenes([{ id: 's', name: 'S', layers: [{
+        id: 'l', effectType: 'solid', params: { color: '#123456', level: 0.25 }, blendMode: 'add', opacity: 0.5,
+    }] }]);
+    const layer = store.replaceLayer('s', 'l', { params: { level: 0.75 } });
+    assert.deepStrictEqual(layer, {
+        id: 'l', effectType: 'solid', params: { color: '#123456', level: 0.75 },
+        blendMode: 'add', opacity: 0.5, enabled: true, solo: false,
+    });
+    assert.strictEqual(store.replaceLayer('s', 'l', { enabled: false }).params.level, 0.75);
+});
+
+test('a layer PUT refuses to change effectType, and leaves the scene exactly as it was', () => {
+    const store = gradientStore();
+    const before = store.get('g');
+    assert.throws(() => store.replaceLayer('g', 'lg', { effectType: 'solid', params: {} }),
+        (err) => err.status === 400 && /effectType/.test(err.message));
+    assert.strictEqual(store.get('g'), before);
+    assert.strictEqual(store.get('g').layers[0].effectType, 'gradient_linear');
+    assert.strictEqual(store._dirty, false);
+});
+
+test('a layer PUT whose body or params are not objects is a 400', () => {
+    const store = gradientStore();
+    for (const body of [null, 'x', [1], { params: 'x' }, { params: [1] }]) {
+        assert.throws(() => store.replaceLayer('g', 'lg', body), (err) => err.status === 400, JSON.stringify(body));
+    }
+});
+
+test('create reassigns a layer id another scene already has, and that scene keeps rendering', () => {
+    const store = gradientStore();
+    const created = store.create({ name: 'C', layers: [{ id: 'lo', effectType: 'wavelet', params: {} }] });
+    assert.notStrictEqual(created.layers[0].id, 'lo');
+    store.compositor.renderFrame(store.get('o'), 1000);
+    assert.ok(store.compositor.composite.some((v) => v > 0), 'the original owner of the id must not go black');
+});
+
+test('replace may keep its own layer ids but not take another scene\'s', () => {
+    const store = gradientStore();
+    const scene = store.replace('g', { layers: [
+        { id: 'lg', effectType: 'gradient_linear', params: {} },
+        { id: 'lo', effectType: 'wavelet', params: {} },
+    ] });
+    assert.strictEqual(scene.layers[0].id, 'lg');
+    assert.notStrictEqual(scene.layers[1].id, 'lo');
+});
+
+test('a merging import that reuses another scene\'s layer id does not black it out', () => {
+    // Reproduced: the merged scene took over the compositor entry for 'lo',
+    // and the solid scene rendered black until restart.
+    const store = gradientStore();
+    store.importMerge([{ id: 'new', name: 'New', layers: [{ id: 'lo', effectType: 'wavelet', params: {} }] }]);
+    const ids = store.scenes.flatMap((s) => s.layers.map((l) => l.id));
+    assert.strictEqual(new Set(ids).size, ids.length, 'layer ids must be unique across the library');
+    store.compositor.renderFrame(store.get('new'), 1000);
+    store.compositor.renderFrame(store.get('o'), 1000);
+    assert.ok(store.compositor.composite.some((v) => v > 0));
+});
+
+test('a merging import may keep the ids of the scene it replaces, and releases the ones it drops', () => {
+    const store = twoSceneStore();
+    store.importMerge([{ id: 'b', name: 'B2', layers: [{ id: 'lb1', effectType: 'wavelet', params: {} }] }]);
+    assert.deepStrictEqual(store.get('b').layers.map((l) => l.id), ['lb1']);
+    assert.deepStrictEqual([...store.compositor.layers.keys()].sort(), ['la', 'lb1']);
+});
+
+test('a layer id dropped by one merged scene and taken by another is not released', () => {
+    const store = twoSceneStore();
+    store.importMerge([
+        { id: 'c', name: 'C', layers: [{ id: 'lb2', effectType: 'noise', params: {} }] },
+        { id: 'b', name: 'B2', layers: [] },
+    ]);
+    assert.strictEqual(store.get('c').layers[0].id, 'lb2');
+    assert.ok(store.compositor.layers.has('lb2'), 'the new owner\'s instance must survive the release');
+});
+
+test('import and load skip what is not an object instead of throwing', () => {
+    const store = twoSceneStore();
+    assert.doesNotThrow(() => store.importMerge([null, 'x', { id: 'c', layers: [null, 3, { effectType: 'solid' }] }]));
+    assert.strictEqual(store.get('c').layers.length, 1);
+    assert.doesNotThrow(() => store.importReplace([null, { id: 'd', layers: 'nope' }]));
+    assert.deepStrictEqual(store.list(), [{ id: 'd', name: 'Untitled', layerCount: 0 }]);
+});
+
+test('a replacing import that fails part-way leaves the library exactly as it was', () => {
+    // An effect whose prepare() throws on its defaults too is a code bug, but
+    // it is also the one way left for building the new library to throw, and
+    // the old one must still be whole when it does.
+    const store = twoSceneStore();
+    store.setActive('b');
+    const before = store.scenes;
+    quietly(() => withThrowingPrepare('solid', () => true, () => {
+        assert.throws(() => store.importReplace([{ id: 'z', layers: [{ effectType: 'solid' }] }]));
+    }));
+    assert.strictEqual(store.scenes, before);
+    assert.strictEqual(store.activeSceneId, 'b');
+    assert.strictEqual(store.compositor.layers.size, 3, 'nothing was released');
+});
+
+test('a persisted layer with bad params loads, rather than failing the whole library', async () => {
+    const file = tmpFile('scenes.json');
+    jsonStore.save(file, { version: 2, activeSceneId: 'g', scenes: [
+        { id: 'g', name: 'G', layers: [{ id: 'lg', effectType: 'gradient_linear', params: { stops: null, repeats: 'lots' } }] },
+    ] });
+    const store = makePersistedStore(file);
+    await store.load();
+    assert.strictEqual(store.activeSceneId, 'g');
+    store.compositor.renderFrame(store.activeScene(), 0);
+    assert.ok(store.compositor.composite.every(Number.isFinite));
+});
