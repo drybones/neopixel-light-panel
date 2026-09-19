@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const power = require('../engine/power');
 const { PowerMeter, scaleFor, budgetFor, normaliseConfig, milliampsFor } = power;
 const VirtualOPC = require('../virtual-opc');
+const { HEADER_BYTES: R } = require('../engine/pixel-sink');
 
 const NUM_LEDS = 240;
 
@@ -95,7 +96,7 @@ test('a limited frame is sent at or under the budget, never over', () => {
     // Re-estimate over the bytes that actually went out, which is the only
     // figure the panel cares about.
     const check = sinkWith(cfg);
-    const resent = paint(check, sink.pixelBuffer[0], sink.pixelBuffer[1], sink.pixelBuffer[2]);
+    const resent = paint(check, sink.pixelBuffer[R], sink.pixelBuffer[R + 1], sink.pixelBuffer[R + 2]);
     assert.ok(resent.requestedMilliamps <= 8800,
         `the frame as sent draws ${resent.requestedMilliamps}mA against a budget of 8800`);
 });
@@ -106,19 +107,19 @@ test('the rescale is gamma-corrected, not linear', () => {
     // Needing 65% of the current means scaling values by 0.65^0.4 = 0.843,
     // i.e. white at byte 215. A linear rescale would drop it to 166 and dim
     // the panel far more than the budget requires.
-    assert.strictEqual(sink.pixelBuffer[0], 215);
+    assert.strictEqual(sink.pixelBuffer[R], 215);
 });
 
 test('an already-limited frame is not dimmed twice', () => {
     const cfg = config(TIGHT_BUDGET);
     const first = sinkWith(cfg);
     paint(first, 255, 255, 255);
-    const limited = first.pixelBuffer[0];
+    const limited = first.pixelBuffer[R];
 
     const second = sinkWith(cfg);
     const snap = paint(second, limited, limited, limited);
     assert.strictEqual(snap.scale, 1);
-    assert.strictEqual(second.pixelBuffer[0], limited);
+    assert.strictEqual(second.pixelBuffer[R], limited);
 });
 
 /*
@@ -138,7 +139,7 @@ test('the scale is continuous at the budget boundary', () => {
 test('limit:false measures without acting', () => {
     const sink = sinkWith(config({ ...TIGHT_BUDGET, limit: false }));
     const snap = paint(sink, 255, 255, 255);
-    assert.strictEqual(sink.pixelBuffer[0], 255);
+    assert.strictEqual(sink.pixelBuffer[R], 255);
     assert.strictEqual(snap.scale, 1);
     // Still reports what it would have cost — the headroom reading is the
     // reason measurement is unconditional.
@@ -221,7 +222,7 @@ test('limiting dims the panel and leaves the composite the previews read', () =>
     compositor.renderFrame(store.get(created.id), Date.now());
 
     assert.strictEqual(compositor.composite[0], 255, 'the preview source is untouched');
-    assert.strictEqual(sink.pixelBuffer[0], 215, 'the panel is pulled back');
+    assert.strictEqual(sink.pixelBuffer[R], 215, 'the panel is pulled back');
 });
 
 // ---------------------------------------------------------------- hot loop

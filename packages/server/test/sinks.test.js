@@ -3,11 +3,12 @@ const assert = require('node:assert');
 
 const OPC = require('../opc');
 const VirtualOPC = require('../virtual-opc');
+const { HEADER_BYTES } = require('../engine/pixel-sink');
 
 // Both sinks, driven through the real setPixel. The hardware one is only
-// constructed here — nothing calls _reconnect, so no socket is opened — and
-// its buffer carries the 4-byte OPC header the virtual one doesn't, which is
-// the only difference the readers below have to know about.
+// constructed here — nothing calls _reconnect, so no socket is opened. Both
+// buffers are OPC-framed, so one reader serves both.
+const read = (sink) => [...sink.pixelBuffer.subarray(HEADER_BYTES, HEADER_BYTES + 3)];
 const SINKS = [
     {
         name: 'opc',
@@ -16,7 +17,7 @@ const SINKS = [
             sink.setPixelCount(1);
             return sink;
         },
-        read: (sink) => [sink.pixelBuffer[4], sink.pixelBuffer[5], sink.pixelBuffer[6]],
+        read,
     },
     {
         name: 'virtual-opc',
@@ -25,7 +26,7 @@ const SINKS = [
             sink.setPixelCount(1);
             return sink;
         },
-        read: (sink) => [sink.pixelBuffer[0], sink.pixelBuffer[1], sink.pixelBuffer[2]],
+        read,
     },
 ];
 
@@ -115,5 +116,37 @@ test('both sinks produce identical bytes across the range', () => {
                 byteFor(SINKS[1], value, brightness),
                 `sinks disagree at value ${value}, brightness ${brightness}`);
         }
+    }
+});
+
+test('both sinks hold the same whole frame, header and limiter pass included', () => {
+    // The stronger form of the test above: every byte of the buffer, over a
+    // frame the limiter rescales. The virtual sink carries the OPC header
+    // precisely so that this comparison needs no offsets.
+    //
+    // The hardware sink's writePixels would open a socket, so its send is
+    // stubbed out; everything before the send is the shared path.
+    const frame = (Sink) => {
+        const sink = new Sink('localhost', 7890, 0.8);
+        sink._send = () => {};
+        sink.setPixelCount(240);
+        sink.power.setConfig({ maxMilliamps: 4000 });
+        for (let i = 0; i < 240; i++) sink.setPixel(i, i * 3, 510 - i, (i * 37) % 300);
+        sink.writePixels();
+        assert.ok(sink.power.snapshot().limiting, 'the frame should be over budget');
+        return sink.pixelBuffer;
+    };
+    assert.deepStrictEqual(frame(VirtualOPC), frame(OPC));
+});
+
+test('both sinks grow their buffer for a pixel past the end', () => {
+    // The copies had drifted here: only the hardware one grew.
+    for (const Sink of [OPC, VirtualOPC]) {
+        const sink = new Sink('localhost', 7890, 1);
+        sink.setPixelCount(1);
+        sink.setPixel(4, 10, 20, 30);
+        const at = HEADER_BYTES + 4 * 3;
+        assert.deepStrictEqual([...sink.pixelBuffer.subarray(at, at + 3)], [10, 20, 30], Sink.name);
+        assert.strictEqual(sink.pixelBuffer.readUInt16BE(2), 15, `${Sink.name}: OPC length header`);
     }
 });
