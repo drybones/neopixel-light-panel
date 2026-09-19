@@ -15,6 +15,7 @@ var effects = require('./effects');
 var createScenesRouter = require('./routes/scenes');
 var createSystemRouter = require('./routes/system');
 var { errorHandler } = require('./routes/errors');
+var { createOriginGuard } = require('./routes/origin');
 
 var compositor = new Compositor(client, model);
 
@@ -34,9 +35,13 @@ var effectPreviewCache = new EffectPreviewCache(model);
 var broadcaster = new Broadcaster(compositor, model.length);
 
 var express = require('express');
-var cors = require('cors');
 var app = express();
-app.use(cors());
+// The production UI is served below, same-origin; the Vite dev server is the
+// only foreign page that should reach the API, and only in dev. See
+// routes/origin.js for why CORS alone would not be enough.
+app.use(createOriginGuard({
+    allowedOrigins: process.env.VIRTUAL ? ['http://localhost:3002'] : [],
+}));
 app.use(express.static(path.join(__dirname, '../ui/dist')));
 app.use(express.json());
 
