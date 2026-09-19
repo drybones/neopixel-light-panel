@@ -55,8 +55,7 @@ function createTick(deps) {
             var t0 = frameStats.begin();
             compositor.renderFrame(scene, now());
             frameStats.endRender(t0);
-            broadcaster.tick();
-            broadcaster.tickLayers(scene);
+            broadcaster.tick(scene);
             frameStats.end(t0);
             offRendered = false;
         } else if (!offRendered) {
@@ -64,7 +63,7 @@ function createTick(deps) {
             // sampled: it is not a stalled render, and counting those ticks
             // would report 0 FPS for a panel that is behaving correctly.
             compositor.renderBlack();
-            broadcaster.tick(true);
+            broadcaster.tick(null, true);
             offRendered = true;
         }
     }

@@ -21,8 +21,9 @@ function harness() {
             renderBlack: function() { calls.push('black'); },
         },
         broadcaster: {
-            tick: function(force) { calls.push(force ? 'broadcast forced' : 'broadcast'); },
-            tickLayers: function(scene) { calls.push('layers ' + scene.id); },
+            tick: function(scene, force) {
+                calls.push('broadcast ' + (scene ? scene.id : 'off') + (force ? ' forced' : ''));
+            },
         },
         frameStats: {
             restart: function() { calls.push('stats restart'); },
@@ -36,11 +37,14 @@ function harness() {
     return { tick: tick, calls: calls, state: state };
 }
 
-test('an active scene renders and broadcasts both streams every tick', () => {
+test('an active scene renders and broadcasts its frame every tick', () => {
+    // The broadcaster is handed the scene, not just told to send: one frame
+    // carries the composite to everyone and that scene's layers to whoever
+    // asked for them.
     var h = harness();
     h.state.scene = { id: 's1', layers: [] };
     h.tick();
-    assert.deepStrictEqual(h.calls, ['stats restart', 'render s1 @1000', 'broadcast', 'layers s1']);
+    assert.deepStrictEqual(h.calls, ['stats restart', 'render s1 @1000', 'broadcast s1']);
 });
 
 test('off is one black frame, forced out to clients, and then nothing', () => {
@@ -50,7 +54,7 @@ test('off is one black frame, forced out to clients, and then nothing', () => {
     h.tick();
     h.tick();
     h.tick();
-    assert.deepStrictEqual(h.calls, ['black', 'broadcast forced']);
+    assert.deepStrictEqual(h.calls, ['black', 'broadcast off forced']);
 });
 
 test('going off again after a scene renders a fresh black frame', () => {

@@ -58,7 +58,7 @@ test('one socket for every subscriber', () => {
   expect(latest().url).toBe('ws://panel:3001');
 });
 
-test('a v1 frame goes to composite subscribers; a v2 frame to both kinds', () => {
+test('a frame goes to composite subscribers, and its layers to theirs', () => {
   const composite = vi.fn();
   const layer = vi.fn();
   const otherLayer = vi.fn();
@@ -67,7 +67,8 @@ test('a v1 frame goes to composite subscribers; a v2 frame to both kinds', () =>
   stream.subscribeLayer('l2', otherLayer);
   latest().open();
 
-  latest().receive([[1, 2, 3]]);
+  // A frame without layers: the shape every client gets until it subscribes.
+  latest().receive({ type: 'frame', composite: [[1, 2, 3]] });
   expect(composite).toHaveBeenLastCalledWith([[1, 2, 3]]);
   expect(layer).not.toHaveBeenCalled();
 
@@ -75,6 +76,20 @@ test('a v1 frame goes to composite subscribers; a v2 frame to both kinds', () =>
   expect(composite).toHaveBeenLastCalledWith([[4, 5, 6]]);
   expect(layer).toHaveBeenCalledWith([[7, 8, 9]]);
   expect(otherLayer).not.toHaveBeenCalled();
+});
+
+test('a message that is not a frame is ignored rather than thrown on', () => {
+  // One shape, so anything else is a server that has moved on without this
+  // client — ignored deliberately, where a frame never should be.
+  const composite = vi.fn();
+  stream.subscribeComposite(composite);
+  latest().open();
+
+  expect(() => latest().receive({ type: 'something_else' })).not.toThrow();
+  expect(composite).not.toHaveBeenCalled();
+
+  latest().receive({ type: 'frame', composite: [[1, 1, 1]] });
+  expect(composite).toHaveBeenCalledTimes(1);
 });
 
 test('status follows the socket, and a new subscriber is told the current state at once', () => {
