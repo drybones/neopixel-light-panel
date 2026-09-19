@@ -20,9 +20,16 @@ var TILE = {
     mirror: 2,
 };
 
+// engine/params guarantees minStops usable stops on every stored layer, so the
+// guard here is for callers that skip the store. Anything unusable is dropped;
+// one stop is a flat colour and none is black, rather than a throw that would
+// leave the layer unprepared.
 function buildLut(stops) {
-    var sorted = stops.slice().sort(function(a, b) { return a.position - b.position; });
+    var sorted = (Array.isArray(stops) ? stops : [])
+        .filter(function(s) { return s && typeof s.position === 'number' && isFinite(s.position); })
+        .sort(function(a, b) { return a.position - b.position; });
     var lut = new Float32Array(LUT_SIZE * 3);
+    if (sorted.length === 0) return lut;
     var si = 0;
     for (var i = 0; i < LUT_SIZE; i++) {
         var u = i / (LUT_SIZE - 1);

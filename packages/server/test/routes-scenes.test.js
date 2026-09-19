@@ -20,6 +20,7 @@ const { SceneStore } = require('../engine/scene-store');
 const createScenesRouter = require('../routes/scenes');
 const effects = require('../effects');
 const filmstrip = require('../engine/filmstrip');
+const { errorHandler } = require('../routes/errors');
 const { startApp } = require('./support/http');
 
 function stubPreviewCache() {
@@ -41,6 +42,7 @@ async function harness() {
 
     const app = await startApp((a) => {
         a.use('/api', createScenesRouter(store, stubPreviewCache(), stubPreviewCache()));
+        a.use(errorHandler);
     });
     return { app, store };
 }
@@ -170,17 +172,58 @@ test('PUT /api/scenes/:sceneId/layers/:layerId 404s on either unknown half', asy
     } finally { await app.close(); }
 });
 
-test('a partial layer PUT drops effectType rather than merging', async () => {
-    // Pins the hazard the high-frequency edit path carries: this route takes a
-    // whole layer, so a body missing effectType produces a layer without one
-    // and still answers 200. The UI always sends the complete layer; anything
-    // hand-driving this API has to do the same.
+test('a partial layer PUT merges over the stored layer', async () => {
+    // It used to replace: a params-only body dropped effectType, answered 200,
+    // and the layer rendered nothing from then on.
     const { app, store } = await harness();
     try {
-        const res = await app.put('/api/scenes/s1/layers/l1', { body: { params: { color: '#123456' } } });
+        const res = await app.put('/api/scenes/s1/layers/l1', { body: { params: { level: 0.5 } } });
         assert.strictEqual(res.status, 200);
-        assert.strictEqual(res.json.effectType, undefined);
-        assert.strictEqual(store.get('s1').layers[0].effectType, undefined);
+        assert.strictEqual(res.json.effectType, 'solid');
+        assert.deepStrictEqual(store.get('s1').layers[0].params, { color: '#ff0000', level: 0.5 });
+    } finally { await app.close(); }
+});
+
+test('a layer PUT that would change effectType is a 400 with a reason, and changes nothing', async () => {
+    const { app, store } = await harness();
+    try {
+        const before = store.getPublic('s1');
+        const res = await app.put('/api/scenes/s1/layers/l1', { body: { effectType: 'wavelet' } });
+        assert.strictEqual(res.status, 400);
+        assert.match(res.json.error, /effectType/);
+        assert.deepStrictEqual(store.getPublic('s1'), before);
+
+        const bad = await app.put('/api/scenes/s1/layers/l1', { body: { params: 'loud' } });
+        assert.strictEqual(bad.status, 400);
+        assert.deepStrictEqual(store.getPublic('s1'), before);
+    } finally { await app.close(); }
+});
+
+test('a wrong-typed param is coerced to its default, and the response says so', async () => {
+    // Reproduced: {x: "left"} reached the emitter as NaN, and particles.js's
+    // guard turned every particle into an ambient one lighting the panel.
+    const { app, store } = await harness();
+    try {
+        const created = await app.post('/api/scenes', { body: { layers: [{ effectType: 'emitter' }] } });
+        const layerId = created.json.layers[0].id;
+        const res = await app.put('/api/scenes/' + created.json.id + '/layers/' + layerId, {
+            body: { params: { x: 'left', y: 0.5 } },
+        });
+        assert.strictEqual(res.status, 200);
+        assert.strictEqual(res.json.params.x, 0);
+        assert.strictEqual(res.json.params.y, 0.5);
+        assert.strictEqual(store.get(created.json.id).layers[0].params.x, 0);
+    } finally { await app.close(); }
+});
+
+test('a scene PUT or POST whose layers are not an array is a 400', async () => {
+    const { app, store } = await harness();
+    try {
+        assert.strictEqual((await app.put('/api/scenes/s1', { body: { layers: 'none' } })).status, 400);
+        assert.strictEqual(store.get('s1').layers.length, 1, 'a refused PUT must not empty the scene');
+        assert.strictEqual((await app.put('/api/scenes/s1', { body: [1] })).status, 400);
+        assert.strictEqual((await app.post('/api/scenes', { body: { layers: {} } })).status, 400);
+        assert.strictEqual(store.scenes.length, 2);
     } finally { await app.close(); }
 });
 
@@ -315,5 +358,25 @@ test('malformed JSON is a 400 from the body parser, not a 500', async () => {
     try {
         const res = await app.post('/api/scenes/import', { body: '{"version":2,', raw: true });
         assert.strictEqual(res.status, 400);
+        assert.ok(res.json && typeof res.json.error === 'string', 'the {error} shape, not an HTML page');
     } finally { await app.close(); }
+});
+
+test('an unexpected throw is a JSON 500 that keeps its message in the log', async () => {
+    const logged = [];
+    const error = console.error;
+    console.error = (...args) => logged.push(args);
+    const app = await startApp((a) => {
+        a.get('/boom', () => { throw new Error('secret detail'); });
+        a.use(errorHandler);
+    });
+    try {
+        const res = await app.get('/boom');
+        assert.strictEqual(res.status, 500);
+        assert.deepStrictEqual(res.json, { error: 'Internal server error' });
+        assert.ok(logged.some((args) => args.some((a) => a instanceof Error && a.message === 'secret detail')));
+    } finally {
+        console.error = error;
+        await app.close();
+    }
 });

@@ -1,7 +1,8 @@
 /*
  * Effect registry. Each module exports:
  *   type, name          — identity
- *   schema, defaults    — drives UI controls and server-side validation
+ *   schema, defaults    — drives UI controls, and the per-field type
+ *                         coercion every write goes through (engine/params)
  *   prepare(params)     — API-write-time precompute; never called per frame
  *   createInstance(ctx) — per-layer instance holding any animation state;
  *                         recreated only when a layer's effectType changes
@@ -20,7 +21,9 @@ var modules = [
     require('./text'),
 ];
 
-var byType = {};
+// No prototype: a layer's effectType comes straight off the API, and a plain
+// object would answer "constructor" or "toString" with a function.
+var byType = Object.create(null);
 modules.forEach(function(m) { byType[m.type] = m; });
 
 function get(type) {

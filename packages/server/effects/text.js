@@ -117,11 +117,11 @@ module.exports = {
     ],
 
     /*
-     * Params are never type-checked anywhere else — scene-store's
-     * normaliseLayer merges them over defaults and validates nothing but
-     * opacity — so everything that could arrive over the API as the wrong type
-     * or an absurd number is defended here, on the write path, rather than
-     * thrown inside the 10ms tick.
+     * engine/params already coerces every field to its declared type, but not
+     * into a range — min/max are slider hints — so an absurd number still
+     * arrives here, and is defended on the write path rather than thrown
+     * inside the 10ms tick. The type checks stay as well: prepare() is also
+     * called directly, by the filmstrip and the tests.
      */
     prepare(params) {
         var text = typeof params.text === 'string' ? params.text.slice(0, raster.MAX_TEXT) : '';
