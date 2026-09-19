@@ -58,13 +58,13 @@ var X_STRETCH = 1.5;
 // the loop only ever runs the active scene, and it fast-exits entirely when
 // nothing is active. It is not a slow frame: the tick is 10ms, so 500ms is 50
 // of them, and engine/frame-stats draws the line at the same place for the
-// same reason. It has to stay clear of the filmstrip's 200ms warm-up step,
+// same reason, which is why both import it from the loop. It has to stay clear of the filmstrip's 200ms warm-up step,
 // which is a real gap between renders and must not read as a discontinuity —
 // which is the whole reason this is a threshold and not zero. A gap under it
 // still hands back whatever died during it in one tick; at half a second that
 // is a tenth of the field ringing at 1.18x rather than a 2x burst, and it
 // needs a scene flipped away from and back inside half a second to see.
-var RESUME_MS = 500;
+var RESUME_MS = require('../engine/render-loop').RESUME_MS;
 
 // falloff is 1/size^2, so a size of 0 divides to Infinity and then
 // intensity / (1 + Infinity * 0) is NaN, straight into the layer buffer and
