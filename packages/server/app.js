@@ -11,6 +11,7 @@ var { SettingsStore } = require('./engine/settings-store');
 var { Broadcaster } = require('./engine/broadcast');
 var { PreviewCache, EffectPreviewCache } = require('./engine/preview-cache');
 var { FrameStats } = require('./engine/frame-stats');
+var { createTick } = require('./engine/render-loop');
 var effects = require('./effects');
 var createScenesRouter = require('./routes/scenes');
 var createSystemRouter = require('./routes/system');
@@ -121,61 +122,11 @@ server.on('error', function(err) {
     process.exit(1);
 });
 
-// Render loop. When no scene is active ("off"), render one black frame,
-// push it to WS clients, then idle.
-var offRendered = false;
-var statsSceneId = null;
-
-// One bad frame drops a frame, not the service. The log is rate-limited
-// because a persistent fault would otherwise write ~90 lines a second; the
-// scene id is the datum you want, since cost and faults are per scene.
-var TICK_ERROR_LOG_MS = 5000;
-var lastTickErrorAt = 0;
-
-function tick() {
-    try {
-        renderTick();
-    } catch (err) {
-        var now = Date.now();
-        if (now - lastTickErrorAt >= TICK_ERROR_LOG_MS) {
-            lastTickErrorAt = now;
-            console.error('Render tick failed (scene ' + statsSceneId + '):', err);
-        }
-    }
-}
-
-function renderTick() {
-    var scene = store.activeScene();
-    if (scene) {
-        // Frame stats are per scene: cost varies by what is being rendered,
-        // and a switch is continuous, so without this a heavy scene's late
-        // frames would be read as the light one you moved to. Checked here
-        // rather than in the route because every path that changes what
-        // renders — activation, an import, deleting the active scene — comes
-        // through this one comparison. Going "off" deliberately does not
-        // clear it: coming back to the same scene resumes the same soak.
-        if (scene.id !== statsSceneId) {
-            statsSceneId = scene.id;
-            frameStats.restart();
-        }
-        // begin() returns 0 while the tracker is off, which makes every
-        // other call here an early return — the instrumentation costs a
-        // boolean test on the path that matters.
-        var t0 = frameStats.begin();
-        compositor.renderFrame(scene, Date.now());
-        frameStats.endRender(t0);
-        broadcaster.tick();
-        broadcaster.tickLayers(scene);
-        frameStats.end(t0);
-        offRendered = false;
-    } else if (!offRendered) {
-        // "Off" is one black frame and then an idle loop. Deliberately not
-        // sampled: it is not a stalled render, and counting those ticks
-        // would report 0 FPS for a panel that is behaving correctly.
-        compositor.renderBlack();
-        broadcaster.tick(true);
-        offRendered = true;
-    }
-}
-
-setInterval(tick, TICK_MS);
+// Render loop. The tick itself lives in engine/render-loop.js, where it can
+// be tested; this file only drives it.
+setInterval(createTick({
+    store: store,
+    compositor: compositor,
+    broadcaster: broadcaster,
+    frameStats: frameStats,
+}), TICK_MS);
