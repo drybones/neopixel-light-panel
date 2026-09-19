@@ -1,9 +1,10 @@
 // Single WebSocket connection to the pixel broadcaster. Frames never
 // enter React state — canvases subscribe and paint imperatively.
 //
-// v1 messages are bare [[r,g,b], ...] composite frames. Stage 5 adds
-// {type:"frame", composite, layers} objects; the first character
-// distinguishes them.
+// Every message is {type:"frame", composite, layers?}: the composite for
+// every client, layers only for one that asked (setLayerScene). There were
+// two shapes until #121, told apart by the message's first character, and an
+// unrecognised one was dropped silently — the previews simply froze.
 
 import { wsUrl } from './client';
 
@@ -21,19 +22,13 @@ function notifyStatus() {
 }
 
 function handleMessage(data) {
-  if (data[0] === '[') {
-    const frame = JSON.parse(data);
-    compositeSubs.forEach((cb) => cb(frame));
-    return;
-  }
   const msg = JSON.parse(data);
-  if (msg.type === 'frame') {
-    if (msg.composite) compositeSubs.forEach((cb) => cb(msg.composite));
-    if (msg.layers) {
-      for (const [layerId, frame] of Object.entries(msg.layers)) {
-        const subs = layerSubs.get(layerId);
-        if (subs) subs.forEach((cb) => cb(frame));
-      }
+  if (msg.type !== 'frame') return;
+  if (msg.composite) compositeSubs.forEach((cb) => cb(msg.composite));
+  if (msg.layers) {
+    for (const [layerId, frame] of Object.entries(msg.layers)) {
+      const subs = layerSubs.get(layerId);
+      if (subs) subs.forEach((cb) => cb(frame));
     }
   }
 }

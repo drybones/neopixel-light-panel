@@ -19,8 +19,8 @@ export default function ParamPanel({
   layer, effect, blendModes = [], onUpdate, onCommit, onDelete, onDuplicate,
 }) {
   const layerId = layer ? layer.id : null;
-  // The XY pad's background is the selected layer's own live render (WS
-  // v2); falls back to the composite until a layer frame arrives.
+  // The XY pad's background is the selected layer's own live render; falls
+  // back to the composite until a layer frame arrives.
   const subscribeSelectedLayer = useCallback((cb) => {
     if (!layerId) return subscribeComposite(cb);
     const unsubComposite = subscribeComposite(cb);

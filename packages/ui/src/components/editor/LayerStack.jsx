@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import LedCanvas from '../preview/LedCanvas';
 import { subscribeLayer } from '../../api/lightStream';
 
-// Live animated thumbnail of a single layer, fed by the WS v2 stream.
+// Live animated thumbnail of a single layer, fed by the stream's `layers`.
 // Falls back to colour swatches until the first frame arrives (the
 // canvas starts black, so keep it cheap: render canvas immediately).
 //

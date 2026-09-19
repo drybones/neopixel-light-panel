@@ -554,20 +554,22 @@ An unparseable `background` falls back to **black**, not white as `color` does: 
 
 A WebSocket server on port `3001` streams pixel state in both virtual and hardware modes.
 
-**v1 (default):** on connect, each message is a JSON array of 240 `[r, g, b]` triples (0–255) — the composite output **before** global brightness — at ~30 FPS. The most recent frame is replayed to new connections. Streamed frames are deliberately pre-fader: previews always show the scene at full brightness, and only the panel dims with `/api/brightness`.
-
-**v2 (layer previews):** send
-
-```json
-{ "type": "subscribe_layers", "sceneId": "a3b7c901" }
-```
-
-and while that scene is active you receive, at ~15 FPS:
+Every message has one shape, at ~30 FPS:
 
 ```json
 { "type": "frame", "composite": [[r,g,b], ...], "layers": { "<layerId>": [[r,g,b], ...] } }
 ```
 
-instead of v1 frames. `composite` is pre-brightness like v1; layer frames are additionally pre-opacity (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to revert to v1.
+`composite` is 240 `[r, g, b]` triples (0–255) — the composite output **before** global brightness — and is in every frame. The most recent frame is replayed to new connections. Streamed frames are deliberately pre-fader: previews always show the scene at full brightness, and only the panel dims with `/api/brightness`.
+
+**`layers` (layer previews)** is present only for a client that asked for it:
+
+```json
+{ "type": "subscribe_layers", "sceneId": "a3b7c901" }
+```
+
+While that scene is the active one, roughly every other frame carries its layers — they are the expensive half, so they run at ~15 FPS while the composite keeps its own rate. Layer frames are pre-opacity as well as pre-brightness (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to stop them.
+
+A client should ignore a message whose `type` it does not know. Until #121 there were two shapes — a bare `[[r,g,b], ...]` array and this object — and a client that failed to recognise one dropped every frame with no error, which looks exactly like a frozen preview.
 
 Inbound messages are limited to 4 KB; a larger one closes that connection with code `1009`. Nothing the stream accepts is anywhere near that.

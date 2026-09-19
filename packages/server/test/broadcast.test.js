@@ -98,11 +98,10 @@ test('a subscribe message within the limit still routes', async () => {
 
 // ---- the streams ----
 //
-// Named for what they carry rather than as "v1" and "v2": nothing outside
-// this repo reads port 3001, and the server and UI deploy from one commit, so
-// the two message shapes are not versions anyone depends on — #121 is about
-// unifying them. What is pinned here is behaviour; the shape is asserted
-// only where lightStream's parser would silently drop a frame that changed.
+// Since #121 there is one message shape, {type:"frame", composite, layers?},
+// and what differs between clients is only whether layers ride along. What is
+// pinned here is behaviour: who gets layers, at what rate, and what a new
+// connection is replayed.
 //
 // Four pixels, so a frame is small enough to read in an assertion. The fake
 // compositor's buffers are plain arrays standing in for its Float32Arrays —
@@ -135,32 +134,33 @@ async function listen(b) {
     return { ws: ws, got: got };
 }
 
-// A forced composite frame with a marker in its first pixel. Messages on one
-// socket arrive in order, so once the barrier is in, anything sent before it
-// has arrived too — which is how "nothing was sent" is asserted without a
-// sleep. Not usable on a layer subscriber, which is deliberately not sent
-// composite frames at all.
-async function barrier(b, c, client, marker) {
+const firstPixel = (m) => JSON.parse(m).composite[0];
+
+// A forced frame with a marker in its first pixel. Messages on one socket
+// arrive in order, so once the barrier is in, anything sent before it has
+// arrived too — which is how "nothing was sent" is asserted without a sleep.
+async function barrier(b, c, client, marker, scene) {
     c.composite[0] = marker;
-    b.tick(true);
-    await waitFor(() => client.got.some((m) => m.startsWith('[[' + marker + ',')));
-    return client.got.filter((m) => !m.startsWith('[[' + marker + ','));
+    b.tick(scene || null, true);
+    await waitFor(() => client.got.some((m) => firstPixel(m)[0] === marker));
+    return client.got.filter((m) => firstPixel(m)[0] !== marker);
 }
 
-test('a composite frame is the panel as clamped integer triples', async () => {
-    // Asserted as the bare array it is today because lightStream routes on
-    // the first character: wrap it in an object and the UI would drop every
-    // frame without an error. Unify the two shapes (#121) and this changes with it.
+test('a frame is the panel as clamped integer triples, in the one message shape', async () => {
+    // One shape for every client, layers or not: the UI has a single parse
+    // path, and a client that asked for no layers simply gets no `layers`.
     var c = fakeCompositor();
     c.composite = [300, -5, 12.7, 1, 2, 3, 4, 5, 6, 255, 256, 0];
     var b = await start(c);
     try {
         var client = await listen(b);
-        b.tick(true);
+        b.tick(null, true);
         await waitFor(() => client.got.length === 1);
 
-        assert.strictEqual(client.got[0][0], '[');
-        assert.deepStrictEqual(JSON.parse(client.got[0]), [[255, 0, 12], [1, 2, 3], [4, 5, 6], [255, 255, 0]]);
+        var msg = JSON.parse(client.got[0]);
+        assert.strictEqual(msg.type, 'frame');
+        assert.deepStrictEqual(msg.composite, [[255, 0, 12], [1, 2, 3], [4, 5, 6], [255, 255, 0]]);
+        assert.strictEqual('layers' in msg, false);
         client.ws.close();
     } finally {
         await b.close();
@@ -173,12 +173,12 @@ test('composite frames are throttled to one per interval, and force bypasses it'
     var b = await start(c);
     try {
         var client = await listen(b);
-        b.tick();              // sent
-        b.tick();              // same instant: throttled
+        b.tick(null);          // sent
+        b.tick(null);          // same instant: throttled
         t.mock.timers.tick(20);
-        b.tick();              // 20ms on: still throttled
+        b.tick(null);          // 20ms on: still throttled
         t.mock.timers.tick(20);
-        b.tick();              // 40ms on: sent
+        b.tick(null);          // 40ms on: sent
         var before = await barrier(b, c, client, 7);  // forced, inside the window
         assert.strictEqual(before.length, 2);
         client.ws.close();
@@ -194,14 +194,14 @@ test('with no clients an ordinary tick serialises nothing, but the off frame is 
     var c = fakeCompositor();
     var b = await start(c);
     try {
-        b.tick();
+        b.tick(null);
         assert.strictEqual(b._lastMsg, null);
 
         c.composite[0] = 9;
-        b.tick(true);
+        b.tick(null, true);
         var client = await listen(b);
         await waitFor(() => client.got.length === 1);
-        assert.deepStrictEqual(JSON.parse(client.got[0])[0], [9, 0, 0]);
+        assert.deepStrictEqual(firstPixel(client.got[0]), [9, 0, 0]);
         client.ws.close();
     } finally {
         await b.close();
@@ -214,7 +214,7 @@ test('a new connection is sent the last frame at once, so an idle panel is not b
     try {
         var first = await listen(b);
         c.composite[3] = 42;
-        b.tick(true);
+        b.tick(null, true);
         await waitFor(() => first.got.length === 1);
 
         var late = await listen(b);
@@ -227,7 +227,7 @@ test('a new connection is sent the last frame at once, so an idle panel is not b
     }
 });
 
-test('a layer subscriber gets its scene\'s layers, with the composite inside the same frame', async () => {
+test('a layer subscriber gets its scene\'s layers alongside the composite', async () => {
     var c = fakeCompositor();
     c.layers.l1 = [10, 20, 30, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     c.layers.l2 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 999, 0, 0];
@@ -238,12 +238,10 @@ test('a layer subscriber gets its scene\'s layers, with the composite inside the
         editor.ws.send(JSON.stringify({ type: 'subscribe_layers', sceneId: 's1' }));
         await waitFor(() => serverSideOf(b)._layerSceneId === 's1');
 
-        b.tick(true);            // the plain composite stream: not for this client
-        b.tickLayers(scene, true);
+        b.tick(scene, true);
         await waitFor(() => editor.got.length >= 1);
 
-        assert.strictEqual(editor.got.length, 1);
-        assert.strictEqual(editor.got[0][0], '{');
+        assert.strictEqual(editor.got.length, 1, 'one frame, not one per stream');
         var msg = JSON.parse(editor.got[0]);
         assert.strictEqual(msg.type, 'frame');
         assert.strictEqual(msg.composite.length, 4);
@@ -251,6 +249,35 @@ test('a layer subscriber gets its scene\'s layers, with the composite inside the
         assert.deepStrictEqual(msg.layers.l1[0], [10, 20, 30]);
         // Layer buffers are clamped like the composite.
         assert.deepStrictEqual(msg.layers.l2[3], [255, 0, 0]);
+        editor.ws.close();
+    } finally {
+        await b.close();
+    }
+});
+
+test('a client that asked for no layers gets the same frame without them', async () => {
+    // The two used to be different message shapes on different schedules;
+    // now the difference is one key, and both clients are on one path.
+    var c = fakeCompositor();
+    c.layers.l1 = [1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    var scene = { id: 's1', layers: [{ id: 'l1' }] };
+    var b = await start(c);
+    try {
+        var plain = await listen(b);
+        var editor = await listen(b);
+        editor.ws.send(JSON.stringify({ type: 'subscribe_layers', sceneId: 's1' }));
+        await waitFor(() => Array.from(b.wss.clients).some((s) => s._layerSceneId === 's1'));
+
+        b.tick(scene, true);
+        await waitFor(() => plain.got.length === 1 && editor.got.length === 1);
+
+        var a = JSON.parse(plain.got[0]);
+        var e = JSON.parse(editor.got[0]);
+        assert.strictEqual(a.type, e.type);
+        assert.deepStrictEqual(a.composite, e.composite, 'same composite, same tick');
+        assert.strictEqual('layers' in a, false);
+        assert.deepStrictEqual(Object.keys(e.layers), ['l1']);
+        plain.ws.close();
         editor.ws.close();
     } finally {
         await b.close();
@@ -266,24 +293,25 @@ test('layer frames go only to subscribers of the scene being rendered', async ()
         other.ws.send(JSON.stringify({ type: 'subscribe_layers', sceneId: 'elsewhere' }));
         await waitFor(() => serverSideOf(b)._layerSceneId === 'elsewhere');
 
-        b.tickLayers({ id: 's1', layers: [{ id: 'l1' }] }, true);
-        // Nobody wanted s1, so its layers were never even read.
+        var scene = { id: 's1', layers: [{ id: 'l1' }] };
+        b.tick(scene, true);
+        // Nobody wanted s1's layers, so they were never even read.
         assert.deepStrictEqual(c.layerReads, []);
 
-        // And the subscriber to another scene hears nothing — a layer
-        // subscriber is off the plain composite stream too. Unsubscribing
-        // puts it back on.
-        other.ws.send(JSON.stringify({ type: 'unsubscribe_layers' }));
-        await waitFor(() => serverSideOf(b)._layerSceneId === null);
-        var before = await barrier(b, c, other, 5);
-        assert.deepStrictEqual(before, []);
+        // It still gets the composite, though — an editor whose scene is not
+        // the active one shows the panel, it does not go dark.
+        await waitFor(() => other.got.length === 1);
+        assert.strictEqual('layers' in JSON.parse(other.got[0]), false);
         other.ws.close();
     } finally {
         await b.close();
     }
 });
 
-test('layer frames are throttled to their own, slower interval', async (t) => {
+test('layers ride at their own, slower rate while the composite keeps its own', async (t) => {
+    // The point of unifying: the editor's stage is no longer pulled down to
+    // the layer rate. Every frame carries the composite, every other frame
+    // carries layers too.
     t.mock.timers.enable({ apis: ['Date'], now: 1000000 });
     var c = fakeCompositor();
     c.layers.l1 = new Array(12).fill(0);
@@ -294,14 +322,17 @@ test('layer frames are throttled to their own, slower interval', async (t) => {
         editor.ws.send(JSON.stringify({ type: 'subscribe_layers', sceneId: 's1' }));
         await waitFor(() => serverSideOf(b)._layerSceneId === 's1');
 
-        b.tickLayers(scene);     // sent
+        b.tick(scene);           // composite + layers
         t.mock.timers.tick(40);
-        b.tickLayers(scene);     // 40ms: past the composite's 33, not the layers' 66
-        t.mock.timers.tick(30);
-        b.tickLayers(scene);     // 70ms: sent
-        b.tickLayers(scene, true); // barrier: forced
-        await waitFor(() => editor.got.length >= 3);
-        assert.strictEqual(editor.got.length, 3);
+        b.tick(scene);           // 40ms: past the composite's 33, not the layers' 66
+        t.mock.timers.tick(40);
+        b.tick(scene);           // 80ms: both again
+        await waitFor(() => editor.got.length === 3);
+
+        var withLayers = editor.got.map((m) => 'layers' in JSON.parse(m));
+        assert.deepStrictEqual(withLayers, [true, false, true]);
+        // and the composite was there every time
+        assert.ok(editor.got.every((m) => JSON.parse(m).composite.length === 4));
         editor.ws.close();
     } finally {
         await b.close();

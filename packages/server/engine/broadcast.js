@@ -13,19 +13,28 @@
  * are the same operation, so the panel is this preview scaled by the
  * fader, and nothing appears on one that cannot appear on the other.
  *
- * v1 protocol (default): bare [[r,g,b], ...] JSON frames of the
- * composite, throttled to ~30 fps. New connections get the last frame
- * immediately so the UI never shows a stale canvas (e.g. after "off").
+ * Every message is one shape:
+ *   {"type": "frame", "composite": [[r,g,b],...], "layers"?: {layerId: [...]}}
+ * throttled to ~30 fps, and a new connection is sent the last one at once so
+ * the UI never shows a stale canvas (e.g. after "off").
  *
- * v2 protocol (editor): a client sends
+ * `layers` rides along for a client that asked for them:
  *   {"type": "subscribe_layers", "sceneId": "..."}
- * and, while its scene is the active one, receives
- *   {"type": "frame", "composite": [[r,g,b],...], "layers": {layerId: [[r,g,b],...]}}
- * at ~15 fps instead of v1 frames. Layer frames are the raw per-layer
- * buffers — pre-opacity and pre-brightness, deliberately, so a faint
- * layer's thumbnail is still legible. {"type": "unsubscribe_layers"}
- * reverts to v1. Layer serialisation only happens while at least one
- * subscriber exists.
+ * attaches them while that scene is the active one, at ~15 fps — half the
+ * frames carry layers, all of them carry the composite. {"type":
+ * "unsubscribe_layers"} stops them. Layer frames are the raw per-layer
+ * buffers — pre-opacity and pre-brightness, deliberately, so a faint layer's
+ * thumbnail is still legible — and are only serialised while a subscriber
+ * exists, which is the expensive half.
+ *
+ * There were two shapes here until #121: a bare [[r,g,b],...] array for
+ * ordinary clients and this object for the editor, told apart on the client
+ * by the message's first character. They were never versions anyone could be
+ * on independently — the Pi builds the UI from the same commit — and the
+ * discriminator had a silent failure mode, since an unrecognised shape left
+ * the previews frozen with no error anywhere. One consequence of unifying is
+ * deliberate: the editor's stage now runs at the composite's rate like every
+ * other preview, where it used to be pulled down to the layer rate.
  */
 
 var WebSocket = require('ws');
@@ -105,8 +114,13 @@ class Broadcaster {
         return target;
     }
 
-    // Composite broadcast (v1), called every render tick; throttled inside.
-    tick(force) {
+    /*
+     * One frame out, called every render tick with the scene being rendered
+     * (null when the panel is off). Throttled inside; `force` is for the
+     * frames the loop only renders once — the black frame after "off", which
+     * is the last thing a client connecting to an idle panel will be sent.
+     */
+    tick(scene, force) {
         var now = Date.now();
         if (!force && now - this._lastSent < FRAME_INTERVAL_MS) return;
         if (this.wss.clients.size === 0 && !force) return;
@@ -115,27 +129,39 @@ class Broadcaster {
         this._lastSent = now;
 
         this._pixelArray = this._serialiseBuffer(buf, this._pixelArray);
-        this._lastMsg = JSON.stringify(this._pixelArray);
+        // Kept without layers: it is replayed to whoever connects next, who
+        // has not subscribed to anything yet.
+        this._lastMsg = JSON.stringify({ type: 'frame', composite: this._pixelArray });
 
-        var msg = this._lastMsg;
+        var subscribers = this._layerSubscribers(scene);
+        var layerMsg = subscribers.length > 0 ? this._layerMessage(scene, now) : null;
+
+        var plain = this._lastMsg;
         this.wss.clients.forEach(function(socket) {
-            if (socket.readyState === WebSocket.OPEN && !socket._layerSceneId) socket.send(msg);
+            if (socket.readyState !== WebSocket.OPEN) return;
+            socket.send(layerMsg && socket._layerSceneId === scene.id ? layerMsg : plain);
         });
     }
 
-    // Layer broadcast (v2), called every render tick with the active scene;
-    // does nothing unless someone subscribed to that scene's layers.
-    tickLayers(scene, force) {
-        var now = Date.now();
-        if (!force && now - this._lastLayerSent < LAYER_FRAME_INTERVAL_MS) return;
-
+    // Clients wanting the layers of the scene actually being rendered. A
+    // subscriber to some other scene is an editor whose scene is not active;
+    // it stays on the plain composite.
+    _layerSubscribers(scene) {
         var subscribers = [];
+        if (!scene) return subscribers;
         this.wss.clients.forEach(function(socket) {
             if (socket.readyState === WebSocket.OPEN && socket._layerSceneId === scene.id) {
                 subscribers.push(socket);
             }
         });
-        if (subscribers.length === 0) return;
+        return subscribers;
+    }
+
+    // The same frame with `layers` attached, or null while the layer throttle
+    // holds — layers are the expensive half, so they run at half the rate and
+    // the composite goes out either way.
+    _layerMessage(scene, now) {
+        if (now - this._lastLayerSent < LAYER_FRAME_INTERVAL_MS) return null;
         this._lastLayerSent = now;
 
         // One reusable array per layer of the scene being previewed; keyed
@@ -145,9 +171,6 @@ class Broadcaster {
             this._layerArrays.clear();
             this._layerArraysSceneId = scene.id;
         }
-
-        var buf = this.compositor.composite;
-        this._pixelArray = this._serialiseBuffer(buf, this._pixelArray);
 
         var layers = {};
         for (var i = 0; i < scene.layers.length; i++) {
@@ -159,8 +182,7 @@ class Broadcaster {
             layers[layer.id] = arr;
         }
 
-        var msg = JSON.stringify({ type: 'frame', composite: this._pixelArray, layers: layers });
-        subscribers.forEach(function(socket) { socket.send(msg); });
+        return JSON.stringify({ type: 'frame', composite: this._pixelArray, layers: layers });
     }
 
     // Tests only: wss.close() alone leaves connected clients open.

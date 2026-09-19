@@ -126,7 +126,7 @@ test('a layer row renders a thumbnail subscribed to that layer', () => {
     />,
   );
 
-  // The thumbnail subscribes per layer id — the v2 layer stream, not the
+  // The thumbnail subscribes per layer id — the stream's layers, not the
   // composite, which is what makes each row show its own layer.
   expect(stream.ids).toEqual(['layer-7']);
 
