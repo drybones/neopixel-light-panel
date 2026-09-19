@@ -57,6 +57,18 @@ test('GET /api/effects returns the catalog the UI builds controls from', async (
     } finally { await app.close(); }
 });
 
+test('GET /api/blend-modes serves every mode the compositor resolves, labelled', async () => {
+    const { BLEND } = require('../engine/compositor');
+    const { app } = await harness();
+    try {
+        const res = await app.get('/api/blend-modes');
+        assert.strictEqual(res.status, 200);
+        assert.deepStrictEqual(res.json.map((m) => m.value).sort(), Object.keys(BLEND).sort());
+        assert.ok(res.json.every((m) => typeof m.label === 'string' && m.label));
+        assert.ok(res.json.every((m) => !('id' in m)), 'the blend id is internal');
+    } finally { await app.close(); }
+});
+
 test('GET /api/effects/previews carries the filmstrip envelope', async () => {
     const { app } = await harness();
     try {

@@ -6,7 +6,9 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi
-ExecStart=/usr/local/bin/fcserver /usr/local/bin/fcserver.json
+# The repo copy, not one under /usr/local: engine/power.js reads this same
+# file for its gamma and whitepoint, so there is one curve and nothing to sync.
+ExecStart=/usr/local/bin/fcserver /home/pi/github/neopixel-light-panel/packages/server/fcserver.json
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

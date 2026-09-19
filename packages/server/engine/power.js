@@ -19,7 +19,10 @@
  *   read 3-4x high on every ordinary scene and would miss the one thing worth
  *   knowing: 255 is the single input the gamma curve does not attenuate,
  *   which is why solid white is the one scene that bites. The gamma and
- *   whitepoint here MUST match fcserver.json or every reading is wrong.
+ *   whitepoint are *read from* fcserver.json rather than restated here — a
+ *   mismatch makes every reading wrong with nothing to tell you — and are
+ *   not part of the config the API edits, since they describe fcserver
+ *   rather than anything a user chooses.
  *
  * - **The budget is the PSU's rating, not a modelled rail.** A tighter,
  *   IR-drop-aware cap (V = openCircuitVolts - I * ohms, tightening as the
@@ -40,6 +43,8 @@
 // Same line frame-stats draws for "nothing has rendered lately". It is the
 // same fact about the same loop — when no scene is active the tick renders
 // one black frame and fast-exits — so it is deliberately not re-hardcoded.
+var fs = require('fs');
+var path = require('path');
 var IDLE_MS = require('./frame-stats').IDLE_MS;
 
 // Rolling window for the reported figures, matching frame-stats: an
@@ -55,6 +60,46 @@ var CAPACITY = 256;
 // integer truncation and makes the result exceed the limit.
 var MIN_SCALE = 1 / 255;
 
+// The config fcserver runs: fcserver.service points it at this file, so the
+// curve read here is the curve applied to the panel.
+var FCSERVER_CONFIG = path.join(__dirname, '..', 'fcserver.json');
+
+// fcserver's own behaviour when a config has no color block: no curve, no
+// whitepoint. Also the fallback when the file cannot be read at all, which
+// errs the safe way — a linear curve over-estimates the current of every
+// value below 255, so the limiter dims early rather than late.
+var FCSERVER_DEFAULT_COLOUR = { gamma: 1, whitepoint: [1, 1, 1] };
+
+/*
+ * fcserver's colour curve, from its config file. Every failure degrades to
+ * FCSERVER_DEFAULT_COLOUR with a warning rather than throwing: this runs at
+ * module load, and a throw here would take the render loop's sink with it.
+ */
+function readFcserverColour(file, onWarn) {
+    var warn = onWarn || function(msg) { console.warn('Power meter: ' + msg); };
+    var doc;
+    try {
+        doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch (err) {
+        warn('cannot read ' + file + ' (' + err.message + '); estimating with a linear curve, which reads high');
+        return copyColour(FCSERVER_DEFAULT_COLOUR);
+    }
+    var color = (doc && doc.color) || {};
+    var gamma = num(color.gamma, FCSERVER_DEFAULT_COLOUR.gamma, 0.1, 10);
+    var whitepoint = normaliseWhitepoint(color.whitepoint, FCSERVER_DEFAULT_COLOUR.whitepoint);
+    if (color.gamma !== undefined && gamma !== color.gamma) {
+        warn('gamma ' + JSON.stringify(color.gamma) + ' in ' + file + ' is not usable; using ' + gamma);
+    }
+    if (color.whitepoint !== undefined && JSON.stringify(whitepoint) !== JSON.stringify(color.whitepoint)) {
+        warn('whitepoint ' + JSON.stringify(color.whitepoint) + ' in ' + file + ' is not usable; using ' + JSON.stringify(whitepoint));
+    }
+    return { gamma: gamma, whitepoint: whitepoint };
+}
+
+function copyColour(c) {
+    return { gamma: c.gamma, whitepoint: c.whitepoint.slice() };
+}
+
 var DEFAULTS = {
     // Act on the estimate, not just report it.
     limit: true,
@@ -68,9 +113,6 @@ var DEFAULTS = {
     // Per-LED quiescent draw of the driver itself — not controllable, so it
     // sets the floor below which no amount of dimming helps.
     standbyMilliamps: 1,
-    // MUST match fcserver.json.
-    gamma: 2.5,
-    whitepoint: [0.98, 1, 1],
 };
 
 function num(value, fallback, min, max) {
@@ -94,10 +136,6 @@ function normaliseConfig(input, base) {
         overheadMilliamps: num(raw.overheadMilliamps, from.overheadMilliamps, 0, 1e6),
         ledMilliamps: num(raw.ledMilliamps, from.ledMilliamps, 0, 1000),
         standbyMilliamps: num(raw.standbyMilliamps, from.standbyMilliamps, 0, 100),
-        // A gamma at or below 0 inverts the curve and a 1/gamma of 0 divides
-        // by zero in the rescale, so the low end is pinned above both.
-        gamma: num(raw.gamma, from.gamma, 0.1, 10),
-        whitepoint: normaliseWhitepoint(raw.whitepoint, from.whitepoint),
     };
     return cfg;
 }
@@ -108,6 +146,8 @@ function normaliseWhitepoint(value, fallback) {
     for (var i = 0; i < 3; i++) out.push(num(value[i], fallback[i], 0, 1));
     return out;
 }
+
+var FCSERVER_COLOUR = readFcserverColour(FCSERVER_CONFIG);
 
 /*
  * fcserver's colour LUT, as duty cycle per channel value: what fraction of
@@ -153,7 +193,7 @@ function budgetFor(cfg) {
  * nothing — dimming cannot get there, and the UI should say so rather than
  * showing a near-black panel with no explanation.
  */
-function scaleFor(milliamps, numLeds, cfg) {
+function scaleFor(milliamps, numLeds, cfg, gamma) {
     var budget = budgetFor(cfg);
     if (!cfg.limit || milliamps <= budget) return { scale: 1, floored: false };
 
@@ -164,7 +204,7 @@ function scaleFor(milliamps, numLeds, cfg) {
     var estimateLed = milliamps - standby;
     if (estimateLed <= 0) return { scale: 1, floored: false };
 
-    var scale = Math.pow(budgetLed / estimateLed, 1 / cfg.gamma);
+    var scale = Math.pow(budgetLed / estimateLed, 1 / gamma);
     if (scale < MIN_SCALE) scale = MIN_SCALE;
     if (scale > 1) scale = 1;
     return { scale: scale, floored: false };
@@ -199,17 +239,21 @@ class PowerMeter {
         this.scale = 1;
         this.floored = false;
 
-        this.setConfig(opts.config);
-    }
-
-    setConfig(config) {
-        this.config = normaliseConfig(config, this.config || DEFAULTS);
-        var luts = buildDutyLut(this.config.gamma, this.config.whitepoint);
+        // Fixed for the meter's life: fcserver reads its config once at
+        // start-up too. Injectable so tests can pin a curve.
+        this.colour = opts.colour ? copyColour(opts.colour) : copyColour(FCSERVER_COLOUR);
+        var luts = buildDutyLut(this.colour.gamma, this.colour.whitepoint);
         // Held as three fields rather than an array of arrays: this is the
         // innermost thing in the render path.
         this._lutR = luts[0];
         this._lutG = luts[1];
         this._lutB = luts[2];
+
+        this.setConfig(opts.config);
+    }
+
+    setConfig(config) {
+        this.config = normaliseConfig(config, this.config || DEFAULTS);
         this.budgetMilliamps = budgetFor(this.config);
     }
 
@@ -236,7 +280,8 @@ class PowerMeter {
         var requested = milliampsFor(this._dutySum, this.numLeds, this.config);
         this._dutySum = 0;
 
-        var result = scaleFor(requested, this.numLeds, this.config);
+        var gamma = this.colour.gamma;
+        var result = scaleFor(requested, this.numLeds, this.config, gamma);
         this.scale = result.scale;
         this.floored = result.floored;
 
@@ -246,7 +291,7 @@ class PowerMeter {
         var standby = this.numLeds * this.config.standbyMilliamps;
         var delivered = result.scale === 1
             ? requested
-            : standby + (requested - standby) * Math.pow(result.scale, this.config.gamma);
+            : standby + (requested - standby) * Math.pow(result.scale, gamma);
 
         var now = this._now();
         var i = this._head;
@@ -274,8 +319,10 @@ class PowerMeter {
             overheadMilliamps: cfg.overheadMilliamps,
             ledMilliamps: cfg.ledMilliamps,
             standbyMilliamps: cfg.standbyMilliamps,
-            gamma: cfg.gamma,
-            whitepoint: cfg.whitepoint.slice(),
+            // Read-only: fcserver's curve, reported so a reading can be
+            // checked against it, never set through the API.
+            gamma: this.colour.gamma,
+            whitepoint: this.colour.whitepoint.slice(),
 
             numLeds: this.numLeds,
             budgetMilliamps: this.budgetMilliamps,
@@ -322,7 +369,7 @@ class PowerMeter {
     // What the panel would draw with every LED at 255 — the headline figure
     // for "how much of the supply can this thing actually ask for".
     fullWhiteMilliamps() {
-        var wp = this.config.whitepoint;
+        var wp = this.colour.whitepoint;
         return milliampsFor(this.numLeds * (wp[0] + wp[1] + wp[2]), this.numLeds, this.config);
     }
 }
@@ -330,6 +377,9 @@ class PowerMeter {
 module.exports = {
     PowerMeter: PowerMeter,
     DEFAULTS: DEFAULTS,
+    FCSERVER_COLOUR: FCSERVER_COLOUR,
+    FCSERVER_DEFAULT_COLOUR: FCSERVER_DEFAULT_COLOUR,
+    readFcserverColour: readFcserverColour,
     normaliseConfig: normaliseConfig,
     buildDutyLut: buildDutyLut,
     milliampsFor: milliampsFor,

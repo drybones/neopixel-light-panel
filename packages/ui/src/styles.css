@@ -86,8 +86,7 @@ body {
    The padding stays rather than going to zero: the hover border needs to
    sit off the letters, since collapsed is when the pill most needs to look
    like something you can click. */
-.frame-rate--off,
-.power-meter--off {
+.readout--off {
   margin-left: -7px;
   margin-right: -7px;
 }
@@ -119,10 +118,19 @@ body {
 }
 .ws-dot--on { background: #3dd68c; }
 
-/* Frame-rate readout — a diagnostic, so it reads as chrome rather than as a
-   control until it is switched on. Tabular figures keep the header from
-   twitching as the digits change once a second. */
-.frame-rate {
+/* The header readouts (components/header/ReadoutPill) — diagnostics, so they
+   read as chrome rather than as controls until switched on. Tabular figures
+   keep the header from twitching as the digits change once a second.
+
+   Both pills fold on click, and on a phone that is the point: the header has
+   room for two figures and little else. What folding the power pill costs is
+   worth writing down: it is the only place the limiter is visible at all,
+   since the previews stream the pre-brightness composite by design and a
+   limited panel looks exactly like an unlimited one. Folded, it therefore
+   hides "the panel is being pulled back" as well — accepted rather than let
+   'limiting' and 'floored' push it open on their own, which would mean
+   polling on while folded for a one-off misconfiguration. */
+.readout {
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
@@ -137,9 +145,9 @@ body {
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
-.frame-rate:hover { border-color: var(--border); }
+.readout:hover { border-color: var(--border); }
 /* Anything but "off" is the switched-on look. */
-.frame-rate:not(.frame-rate--off) {
+.readout:not(.readout--off) {
   border-color: var(--border);
   background: var(--surface-2);
 }
@@ -147,22 +155,30 @@ body {
    and the :not() above is left to the border and background. :not() takes the
    specificity of its argument, so putting the white there made it three
    classes and no state colour ever applied. */
-.frame-rate-value { color: var(--text); }
-.frame-rate--ok .frame-rate-value { color: var(--ok); }
-.frame-rate--near .frame-rate-value { color: var(--warn); }
-.frame-rate--slow .frame-rate-value { color: var(--danger); }
+.readout-value { color: var(--text); }
+.readout--ok .readout-value { color: var(--ok); }
+.readout--near .readout-value { color: var(--warn); }
+.readout--slow .readout-value { color: var(--danger); }
+/* Amber, not red: limiting is the system working, not a fault. The border is
+   tinted too, which the frame-rate pill has no equivalent of — the limiter is
+   something being done to the panel, not just a reading of it. Four classes
+   deliberately: it has to outrank both the switched-on look and :hover, each
+   of which is two and also sets border-color. This is the same trap as the
+   white above, one level up. */
+.readout.readout--power.readout--limiting:not(.readout--off) { border-color: var(--warn); }
+.readout--limiting .readout-value { color: var(--warn); }
+.readout--floored .readout-value { color: var(--danger); }
 /* Nothing having rendered lately is not a fault, and nor is not having read
-   yet — grey, like the power pill's equivalents. "off" is grey for a third
-   reason: it is the resting state of a diagnostic that costs something to
-   run, and it needs saying explicitly now that the white above is a base
-   rule rather than something only the switched-on pill picked up. */
-.frame-rate--idle .frame-rate-value,
-.frame-rate--wait .frame-rate-value,
-.frame-rate--off .frame-rate-value { color: var(--text-dim); }
+   yet. "off" is grey for a third reason: it is the resting state of a
+   diagnostic, and it needs saying explicitly now that the white above is a
+   base rule rather than something only the switched-on pill picked up. */
+.readout--idle .readout-value,
+.readout--wait .readout-value,
+.readout--off .readout-value { color: var(--text-dim); }
 /* Grey in every state: colouring the headline number is the whole signal, and
    a pill that changed colour all over would drown it. */
-.frame-rate-detail { color: var(--text-dim); }
-.frame-rate-mode {
+.readout-detail { color: var(--text-dim); }
+.readout-mode {
   color: var(--text-dim);
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -171,56 +187,6 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-
-/* Power readout — same collapse as the frame-rate pill, and for the same
-   reason on a phone, where the header has room for two figures and little
-   else. What it costs is worth writing down: this is the only place the
-   limiter is visible at all, since the previews stream the pre-brightness
-   composite by design and a limited panel looks exactly like an unlimited
-   one. Collapsed, the pill therefore hides "the panel is being pulled back"
-   as well — accepted rather than let 'limiting' and 'floored' push it open
-   on their own, which would mean polling on while collapsed for a case that
-   is a one-off misconfiguration, easily diagnosed once. Unlike that pill,
-   this toggle is display only and never reaches the server. */
-.power-meter {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 2px 6px;
-  color: var(--text-dim);
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-.power-meter:hover { border-color: var(--border); }
-/* Anything but "off" is the expanded look. */
-.power-meter:not(.power-meter--off) {
-  border-color: var(--border);
-  background: var(--surface-2);
-}
-/* One class, so every --state rule below outranks it — see the note on
-   .frame-rate-value for what happens when it is written any other way. */
-.power-meter-value { color: var(--text); }
-.power-meter--ok .power-meter-value { color: var(--ok); }
-.power-meter--near .power-meter-value { color: var(--warn); }
-/* Amber, not red: limiting is the system working, not a fault. The border is
-   tinted too, which the frame-rate pill has no equivalent of — the limiter is
-   something being done to the panel, not just a reading of it. Three classes
-   deliberately: it has to outrank both the expanded look and :hover, each of
-   which is two and also sets border-color. This is the same trap that kept
-   the frame-rate pill's state colours from ever applying, one level up. */
-.power-meter.power-meter--limiting:not(.power-meter--off) { border-color: var(--warn); }
-.power-meter--limiting .power-meter-value { color: var(--warn); }
-.power-meter--floored .power-meter-value { color: var(--danger); }
-.power-meter--idle .power-meter-value,
-.power-meter--wait .power-meter-value,
-.power-meter--off .power-meter-value { color: var(--text-dim); }
-.power-meter-detail { color: var(--text-dim); }
 
 /* Header cog. Sits outside .app-header-brand so it lands at the far end of
    the row, opposite the title, and stays there when the brightness slider
@@ -1121,8 +1087,7 @@ label.settings-row { cursor: pointer; }
   /* Phone header has room for the headline figures and nothing else; the
      render time, late share and current draw stay in the tooltip — which a
      touch device cannot hover, so the pill's colour carries the warning. */
-  .frame-rate-detail { display: none; }
-  .power-meter-detail { display: none; }
+  .readout-detail { display: none; }
   /* A label and its control side by side leaves neither enough room on a
      phone, and the hints are the first thing to get squeezed to one word a
      line. Stack them instead, control under label. */

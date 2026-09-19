@@ -57,6 +57,7 @@ vi.mock('./api/client', () => ({
     activeScene: async () => ({ id: 's1' }),
     brightness: async () => '1',
     effects: async () => EFFECTS,
+    blendModes: async () => [{ value: 'normal', label: 'Normal' }],
     virtual: async () => ({ virtual: true }),
     fps: async () => ({ enabled: false, idle: true, virtual: true, targetFps: 100 }),
     power: async () => ({ idle: true, numLeds: 240, milliamps: null, budgetMilliamps: 18000 }),

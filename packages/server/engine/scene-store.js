@@ -4,9 +4,9 @@
  * filtery happens here, never in the render loop), and persistence.
  *
  * Persistence goes to a single crash-safe JSON document (engine/json-store,
- * atomic tmp+rename with a .bak fallback). Writes are debounced (trailing
- * 2s) so slider drags don't hammer the SD card; flush() is called from
- * signal handlers on shutdown.
+ * atomic tmp+rename with a .bak fallback), written at most every 2s by
+ * DebouncedDoc so slider drags don't hammer the SD card; flush() is called
+ * from signal handlers on shutdown.
  *
  * Document shape: { version: 2, activeSceneId, scenes: [...] }
  */
@@ -17,6 +17,7 @@ var path = require('path');
 var effects = require('../effects');
 var compositorMod = require('./compositor');
 var jsonStore = require('./json-store');
+var { DebouncedDoc } = require('./debounced-doc');
 var { coerceParams, finiteNumber, isPlainObject } = require('./params');
 
 var SAVE_DEBOUNCE_MS = 2000;
@@ -148,14 +149,12 @@ function prepareScene(scene) {
     });
 }
 
-class SceneStore {
+class SceneStore extends DebouncedDoc {
     constructor(compositor, persistFile) {
+        super(persistFile, { debounceMs: SAVE_DEBOUNCE_MS, label: 'scenes' });
         this.compositor = compositor;
-        this.persistFile = persistFile || null;
         this.scenes = [];
         this.activeSceneId = null;
-        this._saveTimer = null;
-        this._dirty = false;
     }
 
     // ---- preprocessing (write path) ----
@@ -222,33 +221,15 @@ class SceneStore {
 
     // ---- persistence ----
 
-    markDirty() {
-        this._dirty = true;
-        var self = this;
-        if (this._saveTimer) return;
-        this._saveTimer = setTimeout(function() {
-            self._saveTimer = null;
-            self.flush();
-        }, SAVE_DEBOUNCE_MS);
-        if (this._saveTimer.unref) this._saveTimer.unref();
+    toDocument() {
+        return {
+            version: 2,
+            activeSceneId: this.activeSceneId,
+            scenes: this.scenes.map(stripRuntime),
+        };
     }
 
-    async flush() {
-        if (!this._dirty || !this.persistFile) return;
-        this._dirty = false;
-        try {
-            jsonStore.save(this.persistFile, {
-                version: 2,
-                activeSceneId: this.activeSceneId,
-                scenes: this.scenes.map(stripRuntime),
-            });
-        } catch (err) {
-            console.error('Failed to persist scenes:', err);
-            this._dirty = true;
-        }
-    }
-
-    async load() {
+    load() {
         var doc = this.persistFile ? jsonStore.load(this.persistFile, warn) : null;
         // Array.isArray, not `.length` — an *empty* scenes array is someone
         // who deleted their library, not a fresh install. Only the absence
@@ -258,13 +239,13 @@ class SceneStore {
         if (doc && Array.isArray(doc.scenes)) {
             this.setScenes(doc.scenes);
             this.activeSceneId = (doc.activeSceneId && this.get(doc.activeSceneId)) ? doc.activeSceneId : null;
-            await this.flush();          // no-op unless setScenes repaired an id
+            this.flush();                // no-op unless setScenes repaired an id
             return;
         }
         this.setScenes(defaultScenes());
         this.activeSceneId = null;
         this._dirty = true;
-        await this.flush();
+        this.flush();
     }
 
     // Repairs rather than trusts the document — duplicate layer ids, params of

@@ -72,26 +72,32 @@ var color = require('./color');
  * LED scenes actually have, both collapse toward zero and read as doing
  * nothing — they belong above a `solid`, not above an `emitter`.
  *
- * THE MODE LIST IS DUPLICATED, unlike effects, which the UI discovers from
- * /api/effects: this map and BLEND_OPTIONS in the UI's ParamPanel.jsx. A mode
- * missing from that list is simply unreachable from the UI with nothing to
- * tell you, and a mode listed there that this map lacks falls back to
- * `normal` on write.
+ * The mode table below is the only list of modes: the write path resolves
+ * names through BLEND, derived from it, and the UI renders what
+ * GET /api/blend-modes serves from it. It used to be duplicated into the UI,
+ * where a mode missing from the copy was unreachable with nothing to say so.
  */
 
-var BLEND = {
-    normal: 0,
-    add: 1,
-    multiply: 2,
-    screen: 3,
-    overlay: 4,
-    subtract: 5,
-    difference: 6,
-    lighten: 7,
-    darken: 8,
-    soft_light: 9,
-    linear_light: 10,
-};
+// In the order the UI offers them, which is by what the mode does to the
+// stack rather than by id: the ones that only add light, the ones that only
+// remove it, then the ones that go both ways. `id` is what blendInto switches
+// on, so it is fixed per mode and never renumbered; the order is free.
+var BLEND_MODES = [
+    { value: 'normal', label: 'Normal', id: 0 },
+    { value: 'add', label: 'Add', id: 1 },
+    { value: 'screen', label: 'Screen', id: 3 },
+    { value: 'lighten', label: 'Lighten', id: 7 },
+    { value: 'subtract', label: 'Subtract', id: 5 },
+    { value: 'multiply', label: 'Multiply', id: 2 },
+    { value: 'darken', label: 'Darken', id: 8 },
+    { value: 'difference', label: 'Difference', id: 6 },
+    { value: 'overlay', label: 'Overlay', id: 4 },
+    { value: 'soft_light', label: 'Soft Light', id: 9 },
+    { value: 'linear_light', label: 'Linear Light', id: 10 },
+];
+
+var BLEND = {};
+BLEND_MODES.forEach(function(m) { BLEND[m.value] = m.id; });
 
 function blendInto(dst, src, mode, opacity, n) {
     for (var i = 0; i < n * 3; i++) {
@@ -277,4 +283,4 @@ class Compositor {
     }
 }
 
-module.exports = { Compositor, BLEND, blendInto };
+module.exports = { Compositor, BLEND, BLEND_MODES, blendInto };

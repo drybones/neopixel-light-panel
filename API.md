@@ -96,6 +96,26 @@ An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only**
 
 Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`, `text`. `emitter`'s presets are where the look of the old `embers`/`candy_sparkler` effects live now; a stored or imported layer using either of those types, or the old combined `gradient`, renders nothing — they are not resolvable effect types.
 
+
+---
+
+### List blend modes
+
+```
+GET /api/blend-modes
+```
+
+Returns every blend mode a layer's `blendMode` accepts, labelled and in the order an editor should offer them — by what the mode does to the stack (only adds light, only removes it, both ways), not alphabetically:
+
+```json
+[
+  { "value": "normal", "label": "Normal" },
+  { "value": "add", "label": "Add" },
+  { "value": "screen", "label": "Screen" }
+]
+```
+
+Discovered rather than hardcoded for the same reason effects are: a client that kept its own list could lack a mode with nothing to say so. An unknown `blendMode` on a write falls back to `normal`.
 ---
 
 ### List scenes
@@ -291,10 +311,10 @@ Five things the numbers do *not* mean:
 
 ```
 GET /api/power
-PUT /api/power                body: any subset of the config fields
+PUT /api/power                body: any subset of the five config fields
 ```
 
-Estimated panel current, and the limiter that keeps frames inside a budget. Both verbs return the same snapshot; the config persists across restarts. A `PUT` **merges** — send one field without resending the rest.
+Estimated panel current, and the limiter that keeps frames inside a budget. Both verbs return the same snapshot; the config persists across restarts. A `PUT` **merges** — send one field without resending the rest. The config is the first five fields below; `gamma` and `whitepoint` are **read-only**, reported from `fcserver.json`, and ignored in a `PUT`.
 
 ```json
 {
@@ -324,7 +344,7 @@ The estimate is summed on the write path, over the post-brightness bytes the sin
 
 Three things worth knowing before trusting the numbers:
 
-- **The model is gamma-aware, and has to be.** `fcserver.json` applies `gamma: 2.5` and a whitepoint, so an LED's duty cycle is `whitepoint × (value/255)^gamma`, not `value/255`. A mid-grey frame draws about 18% of full white, not 50%. **`gamma` and `whitepoint` here must match `fcserver.json`** — change one without the other and every reading is wrong.
+- **The model is gamma-aware, and has to be.** `fcserver.json` applies `gamma: 2.5` and a whitepoint, so an LED's duty cycle is `whitepoint × (value/255)^gamma`, not `value/255`. A mid-grey frame draws about 18% of full white, not 50%. The server reads both from `packages/server/fcserver.json` at start-up — the same file `fcserver.service` runs — rather than keeping its own copy, which is why they can't be set here. If that file can't be read, the estimate falls back to a linear curve, which reads high: the limiter dims early rather than late.
 - **`budgetMilliamps` is `maxMilliamps − overheadMilliamps`.** A tighter, IR-drop-aware cap was tried (a modelled supply rail sagging under load, `rail: {openCircuitVolts, ohms, floorVolts}`) and dropped: fitting it needs a real voltage reading, and the Pi's route to one — `vcgencmd pmic_read_adc` / `EXT5V_V` — is undocumented and unavailable on a standard Pi 4 Model B (Raspberry Pi Ltd's "Extra PMIC features" whitepaper scopes that ADC to CM4 only). The PSU cap alone held up fine against manual full-white testing.
 - **`scale` multiplies channel values, and is not the current ratio.** Current goes as `value^gamma`, so a frame cut to 65% of its current is scaled by `0.65^(1/2.5) = 0.843` — white at byte 215. It is continuous at the threshold, so nothing flickers as a scene animates across it.
 

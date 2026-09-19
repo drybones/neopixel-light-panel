@@ -62,8 +62,8 @@ var BUCKET_MS = 1000;
 var BUCKETS = Math.ceil(LATE_WINDOW_MS / BUCKET_MS);
 
 // A gap beyond this is the loop having been idle (scene off, startup), not a
-// slow frame.
-var RESUME_MS = 500;
+// slow frame. Emitter draws the same line, so it lives with the loop.
+var RESUME_MS = require('./render-loop').RESUME_MS;
 
 // Below this the reported rate is stale — nothing has rendered recently.
 var IDLE_MS = 500;

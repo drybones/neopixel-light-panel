@@ -193,6 +193,7 @@ test('a bad power config degrades per field instead of poisoning the meter', asy
         const res = await app.put('/api/power', { body: { maxMilliamps: 'lots', gamma: NaN } });
         assert.strictEqual(res.status, 200);
         assert.strictEqual(res.json.maxMilliamps, before.maxMilliamps);
+        // gamma is fcserver's, read-only here: a PUT of it is ignored
         assert.strictEqual(res.json.gamma, before.gamma);
         assert.ok(isFinite(res.json.budgetMilliamps));
     } finally { await app.close(); }

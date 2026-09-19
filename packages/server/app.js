@@ -66,7 +66,7 @@ async function initStorage() {
     frameStats.setEnabled(settings.frameStatsEnabled);
 
     try {
-        await store.load();
+        store.load();
         console.log('Loaded ' + store.scenes.length + ' scene(s); active: ' + store.activeSceneId);
     } catch (err) {
         console.error('Scene store load failed:', err);
@@ -84,17 +84,17 @@ async function initStorage() {
 
 initStorage();
 
-async function shutdown() {
-    await store.flush();
-    await settings.flush();
+function shutdown() {
+    store.flush();
+    settings.flush();
     process.exit(0);
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
 // Anything that escapes still exits and lets systemd restart the service, but
-// with the stores written first — their flush is synchronous inside, so this
-// is safe to call on the way out — and with the reason on the first line of
+// with the stores written first — their flush is synchronous, so this is
+// safe to call on the way out — and with the reason on the first line of
 // the journal entry. Without this a crash cost the last 2s of edits (#108).
 process.on('uncaughtException', function(err) {
     console.error('Uncaught exception, exiting:', err);

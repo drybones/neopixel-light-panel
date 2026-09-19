@@ -14,6 +14,14 @@
 // scene id is the datum you want, since cost and faults are per scene.
 var TICK_ERROR_LOG_MS = 5000;
 
+// A gap this long between two renders of the same thing means it was not
+// being rendered in between, not that a frame was slow: the loop renders
+// only the active scene and fast-exits when none is. 50 ticks at 10ms.
+// Shared, not restated, because two readers act on it — frame-stats stops
+// sampling across the gap, and emitter restarts a dead field's ramp — and
+// they have to agree on where a discontinuity is.
+var RESUME_MS = 500;
+
 function createTick(deps) {
     var store = deps.store;
     var compositor = deps.compositor;
@@ -74,4 +82,4 @@ function createTick(deps) {
     };
 }
 
-module.exports = { createTick, TICK_ERROR_LOG_MS };
+module.exports = { createTick, TICK_ERROR_LOG_MS, RESUME_MS };

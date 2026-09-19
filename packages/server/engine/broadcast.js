@@ -6,9 +6,7 @@
  * Frames are serialised from compositor.composite, i.e. *before* global
  * brightness is applied on the client.setPixel() write path: the UI
  * previews are a pre-fader meter, always showing the scene as authored,
- * and only the panel itself dims. (Reading the compositor rather than
- * client.pixelBuffer also sidesteps the 4-byte OPC header that hardware
- * buffers carry and virtual ones don't.)
+ * and only the panel itself dims.
  *
  * Since #92 the sink clamps before it multiplies, which makes that meter
  * exact rather than merely useful: clamp255 here and the sink's ceiling

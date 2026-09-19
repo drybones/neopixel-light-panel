@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useStore } from '../../state/store';
 import { describePower } from '../../lib/power';
+import ReadoutPill from './ReadoutPill';
+import useVisiblePoll from './useVisiblePoll';
 
 // The server averages over a ~1s window, so polling faster only re-reads the
 // same figure.
@@ -48,24 +50,9 @@ export default function PowerMeter() {
   const power = useStore((s) => s.power);
   const pollPower = useStore((s) => s.pollPower);
   const [shown, setShown] = useState(readShown);
+  useVisiblePoll(pollPower, shown, POLL_MS);
 
-  useEffect(() => {
-    if (!shown) return undefined;
-    // A background tab's readout is worth nothing and the requests still cost
-    // the Pi, so pause while hidden — but poll the moment it comes back, or
-    // the first thing shown is a frozen number from whenever it was last
-    // looked at.
-    const poll = () => { if (!document.hidden) pollPower(); };
-    poll();
-    const id = setInterval(poll, POLL_MS);
-    document.addEventListener('visibilitychange', poll);
-    return () => {
-      clearInterval(id);
-      document.removeEventListener('visibilitychange', poll);
-    };
-  }, [shown, pollPower]);
-
-  const { state, label, detail, title } = describePower(power, shown);
+  const readout = describePower(power, shown);
 
   const toggle = () => {
     const next = !shown;
@@ -74,16 +61,12 @@ export default function PowerMeter() {
   };
 
   return (
-    <button
-      type="button"
-      className={`power-meter power-meter--${state}`}
+    <ReadoutPill
+      kind="power"
+      {...readout}
+      pressed={shown}
+      ariaLabel={shown ? `Panel drawing ${readout.label}. Click to hide.` : 'Show power draw'}
       onClick={toggle}
-      aria-pressed={shown}
-      aria-label={shown ? `Panel drawing ${label}. Click to hide.` : 'Show power draw'}
-      title={title}
-    >
-      <span className="power-meter-value">{label}</span>
-      {detail && <span className="power-meter-detail">{detail}</span>}
-    </button>
+    />
   );
 }

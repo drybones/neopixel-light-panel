@@ -19,6 +19,7 @@ const api = vi.hoisted(() => ({
   activeScene: vi.fn(),
   brightness: vi.fn(),
   effects: vi.fn(),
+  blendModes: vi.fn(),
   virtual: vi.fn(),
   fps: vi.fn(),
   power: vi.fn(),
@@ -46,6 +47,7 @@ function serverUp() {
   api.activeScene.mockResolvedValue({ id: 's1' });
   api.brightness.mockResolvedValue('0.5');
   api.effects.mockResolvedValue([]);
+  api.blendModes.mockResolvedValue([]);
   api.virtual.mockResolvedValue({ virtual: true });
   api.fps.mockResolvedValue(null);
   api.power.mockResolvedValue(null);

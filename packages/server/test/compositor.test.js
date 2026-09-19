@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { Compositor, BLEND, blendInto } = require('../engine/compositor');
+const { Compositor, BLEND, BLEND_MODES, blendInto } = require('../engine/compositor');
 const { SceneStore } = require('../engine/scene-store');
 
 function makeModel(n) {
@@ -400,4 +400,20 @@ test('a layer whose effectType has no module renders nothing and throws nothing'
 
     assert.doesNotThrow(() => store.compositor.renderFrame(scene, 0));
     assert.ok(store.compositor.composite.every((v) => v === 0), 'an unknown effect must not put anything on the panel');
+});
+
+test('every blend mode has a distinct id that blendInto implements', () => {
+    // BLEND_MODES is ordered for display, so ids are assigned by hand; a
+    // collision or a gap would send two names to one formula.
+    const ids = BLEND_MODES.map((m) => m.id).sort((a, b) => a - b);
+    assert.deepStrictEqual(ids, ids.map((_, i) => i), 'ids are 0..n-1, each once');
+    assert.strictEqual(new Set(BLEND_MODES.map((m) => m.value)).size, BLEND_MODES.length);
+});
+
+test('blend modes are offered by what they do to the stack, not by id', () => {
+    // The UI renders this order as given (it used to own it): the modes that
+    // only add light, the ones that only remove it, then both ways.
+    const order = BLEND_MODES.map((m) => m.value);
+    assert.deepStrictEqual(order.slice(0, 4), ['normal', 'add', 'screen', 'lighten']);
+    assert.deepStrictEqual(order.slice(4, 7), ['subtract', 'multiply', 'darken']);
 });

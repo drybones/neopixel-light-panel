@@ -34,6 +34,7 @@ export const useStore = create((set, get) => ({
   effectPreviews: {}, // effectType → { hash, pixels } filmstrip for the picker
   previewFrames: 0,
   effects: [],
+  blendModes: [], // [{value, label}] in display order, from the compositor
   activeSceneId: null,
   brightness: 1.0,
   isVirtual: null,
@@ -49,7 +50,7 @@ export const useStore = create((set, get) => ({
   // server could be reached.
   writeError: null,
   loaded: false,
-  // Why the first load failed, or null. The four calls below are the ones
+  // Why the first load failed, or null. The five calls below are the ones
   // nothing renders without, so a down server used to leave `loaded` false
   // with no way out — a blank page under a header whose WebSocket dot goes
   // green on its own schedule, which reads as alive.
@@ -60,11 +61,12 @@ export const useStore = create((set, get) => ({
     set({ initError: null });
     initInFlight = (async () => {
       try {
-        const [scenes, active, brightness, effects, virtual, fps, power] = await Promise.all([
+        const [scenes, active, brightness, effects, blendModes, virtual, fps, power] = await Promise.all([
           api.scenes(),
           api.activeScene(),
           api.brightness(),
           api.effects(),
+          api.blendModes(),
           api.virtual().catch(() => ({ virtual: null })),
           api.fps().catch(() => null),
           api.power().catch(() => null),
@@ -74,6 +76,7 @@ export const useStore = create((set, get) => ({
           activeSceneId: active.id,
           brightness: parseFloat(brightness),
           effects,
+          blendModes,
           isVirtual: virtual.virtual,
           fps,
           power,
