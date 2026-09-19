@@ -2,7 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 
 const power = require('../engine/power');
-const { PowerMeter, scaleFor, budgetFor, normaliseConfig, milliampsFor } = power;
+const { PowerMeter, budgetFor, normaliseConfig, milliampsFor } = power;
+const GAMMA = power.FCSERVER_COLOUR.gamma;
+const scaleFor = (milliamps, numLeds, cfg) => power.scaleFor(milliamps, numLeds, cfg, GAMMA);
 const VirtualOPC = require('../virtual-opc');
 const { HEADER_BYTES: R } = require('../engine/pixel-sink');
 
@@ -64,9 +66,62 @@ test('an unlit panel still draws its standby current', () => {
 });
 
 test('whitepoint is carried into the estimate', () => {
-    const flat = config({ whitepoint: [1, 1, 1] });
-    const snap = paint(sinkWith(flat), 255, 255, 255);
+    const sink = new VirtualOPC();
+    sink.power = new PowerMeter({ colour: { gamma: 2.5, whitepoint: [1, 1, 1] } });
+    sink.setPixelCount(NUM_LEDS);
+    const snap = paint(sink, 255, 255, 255);
     assert.strictEqual(Math.round(snap.requestedMilliamps), NUM_LEDS * 55 + NUM_LEDS);
+});
+
+// --------------------------------------------------------- fcserver.json
+
+test('the curve is the one in the fcserver.json beside the server', () => {
+    // The file fcserver.service runs. Read, not restated: a copy here could
+    // drift from it and every reading would be wrong without a symptom.
+    const file = require('path').join(__dirname, '..', 'fcserver.json');
+    const { color } = JSON.parse(require('fs').readFileSync(file, 'utf8'));
+    assert.deepStrictEqual(power.FCSERVER_COLOUR, { gamma: color.gamma, whitepoint: color.whitepoint });
+    assert.deepStrictEqual(new PowerMeter().snapshot().whitepoint, color.whitepoint);
+});
+
+test('an unreadable fcserver.json falls back to a linear curve, which reads high', () => {
+    const warnings = [];
+    const colour = power.readFcserverColour('/nonexistent/fcserver.json', (m) => warnings.push(m));
+    assert.deepStrictEqual(colour, power.FCSERVER_DEFAULT_COLOUR);
+    assert.strictEqual(warnings.length, 1);
+
+    // The safe direction for a limiter: the linear estimate of a mid-grey
+    // frame is higher than the gamma-aware one, so it dims early, not late.
+    const meterWith = (c) => {
+        const sink = new VirtualOPC();
+        sink.power = new PowerMeter({ colour: c });
+        sink.setPixelCount(NUM_LEDS);
+        return paint(sink, 128, 128, 128).requestedMilliamps;
+    };
+    assert.ok(meterWith(colour) > meterWith(power.FCSERVER_COLOUR));
+});
+
+test('a config with no color block is fcserver\'s own default: no curve', () => {
+    const fs = require('fs');
+    const dir = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'fcserver-'));
+    const file = require('path').join(dir, 'fcserver.json');
+    fs.writeFileSync(file, JSON.stringify({ listen: ['127.0.0.1', 7890] }));
+    const warnings = [];
+    assert.deepStrictEqual(power.readFcserverColour(file, (m) => warnings.push(m)), power.FCSERVER_DEFAULT_COLOUR);
+    assert.deepStrictEqual(warnings, [], 'an absent block is valid fcserver config, not a fault');
+
+    fs.writeFileSync(file, JSON.stringify({ color: { gamma: 'steep', whitepoint: [2, 1] } }));
+    assert.deepStrictEqual(power.readFcserverColour(file, (m) => warnings.push(m)), power.FCSERVER_DEFAULT_COLOUR);
+    assert.strictEqual(warnings.length, 2, 'a present but unusable value is worth a line each');
+});
+
+test('gamma and whitepoint are not part of the editable config', () => {
+    // They describe fcserver. Accepting them here is how a persisted
+    // settings.json came to carry a third copy of the curve, overriding
+    // whatever fcserver.json said.
+    const cfg = normaliseConfig({ gamma: 1, whitepoint: [1, 1, 1] });
+    assert.strictEqual('gamma' in cfg, false);
+    assert.strictEqual('whitepoint' in cfg, false);
 });
 
 // ------------------------------------------------------------------ budget
@@ -255,9 +310,8 @@ test('a partial config merges rather than resetting to defaults', () => {
 });
 
 test('garbage in a config field falls back to the default, not NaN', () => {
-    const cfg = normaliseConfig({ maxMilliamps: NaN, gamma: 'steep', ledMilliamps: -5 });
+    const cfg = normaliseConfig({ maxMilliamps: NaN, ledMilliamps: -5 });
     assert.strictEqual(cfg.maxMilliamps, power.DEFAULTS.maxMilliamps);
-    assert.strictEqual(cfg.gamma, power.DEFAULTS.gamma);
     assert.strictEqual(cfg.ledMilliamps, 0);
     assert.ok(isFinite(milliampsFor(100, NUM_LEDS, cfg)));
 });
