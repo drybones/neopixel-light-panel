@@ -189,8 +189,8 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
       <div className="param-panel-header">
         <span className="param-panel-title">{effect ? effect.name : layer.effectType}</span>
         <div className="param-panel-actions">
-          <button className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
-          <button className="btn btn-ghost btn-danger" onClick={onDelete}>Delete</button>
+          <button type="button" className="btn btn-ghost" onClick={onDuplicate}>Duplicate</button>
+          <button type="button" className="btn btn-ghost btn-danger" onClick={onDelete}>Delete</button>
         </div>
       </div>
       {effect && effect.presets && effect.presets.length > 0 && (

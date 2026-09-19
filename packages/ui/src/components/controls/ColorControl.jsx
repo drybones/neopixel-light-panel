@@ -6,8 +6,12 @@ import { formatHex, parseHex } from '../../lib/colors';
 const SWATCHES = ['#ffffff', '#ff5e3a', '#ffd23f', '#2ee6a8', '#3fd0ff', '#4f8bff', '#b44fff', '#ff3fa4'];
 
 // Swatch row + hex field + full picker for schema `color` entries.
-export default function ColorControl({ label, value, onChange, onCommit }) {
+export default function ColorControl({ label, value: raw, onChange, onCommit }) {
   const [open, setOpen] = useState(false);
+  // The server coerces params on every write and on load, so this should
+  // always be a string — but a missing one threw on toLowerCase() and took
+  // the whole editor with it. Black is what a bad colour renders as anyway.
+  const value = typeof raw === 'string' ? raw : '#000000';
 
   function pick(hex) {
     onChange(hex);
@@ -21,6 +25,7 @@ export default function ColorControl({ label, value, onChange, onCommit }) {
         {SWATCHES.map((c) => (
           <button
             key={c}
+            type="button"
             className={`color-swatch${value.toLowerCase() === c ? ' color-swatch--on' : ''}`}
             style={{ background: c }}
             onClick={() => pick(c)}
@@ -28,6 +33,7 @@ export default function ColorControl({ label, value, onChange, onCommit }) {
           />
         ))}
         <button
+          type="button"
           className="color-swatch color-swatch--custom"
           style={{ background: value }}
           onClick={() => setOpen(!open)}

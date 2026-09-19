@@ -27,11 +27,13 @@ export default function SceneCard({
       tabIndex={0}
       aria-keyshortcuts={KEY_HINT}
       aria-describedby="scene-grid-help"
-      aria-grabbed={dragging || undefined}
       style={offset ? { transform: `translate3d(${offset.x}px, ${offset.y}px, 0)` } : undefined}
       onKeyDown={(e) => {
+        // Keys on the Edit button bubble here, and Enter there fired both the
+        // edit and an activate. The card's own keys are for the card alone.
+        if (e.target !== e.currentTarget) return;
         if (onKeyDown(e, scene.id)) return;
-        if (e.key === 'Enter' || e.key === ' ') onActivate();
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onActivate(); }
       }}
     >
       <div className="scene-card-preview">
@@ -52,6 +54,7 @@ export default function SceneCard({
           <div className="scene-card-meta">{scene.layerCount} layer{scene.layerCount === 1 ? '' : 's'}</div>
         </div>
         <button
+          type="button"
           className="btn btn-ghost scene-card-edit"
           onClick={(e) => { e.stopPropagation(); onEdit(); }}
           aria-label={`Edit ${scene.name}`}

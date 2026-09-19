@@ -10,6 +10,7 @@ import { downloadJson, slugify } from '../../lib/downloadJson';
 
 export default function Editor({ sceneId, onClose }) {
   const scene = useStore((s) => s.sceneDetails[sceneId]);
+  const inLibrary = useStore((s) => s.scenes.some((x) => x.id === sceneId));
   const effects = useStore((s) => s.effects);
   const activeSceneId = useStore((s) => s.activeSceneId);
   const activateScene = useStore((s) => s.activateScene);
@@ -40,6 +41,13 @@ export default function Editor({ sceneId, onClose }) {
       refreshPreview(sceneId);
     };
   }, [sceneId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The scene can leave the library underneath the editor — a failed write
+  // whose reconcile finds it gone, or this editor's own delete — and an editor
+  // over a scene the server doesn't have would only collect refused writes.
+  useEffect(() => {
+    if (!inLibrary) onClose();
+  }, [inLibrary]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (scene) setName(scene.name);
@@ -133,13 +141,13 @@ export default function Editor({ sceneId, onClose }) {
       layers: scene.layers.map((l) => ({ ...JSON.parse(JSON.stringify(l)), id: newLayerId() })),
     };
     const created = await useStore.getState().createScene(copy);
-    window.location.hash = `#/edit/${created.id}`;
+    if (created) window.location.hash = `#/edit/${created.id}`;
   }
 
   return (
     <div className="editor">
       <div className="editor-toolbar">
-        <button className="btn btn-ghost" onClick={onClose} aria-label="Back to scenes">‹ Scenes</button>
+        <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Back to scenes">‹ Scenes</button>
         <input
           className="editor-name"
           value={name}
@@ -149,9 +157,10 @@ export default function Editor({ sceneId, onClose }) {
           aria-label="Scene name"
         />
         <div className="editor-toolbar-right">
-          <button className="btn btn-ghost" onClick={handleExportScene}>Export</button>
-          <button className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
+          <button type="button" className="btn btn-ghost" onClick={handleExportScene}>Export</button>
+          <button type="button" className="btn btn-ghost" onClick={handleDuplicateScene}>Duplicate</button>
           <button
+            type="button"
             className={`btn btn-ghost btn-danger${confirmingDelete ? ' btn-danger-armed' : ''}`}
             onClick={handleDeleteScene}
             onBlur={() => setConfirmingDelete(false)}

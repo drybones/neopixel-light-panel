@@ -80,7 +80,7 @@ export default function SceneLibrarySettings({ onDone }) {
           hint="Downloads every scene, including the ones not currently shown."
           control={(
             <span className="control-stack">
-              <button className="btn btn-ghost" onClick={handleExport}>Export</button>
+              <button type="button" className="btn btn-ghost" onClick={handleExport}>Export</button>
               {exportStatus && (
                 <span
                   className={`row-status${exportStatus.error ? ' row-status--error' : ''}`}

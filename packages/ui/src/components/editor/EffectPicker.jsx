@@ -26,7 +26,7 @@ export default function EffectPicker({ effects, onPick, onClose }) {
         <div className="effect-picker-title">Add a layer</div>
         <div className="effect-picker-grid">
           {effects.map((effect) => (
-            <button key={effect.type} className="effect-picker-item" onClick={() => onPick(effect.type)}>
+            <button key={effect.type} type="button" className="effect-picker-item" onClick={() => onPick(effect.type)}>
               <span className="effect-picker-preview" aria-hidden="true">
                 <FilmstripCanvas
                   strip={previews[effect.type]}

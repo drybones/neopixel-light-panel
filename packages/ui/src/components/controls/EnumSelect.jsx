@@ -13,7 +13,9 @@ export default function EnumSelect({ label, options, value, onChange }) {
         {options.map((opt) => (
           <button
             key={opt.value}
+            type="button"
             className={`segmented-item${opt.value === value ? ' segmented-item--on' : ''}`}
+            aria-pressed={opt.value === value}
             onClick={() => onChange(opt.value)}
           >
             {opt.label}

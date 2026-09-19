@@ -7,6 +7,8 @@ import BrightnessSlider from './components/switcher/BrightnessSlider';
 import FrameRate from './components/switcher/FrameRate';
 import PowerMeter from './components/switcher/PowerMeter';
 import SettingsPage from './components/settings/SettingsPage';
+import ErrorBoundary from './components/ErrorBoundary';
+import WriteError from './components/WriteError';
 
 function parseHash() {
   if (/^#\/settings/.test(window.location.hash)) return { view: 'settings' };
@@ -40,13 +42,22 @@ export default function App() {
   const [route, setRoute] = useState(parseHash());
   const [wsConnected, setWsConnected] = useState(false);
   const loaded = useStore((s) => s.loaded);
+  const initError = useStore((s) => s.initError);
   const init = useStore((s) => s.init);
 
+  // The WebSocket reconnecting is the best signal there is that the server is
+  // back — it lives in the same process — so a failed first load retries on
+  // it rather than waiting for someone to find the button. Guarded by the
+  // store's state, not this closure's: the socket reconnects for its own
+  // reasons long after the load has succeeded.
   useEffect(() => {
     init();
     const onHash = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHash);
-    const unsub = subscribeStatus(setWsConnected);
+    const unsub = subscribeStatus((connected) => {
+      setWsConnected(connected);
+      if (connected && useStore.getState().initError) init();
+    });
     return () => {
       window.removeEventListener('hashchange', onHash);
       unsub();
@@ -65,7 +76,7 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <div className="app-header-brand">
-          <button className="app-title" onClick={goHome} aria-label="Back to scenes">
+          <button type="button" className="app-title" onClick={goHome} aria-label="Back to scenes">
             Lightpanel
           </button>
           <span
@@ -93,14 +104,29 @@ export default function App() {
           </button>
         )}
       </header>
+      {loaded && <WriteError />}
       {!loaded ? (
-        <div className="app-loading">Connecting…</div>
-      ) : route.view === 'editor' ? (
-        <Editor sceneId={route.sceneId} onClose={goHome} />
-      ) : route.view === 'settings' ? (
-        <SettingsPage onClose={goHome} />
+        initError ? (
+          <div className="app-failure" role="alert">
+            <p className="app-failure-title">Can't reach the light panel.</p>
+            <p className="app-failure-detail">
+              {initError}. This retries by itself when the panel's live preview reconnects.
+            </p>
+            <button type="button" className="btn" onClick={() => init()}>Try again</button>
+          </div>
+        ) : (
+          <div className="app-loading">Connecting…</div>
+        )
       ) : (
-        <SceneGrid onEdit={openEditor} />
+        <ErrorBoundary resetKey={`${route.view}/${route.sceneId || ''}`} onHome={goHome}>
+          {route.view === 'editor' ? (
+            <Editor sceneId={route.sceneId} onClose={goHome} />
+          ) : route.view === 'settings' ? (
+            <SettingsPage onClose={goHome} />
+          ) : (
+            <SceneGrid onEdit={openEditor} />
+          )}
+        </ErrorBoundary>
       )}
     </div>
   );

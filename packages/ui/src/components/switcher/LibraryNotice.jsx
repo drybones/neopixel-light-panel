@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useStore } from '../../state/store';
+import Notice from '../Notice';
 
 // Long enough to read after a page change, short enough that it is gone by
 // the time you come back to the switcher for an unrelated reason.
@@ -16,33 +17,17 @@ const DISMISS_MS = 8000;
  * caller.
  *
  * It clears itself as well as offering a ×. Without the timer, going to
- * settings and back an hour later would still be told what you did then —
- * a notice that outlives the moment it describes reads as a status, and this
- * is not one.
+ * settings and back an hour later would still be told what you did then.
  */
 export default function LibraryNotice() {
   const message = useStore((s) => s.libraryNotice);
   const clearLibraryNotice = useStore((s) => s.clearLibraryNotice);
-
-  useEffect(() => {
-    if (!message) return undefined;
-    const timer = setTimeout(clearLibraryNotice, DISMISS_MS);
-    return () => clearTimeout(timer);
-  }, [message, clearLibraryNotice]);
-
-  if (!message) return null;
-
   return (
-    <div className="library-notice" role="status">
-      <span className="library-notice-text">{message}</span>
-      <button
-        type="button"
-        className="library-notice-dismiss"
-        onClick={clearLibraryNotice}
-        aria-label="Dismiss"
-      >
-        ×
-      </button>
-    </div>
+    <Notice
+      message={message}
+      onDismiss={clearLibraryNotice}
+      dismissMs={DISMISS_MS}
+      className="library-notice"
+    />
   );
 }
