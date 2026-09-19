@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "concurrently -n server,ui \"npm run dev --workspace=packages/server\" \"npm start --workspace=packages/ui\"",
     "start": "npm start --workspace=packages/server",
-    "deploy": "bash scripts/deploy-pi.sh"
+    "deploy": "bash scripts/deploy-pi.sh",
+    "test": "npm test --workspace=packages/server && npm test --workspace=packages/ui"
   },
   "devDependencies": {
     "concurrently": "^10.0.5"
