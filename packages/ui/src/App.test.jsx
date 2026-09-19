@@ -15,7 +15,7 @@ import {
   afterEach, beforeEach, expect, test, vi,
 } from 'vitest';
 import {
-  cleanup, render, screen, waitFor,
+  cleanup, fireEvent, render, screen, waitFor,
 } from '@testing-library/react';
 import { installCanvasStub } from './test/canvasStub';
 
@@ -53,7 +53,7 @@ vi.mock('./api/client', () => ({
   baseUrl: 'http://localhost:3000',
   wsUrl: 'ws://localhost:3001',
   api: {
-    scenes: async () => SCENES,
+    scenes: vi.fn(async () => SCENES),
     activeScene: async () => ({ id: 's1' }),
     brightness: async () => '1',
     effects: async () => EFFECTS,
@@ -71,6 +71,8 @@ vi.mock('./api/client', () => ({
 }));
 
 const { default: App } = await import('./App');
+const { api } = await import('./api/client');
+const { useStore } = await import('./state/store');
 
 class FakeIntersectionObserver {
   constructor(cb) { this.cb = cb; }
@@ -87,6 +89,7 @@ beforeEach(() => {
   uninstall = installCanvasStub();
   window.IntersectionObserver = FakeIntersectionObserver;
   window.location.hash = '';
+  useStore.setState({ loaded: false, initError: null });
 });
 afterEach(() => { cleanup(); uninstall(); });
 
@@ -131,4 +134,13 @@ test('mounting produces no React error or warning', async () => {
   spyError.mockRestore();
   spyWarn.mockRestore();
   expect(errors.map((a) => String(a[0]))).toEqual([]);
+});
+
+test('a server that is down says so and offers a retry, instead of "Connecting…" forever', async () => {
+  api.scenes.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+  render(<App />);
+
+  await waitFor(() => expect(screen.getByText("Can't reach the light panel.")).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+  await waitFor(() => expect(screen.getByText('Embers')).toBeTruthy());
 });

@@ -148,6 +148,16 @@ export default function AngleDial({ entry, value, color, spread, stops, onChange
     onChange(normalise(Math.round(deg)));
   }
 
+  // Up, cancel and lost capture all end a drag. Without the last two, a
+  // gesture the browser took back left the dial chasing a bare cursor; the
+  // guard keeps lostpointercapture, which follows every pointerup, from
+  // committing twice.
+  function endDrag() {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (onCommit) onCommit();
+  }
+
   const step = entry.step || 1;
 
   return (
@@ -171,10 +181,9 @@ export default function AngleDial({ entry, value, color, spread, stops, onChange
           apply(e);
         }}
         onPointerMove={(e) => { if (draggingRef.current) apply(e); }}
-        onPointerUp={() => {
-          draggingRef.current = false;
-          if (onCommit) onCommit();
-        }}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onLostPointerCapture={endDrag}
         onKeyDown={(e) => {
           const big = e.shiftKey ? 15 : step;
           if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') onChange(normalise(value + big));

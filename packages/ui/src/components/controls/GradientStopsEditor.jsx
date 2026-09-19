@@ -19,7 +19,23 @@ const PIN_RADIUS = 8;
 // colours sit under the strip as hex fields, pinned to its ends rather than
 // following the pins, so they stay where you last read them however the stops
 // are dragged.
-export default function GradientStopsEditor({ entry, stops, onChange, onCommit }) {
+// What the editor shows when the param isn't a usable stop list. Every path
+// below assumes at least one stop (the end fields, the nearest-colour lookup),
+// and the server coerces a bad list to the effect's default before it gets
+// here — so this is a last resort that keeps the editor drawable, not a value
+// anything is expected to see. The first edit writes a real list over it.
+const FALLBACK_STOPS = [
+  { position: 0, color: '#000000' },
+  { position: 1, color: '#ffffff' },
+];
+
+function usableStops(stops) {
+  return Array.isArray(stops) && stops.length > 0
+    && stops.every((s) => s && typeof s.color === 'string' && Number.isFinite(s.position));
+}
+
+export default function GradientStopsEditor({ entry, stops: raw, onChange, onCommit }) {
+  const stops = usableStops(raw) ? raw : FALLBACK_STOPS;
   const stripRef = useRef(null);
   const [editing, setEditing] = useState(null); // stop index or null
   const draggingRef = useRef(null);
@@ -74,6 +90,10 @@ export default function GradientStopsEditor({ entry, stops, onChange, onCommit }
     setStop(draggingRef.current, { position: positionFromEvent(e) });
   }
 
+  // Also the cancel path: a gesture the browser takes back (a scroll, a
+  // system swipe) sends pointercancel and never a pointerup, and without this
+  // the pin would go on following a bare cursor. Idempotent, because
+  // lostpointercapture follows every ordinary pointerup as well.
   function handlePinPointerUp() {
     if (draggingRef.current === null) return;
     draggingRef.current = null;
@@ -125,11 +145,14 @@ export default function GradientStopsEditor({ entry, stops, onChange, onCommit }
           {stops.map((stop, i) => (
             <button
               key={i}
+              type="button"
               className={`gradient-pin${editing === i ? ' gradient-pin--on' : ''}`}
               style={{ left: `${stop.position * 100}%`, background: stop.color }}
               onPointerDown={(e) => handlePinPointerDown(e, i)}
               onPointerMove={handlePinPointerMove}
               onPointerUp={handlePinPointerUp}
+              onPointerCancel={handlePinPointerUp}
+              onLostPointerCapture={handlePinPointerUp}
               onClick={(e) => { e.stopPropagation(); handlePinClick(i); }}
               aria-label={`Colour stop at ${Math.round(stop.position * 100)}%`}
             />
@@ -168,7 +191,7 @@ export default function GradientStopsEditor({ entry, stops, onChange, onCommit }
                   width={70}
                 />
                 {removable && (
-                  <button className="btn btn-ghost btn-danger" onClick={() => removeStop(editing)}>Remove stop</button>
+                  <button type="button" className="btn btn-ghost btn-danger" onClick={() => removeStop(editing)}>Remove stop</button>
                 )}
               </div>
             </div>

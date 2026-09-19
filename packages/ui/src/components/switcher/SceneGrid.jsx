@@ -14,6 +14,7 @@ export default function SceneGrid({ onEdit }) {
   const createScene = useStore((s) => s.createScene);
   const reorderScenes = useStore((s) => s.reorderScenes);
   const resetLibrary = useStore((s) => s.resetLibrary);
+  const showWriteError = useStore((s) => s.showWriteError);
   const gridRef = useRef(null);
   const [announcement, setAnnouncement] = useState('');
 
@@ -29,7 +30,13 @@ export default function SceneGrid({ onEdit }) {
 
   async function handleNewScene() {
     const created = await createScene({ name: 'New scene', layers: [{ effectType: 'wavelet' }] });
-    onEdit(created.id);
+    if (created) onEdit(created.id);
+  }
+
+  // The settings page reports a failed restore in its own row; here there is
+  // no row, so it goes up as a write error like any other refused change.
+  function handleRestore() {
+    resetLibrary().catch(() => showWriteError("Couldn't restore the default scenes."));
   }
 
   return (
@@ -89,7 +96,7 @@ export default function SceneGrid({ onEdit }) {
             or build one from scratch.
           </p>
           <div className="scene-empty-actions">
-            <button type="button" className="btn" onClick={() => resetLibrary()}>
+            <button type="button" className="btn" onClick={handleRestore}>
               Restore defaults
             </button>
             <ImportScenesButton className="btn" label="Import scenes" />

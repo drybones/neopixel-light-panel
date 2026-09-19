@@ -198,6 +198,13 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
     apply(e);
   }
 
+  // Up, cancel and lost capture all end a drag — see AngleDial's endDrag.
+  function endDrag() {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    if (onCommit) onCommit();
+  }
+
   const raw = worldToPad(geo, x, y);
   const handle = clampHandle(raw.fx, raw.fy);
   const far = isFarField(geo, x, y);
@@ -216,9 +223,18 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
           style={{ aspectRatio: `${geo.aspect}` }}
           onPointerDown={handlePointerDown}
           onPointerMove={(e) => { if (draggingRef.current) apply(e); }}
-          onPointerUp={() => { draggingRef.current = false; if (onCommit) onCommit(); }}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          onLostPointerCapture={endDrag}
+          // A slider is one-dimensional, so the numeric value carries x and
+          // the text carries both — the text is what a screen reader speaks.
+          // The range is the pad's own edge at this zoom, which a far-field
+          // value can lie beyond; valuetext stays exact either way.
           role="slider"
           aria-label={entry.label}
+          aria-valuenow={Number(x.toFixed(2))}
+          aria-valuemin={-Number((geo.halfX * geo.farScale).toFixed(2))}
+          aria-valuemax={Number((geo.halfX * geo.farScale).toFixed(2))}
           aria-valuetext={`x ${x.toFixed(2)}, y ${y.toFixed(2)}`}
           tabIndex={0}
           onKeyDown={(e) => {

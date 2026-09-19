@@ -23,7 +23,7 @@ export default function SettingsPage({ onClose }) {
   return (
     <div className="settings">
       <div className="settings-toolbar">
-        <button className="btn btn-ghost" onClick={onClose} aria-label="Back to scenes">‹ Scenes</button>
+        <button type="button" className="btn btn-ghost" onClick={onClose} aria-label="Back to scenes">‹ Scenes</button>
         <h1 className="settings-title">Settings</h1>
       </div>
 

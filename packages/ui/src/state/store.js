@@ -23,6 +23,10 @@ function tracked(promise) {
   return promise;
 }
 
+// App retries init both from its button and whenever the WebSocket
+// reconnects; the two can land together, and one load is enough.
+let initInFlight = null;
+
 export const useStore = create((set, get) => ({
   scenes: [],
   sceneDetails: {},   // sceneId → full scene (layers included)
@@ -39,30 +43,54 @@ export const useStore = create((set, get) => ({
   // action rather than by the button, because the settings page navigates
   // here to show it and the empty state's buttons are already here.
   libraryNotice: null,
+  // The last write the server refused or never answered, shown above
+  // whichever view is up. Transient, like libraryNotice: it reports what
+  // happened, and reconcile has already taken the server's view where the
+  // server could be reached.
+  writeError: null,
   loaded: false,
+  // Why the first load failed, or null. The four calls below are the ones
+  // nothing renders without, so a down server used to leave `loaded` false
+  // with no way out — a blank page under a header whose WebSocket dot goes
+  // green on its own schedule, which reads as alive.
+  initError: null,
 
   async init() {
-    const [scenes, active, brightness, effects, virtual, fps, power] = await Promise.all([
-      api.scenes(),
-      api.activeScene(),
-      api.brightness(),
-      api.effects(),
-      api.virtual().catch(() => ({ virtual: null })),
-      api.fps().catch(() => null),
-      api.power().catch(() => null),
-    ]);
-    set({
-      scenes,
-      activeSceneId: active.id,
-      brightness: parseFloat(brightness),
-      effects,
-      isVirtual: virtual.virtual,
-      fps,
-      power,
-      loaded: true,
-    });
-    get().loadAllDetails();
-    get().loadPreviews();
+    if (initInFlight) return initInFlight;
+    set({ initError: null });
+    initInFlight = (async () => {
+      try {
+        const [scenes, active, brightness, effects, virtual, fps, power] = await Promise.all([
+          api.scenes(),
+          api.activeScene(),
+          api.brightness(),
+          api.effects(),
+          api.virtual().catch(() => ({ virtual: null })),
+          api.fps().catch(() => null),
+          api.power().catch(() => null),
+        ]);
+        set({
+          scenes,
+          activeSceneId: active.id,
+          brightness: parseFloat(brightness),
+          effects,
+          isVirtual: virtual.virtual,
+          fps,
+          power,
+          loaded: true,
+        });
+      } catch (err) {
+        set({ initError: err.message || String(err) });
+        return;
+      } finally {
+        initInFlight = null;
+      }
+      // Both have fallbacks — the editor fetches a missing scene itself, and
+      // a card without a strip is the ordinary first paint.
+      get().loadAllDetails().catch(() => {});
+      get().loadPreviews().catch(() => {});
+    })();
+    return initInFlight;
   },
 
   async loadAllDetails() {
@@ -113,13 +141,21 @@ export const useStore = create((set, get) => ({
     try {
       await api.setActiveScene(id);
     } catch {
-      set({ activeSceneId: previous });
+      set({ activeSceneId: previous, writeError: "Couldn't switch scenes." });
     }
   },
 
+  // A refused brightness is re-read rather than reverted: the throttle has
+  // already dropped every value between the last one that landed and this,
+  // so there is nothing correct to revert *to* but what the server holds.
   setBrightness(value) {
     set({ brightness: value });
-    layerThrottle.schedule('brightness', () => api.setBrightness(value));
+    layerThrottle.schedule('brightness', () => api.setBrightness(value).catch(async () => {
+      set({ writeError: "Couldn't change the brightness." });
+      try {
+        set({ brightness: parseFloat(await api.brightness()) });
+      } catch { /* unreachable too: leave the slider where it was put */ }
+    }));
   },
 
   // Frame-rate tracker. The server owns the toggle (it persists it), so the
@@ -176,13 +212,22 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Not optimistic — the new id comes from the server — so a failure has
+  // nothing to undo. It resolves null rather than rejecting, because both
+  // callers navigate to the result and neither has anywhere better to say so.
   async createScene(scene) {
-    const created = await api.createScene(scene);
+    let created;
+    try {
+      created = await api.createScene(scene);
+    } catch {
+      set({ writeError: "Couldn't create the scene." });
+      return null;
+    }
     set((s) => ({
       scenes: [...s.scenes, { id: created.id, name: created.name, layerCount: created.layers.length }],
       sceneDetails: { ...s.sceneDetails, [created.id]: created },
     }));
-    get().loadPreviews(created.id);
+    get().loadPreviews(created.id).catch(() => {});
     return created;
   },
 
@@ -199,7 +244,55 @@ export const useStore = create((set, get) => ({
         activeSceneId: s.activeSceneId === id ? null : s.activeSceneId,
       };
     });
-    await api.deleteScene(id);
+    try {
+      await api.deleteScene(id);
+    } catch {
+      await get().reconcile("Couldn't delete the scene.", id);
+    }
+  },
+
+  // The one recovery for an optimistic write the server refused: say so, and
+  // take the server's view rather than guessing at a revert. Guessing is what
+  // goes wrong — a structural edit is a whole-scene PUT, and the throttled
+  // layer path has already dropped the values between what landed and what
+  // was shown — whereas the server's copy is by definition what the panel is
+  // playing. `sceneId` refetches that one scene as well as the list; a 404
+  // there means it is gone, and it is dropped here too so the editor closes.
+  //
+  // A server that is simply unreachable fails the refetch as well, and then
+  // the optimistic state stays: there is no better view to take, and the
+  // error already says the edit didn't land.
+  async reconcile(message, sceneId) {
+    set({ writeError: message });
+    try {
+      const [scenes, active] = await Promise.all([api.scenes(), api.activeScene()]);
+      set({ scenes, activeSceneId: active.id });
+    } catch { return; }
+    if (!sceneId) return;
+    const stillThere = get().scenes.some((x) => x.id === sceneId);
+    if (!stillThere) {
+      set((s) => {
+        const sceneDetails = { ...s.sceneDetails };
+        delete sceneDetails[sceneId];
+        return { sceneDetails };
+      });
+      return;
+    }
+    try {
+      await get().loadSceneDetail(sceneId);
+    } catch { /* keep what we have */ }
+    get().loadPreviews(sceneId).catch(() => {});
+  },
+
+  // Set from outside the store by a caller that owns a failure the store
+  // doesn't — the switcher's empty-state Restore, which has no inline row to
+  // report into the way the settings page does.
+  showWriteError(message) {
+    set({ writeError: message });
+  },
+
+  clearWriteError() {
+    set({ writeError: null });
   },
 
   // ---- whole-library swaps: reset, delete-all, replacing import ----
@@ -277,7 +370,7 @@ export const useStore = create((set, get) => ({
     try {
       await api.reorderScenes(ids);
     } catch {
-      set({ scenes: await api.scenes() });
+      await get().reconcile("Couldn't reorder the scenes.");
     }
   },
 
@@ -288,7 +381,11 @@ export const useStore = create((set, get) => ({
       sceneDetails: { ...s.sceneDetails, [id]: scene },
       scenes: s.scenes.map((x) => (x.id === id ? { ...x, name: scene.name, layerCount: scene.layers.length } : x)),
     }));
-    await tracked(api.updateScene(id, scene));
+    try {
+      await tracked(api.updateScene(id, scene));
+    } catch {
+      await get().reconcile("Couldn't save that change.", id);
+    }
   },
 
   // High-frequency layer param path — optimistic local update + throttled
@@ -307,7 +404,8 @@ export const useStore = create((set, get) => ({
         },
       };
     });
-    layerThrottle.schedule(`${sceneId}/${layerId}`, () => tracked(api.updateLayer(sceneId, layerId, layer)));
+    layerThrottle.schedule(`${sceneId}/${layerId}`, () => tracked(api.updateLayer(sceneId, layerId, layer))
+      .catch(() => get().reconcile("Couldn't save that change.", sceneId)));
   },
 
   flushLayer(sceneId, layerId) {

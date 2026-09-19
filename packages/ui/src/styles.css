@@ -243,6 +243,17 @@ body {
 
 .app-loading { color: var(--text-dim); padding: 40px 0; text-align: center; }
 
+/* A load that failed, or a view that threw: the same place and weight as
+   "Connecting…", which is what it replaces, plus the one way out. */
+.app-failure { padding: 40px 0; text-align: center; }
+.app-failure-title { margin: 0 0 6px; }
+.app-failure-detail {
+  margin: 0 0 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 /* ── Buttons ── */
 
 .btn {
@@ -273,7 +284,7 @@ body {
    settings page navigates here. A bar in the flow rather than a floating
    toast: the app has no floating UI anywhere, and this one is read on arrival
    rather than caught in passing. */
-.library-notice {
+.notice {
   display: flex;
   align-items: baseline;
   gap: 12px;
@@ -287,8 +298,8 @@ body {
   background: var(--surface);
   font-size: 13px;
 }
-.library-notice-text { flex: 1; min-width: 0; }
-.library-notice-dismiss {
+.notice-text { flex: 1; min-width: 0; }
+.notice-dismiss {
   flex: none;
   background: none;
   border: 0;
@@ -298,7 +309,8 @@ body {
   line-height: 1;
   cursor: pointer;
 }
-.library-notice-dismiss:hover { color: var(--text); }
+.notice-dismiss:hover { color: var(--text); }
+.notice--error { border-left-color: var(--danger); }
 
 /* ── Scene grid / cards ── */
 

@@ -46,8 +46,23 @@ function NumberEntry({ label, value, suffix, onChange }) {
 export default function PowerSettings() {
   const power = useStore((s) => s.power);
   const setPowerConfig = useStore((s) => s.setPowerConfig);
+  const pollPower = useStore((s) => s.pollPower);
 
-  if (!power) return null;
+  // No reading yet: /api/power failed at load and no poll has landed since
+  // (the header pill fills this in by itself while it is open). Said, rather
+  // than rendering nothing — a settings page with the section simply absent
+  // reads as a panel that has no limiter, not one that couldn't be asked.
+  if (!power) {
+    return (
+      <SettingsSection title="Power budget">
+        <SettingsRow
+          label="Unavailable"
+          hint="The panel didn't answer for its power settings. It may be unreachable, or running a server without the power meter."
+          control={<button type="button" className="btn btn-ghost" onClick={() => pollPower()}>Retry</button>}
+        />
+      </SettingsSection>
+    );
+  }
 
   return (
     <SettingsSection

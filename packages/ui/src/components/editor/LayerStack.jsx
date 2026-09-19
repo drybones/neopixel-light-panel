@@ -25,7 +25,13 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
       onClick={onSelect}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); } }}
+      onKeyDown={(e) => {
+        // Keys on the eye and solo buttons bubble here too, and the
+        // preventDefault would swallow the button's own activation — Enter on
+        // "Hide layer" selected the row and left the layer showing.
+        if (e.target !== e.currentTarget) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(); }
+      }}
     >
       <div className="layer-row-thumb">
         <LayerThumb layerId={layer.id} />
@@ -35,6 +41,7 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
         <div className="layer-row-meta">{layer.blendMode} · {Math.round(layer.opacity * 100)}%</div>
       </div>
       <button
+        type="button"
         className="icon-btn"
         onClick={(e) => { e.stopPropagation(); onToggleEnabled(); }}
         aria-label={layer.enabled ? 'Hide layer' : 'Show layer'}
@@ -43,6 +50,7 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
         {layer.enabled ? '👁' : '–'}
       </button>
       <button
+        type="button"
         className={`icon-btn icon-btn-solo${layer.solo ? ' icon-btn-solo--on' : ''}`}
         onClick={(e) => { e.stopPropagation(); onToggleSolo(); }}
         aria-label="Solo layer"
@@ -69,6 +77,7 @@ export default function LayerStack({ scene, effects, selectedLayerId, onSelect, 
         <span>Layers</span>
         <div className="layer-stack-header-actions">
           <button
+            type="button"
             className="icon-btn"
             onClick={() => onMoveLayer(selectedLayerId, +1)}
             disabled={!selectedLayerId}
@@ -76,6 +85,7 @@ export default function LayerStack({ scene, effects, selectedLayerId, onSelect, 
             title="Move layer up"
           >↑</button>
           <button
+            type="button"
             className="icon-btn"
             onClick={() => onMoveLayer(selectedLayerId, -1)}
             disabled={!selectedLayerId}
@@ -96,7 +106,7 @@ export default function LayerStack({ scene, effects, selectedLayerId, onSelect, 
           onToggleSolo={() => onUpdateLayer({ ...layer, solo: !layer.solo }, true)}
         />
       ))}
-      <button className="btn layer-stack-add" onClick={onAddClick}>+ Add layer</button>
+      <button type="button" className="btn layer-stack-add" onClick={onAddClick}>+ Add layer</button>
     </div>
   );
 }
