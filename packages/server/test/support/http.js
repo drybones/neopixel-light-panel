@@ -27,9 +27,9 @@ function startApp(mount) {
 
             async function request(method, path, options) {
                 var opts = options || {};
-                var init = { method: method };
+                var init = { method: method, headers: Object.assign({}, opts.headers) };
                 if (Object.prototype.hasOwnProperty.call(opts, 'body')) {
-                    init.headers = { 'Content-Type': 'application/json' };
+                    init.headers['Content-Type'] = 'application/json';
                     // `raw` sends the string as-is, for the malformed-JSON case.
                     init.body = opts.raw ? opts.body : JSON.stringify(opts.body);
                 }
@@ -39,11 +39,15 @@ function startApp(mount) {
                 if ((res.headers.get('content-type') || '').includes('application/json')) {
                     try { json = JSON.parse(text); } catch (err) { json = undefined; }
                 }
-                return { status: res.status, text: text, json: json };
+                return { status: res.status, headers: res.headers, text: text, json: json };
             }
 
             resolve({
-                get: function(p) { return request('GET', p); },
+                // `origin` is 127.0.0.1:<port>, for suites that need to send a
+                // same-origin Origin header.
+                origin: 'http://127.0.0.1:' + port,
+                request: request,
+                get: function(p, o) { return request('GET', p, o); },
                 post: function(p, o) { return request('POST', p, o); },
                 put: function(p, o) { return request('PUT', p, o); },
                 del: function(p, o) { return request('DELETE', p, o); },

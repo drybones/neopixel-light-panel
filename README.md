@@ -95,6 +95,8 @@ This assumes the Pi is reachable via an SSH host alias named `blinky` (Node 18+,
 | `REACT_APP_LIGHTPANEL_API_SERVER` | `http://localhost:3000` | Backend URL, used by the UI |
 | `REACT_APP_LIGHTPANEL_WS_SERVER` | derived from API URL, port 3001 | WebSocket URL for the LED visualiser |
 
+**Security posture:** the API has no authentication and is meant for a trusted home LAN only — do not port-forward it. It answers cross-origin requests only from the Vite dev server (`http://localhost:3002`, and only when `VIRTUAL` is set), and refuses any state-changing request that a foreign web page sends, so a page someone on the network happens to visit cannot drive the panel. See `packages/server/routes/origin.js`.
+
 ## How it works
 
 The project is an npm workspaces monorepo with two packages.
