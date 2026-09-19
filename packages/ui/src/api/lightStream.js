@@ -2,9 +2,8 @@
 // enter React state — canvases subscribe and paint imperatively.
 //
 // Every message is {type:"frame", composite, layers?}: the composite for
-// every client, layers only for one that asked (setLayerScene). There were
-// two shapes until #121, told apart by the message's first character, and an
-// unrecognised one was dropped silently — the previews simply froze.
+// every client, layers only for one that asked (setLayerScene). A message
+// whose type this does not know is ignored, not guessed at.
 
 import { wsUrl } from './client';
 

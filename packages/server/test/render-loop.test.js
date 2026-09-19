@@ -39,8 +39,8 @@ function harness() {
 
 test('an active scene renders and broadcasts its frame every tick', () => {
     // The broadcaster is handed the scene, not just told to send: one frame
-    // shape carries the composite to everyone and that scene's layers to
-    // whoever asked for them (#121).
+    // carries the composite to everyone and that scene's layers to whoever
+    // asked for them.
     var h = harness();
     h.state.scene = { id: 's1', layers: [] };
     h.tick();

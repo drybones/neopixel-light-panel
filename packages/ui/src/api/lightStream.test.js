@@ -79,9 +79,8 @@ test('a frame goes to composite subscribers, and its layers to theirs', () => {
 });
 
 test('a message that is not a frame is ignored rather than thrown on', () => {
-  // There is one shape now, so anything else is a server that has moved on
-  // without this client. Dropping it quietly is what the two-shape version
-  // did to *frames* by accident (#121); doing it to non-frames is the point.
+  // One shape, so anything else is a server that has moved on without this
+  // client — ignored deliberately, where a frame never should be.
   const composite = vi.fn();
   stream.subscribeComposite(composite);
   latest().open();

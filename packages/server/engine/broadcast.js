@@ -27,14 +27,8 @@
  * thumbnail is still legible — and are only serialised while a subscriber
  * exists, which is the expensive half.
  *
- * There were two shapes here until #121: a bare [[r,g,b],...] array for
- * ordinary clients and this object for the editor, told apart on the client
- * by the message's first character. They were never versions anyone could be
- * on independently — the Pi builds the UI from the same commit — and the
- * discriminator had a silent failure mode, since an unrecognised shape left
- * the previews frozen with no error anywhere. One consequence of unifying is
- * deliberate: the editor's stage now runs at the composite's rate like every
- * other preview, where it used to be pulled down to the layer rate.
+ * The editor is on the same composite rate as every other preview: `layers`
+ * is an attachment to a frame, never a stream of its own.
  */
 
 var WebSocket = require('ws');

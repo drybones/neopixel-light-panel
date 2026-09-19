@@ -570,6 +570,6 @@ Every message has one shape, at ~30 FPS:
 
 While that scene is the active one, roughly every other frame carries its layers — they are the expensive half, so they run at ~15 FPS while the composite keeps its own rate. Layer frames are pre-opacity as well as pre-brightness (thumbnails of faint layers stay legible). Send `{ "type": "unsubscribe_layers" }` to stop them.
 
-A client should ignore a message whose `type` it does not know. Until #121 there were two shapes — a bare `[[r,g,b], ...]` array and this object — and a client that failed to recognise one dropped every frame with no error, which looks exactly like a frozen preview.
+A client should ignore a message whose `type` it does not know.
 
 Inbound messages are limited to 4 KB; a larger one closes that connection with code `1009`. Nothing the stream accepts is anywhere near that.

@@ -98,10 +98,10 @@ test('a subscribe message within the limit still routes', async () => {
 
 // ---- the streams ----
 //
-// Since #121 there is one message shape, {type:"frame", composite, layers?},
-// and what differs between clients is only whether layers ride along. What is
-// pinned here is behaviour: who gets layers, at what rate, and what a new
-// connection is replayed.
+// One message shape, {type:"frame", composite, layers?}: what differs between
+// clients is only whether layers ride along. What is pinned here is
+// behaviour — who gets layers, at what rate, and what a new connection is
+// replayed.
 //
 // Four pixels, so a frame is small enough to read in an assertion. The fake
 // compositor's buffers are plain arrays standing in for its Float32Arrays —
@@ -117,10 +117,10 @@ function fakeCompositor() {
     };
 }
 
-// Every message a client receives, as strings — lightStream routes on the
-// raw first character, so parsing on arrival would hide what it sees. The
-// listener goes on before the socket opens: the server replays its last frame
-// on connection, which can arrive in the same read as the handshake.
+// Every message a client receives, as strings, so an assertion can say what
+// was on the wire rather than what a parse made of it. The listener goes on
+// before the socket opens: the server replays its last frame on connection,
+// which can arrive in the same read as the handshake.
 async function listen(b) {
     var ws = new WebSocket('ws://127.0.0.1:' + b.wss.address().port);
     var got = [];
