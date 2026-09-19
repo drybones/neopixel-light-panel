@@ -4,6 +4,7 @@
 
 var express = require('express');
 var effects = require('../effects');
+var { BLEND_MODES } = require('../engine/compositor');
 var filmstrip = require('../engine/filmstrip');
 
 function createRouter(store, previewCache, effectPreviewCache) {
@@ -11,6 +12,13 @@ function createRouter(store, previewCache, effectPreviewCache) {
 
     router.get('/effects', function(req, res) {
         res.json(effects.catalog());
+    });
+
+    // Discovered like effects, for the same reason: a mode the UI had to be
+    // told about separately was a mode it could silently lack. The int id is
+    // the compositor's business and stays behind.
+    router.get('/blend-modes', function(req, res) {
+        res.json(BLEND_MODES.map(function(m) { return { value: m.value, label: m.label }; }));
     });
 
     // Each effect at its defaults, so the picker can show what a layer will

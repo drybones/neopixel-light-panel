@@ -12,6 +12,7 @@ export default function Editor({ sceneId, onClose }) {
   const scene = useStore((s) => s.sceneDetails[sceneId]);
   const inLibrary = useStore((s) => s.scenes.some((x) => x.id === sceneId));
   const effects = useStore((s) => s.effects);
+  const blendModes = useStore((s) => s.blendModes);
   const activeSceneId = useStore((s) => s.activeSceneId);
   const activateScene = useStore((s) => s.activateScene);
   const loadSceneDetail = useStore((s) => s.loadSceneDetail);
@@ -187,6 +188,7 @@ export default function Editor({ sceneId, onClose }) {
         <ParamPanel
           layer={layer}
           effect={effect}
+          blendModes={blendModes}
           onUpdate={(updated) => handleLayerUpdate(updated)}
           onCommit={commitSelected}
           onDelete={deleteLayer}

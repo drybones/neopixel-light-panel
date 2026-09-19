@@ -96,6 +96,26 @@ An `xy` entry may name `extXKey`/`extYKey`, which the pad draws as **read-only**
 
 Effect types: `wavelet`, `planewave`, `solid`, `gradient_linear`, `gradient_radial`, `emitter`, `particle_trail`, `noise`, `twinkle`, `text`. `emitter`'s presets are where the look of the old `embers`/`candy_sparkler` effects live now; a stored or imported layer using either of those types, or the old combined `gradient`, renders nothing — they are not resolvable effect types.
 
+
+---
+
+### List blend modes
+
+```
+GET /api/blend-modes
+```
+
+Returns every blend mode a layer's `blendMode` accepts, labelled and in the order an editor should offer them — by what the mode does to the stack (only adds light, only removes it, both ways), not alphabetically:
+
+```json
+[
+  { "value": "normal", "label": "Normal" },
+  { "value": "add", "label": "Add" },
+  { "value": "screen", "label": "Screen" }
+]
+```
+
+Discovered rather than hardcoded for the same reason effects are: a client that kept its own list could lack a mode with nothing to say so. An unknown `blendMode` on a write falls back to `normal`.
 ---
 
 ### List scenes

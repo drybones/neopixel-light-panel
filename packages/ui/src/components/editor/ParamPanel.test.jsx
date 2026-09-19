@@ -57,10 +57,21 @@ const LAYER = {
   solo: false,
 };
 
+// A subset, deliberately out of the server's id order: the panel renders
+// what it is given, in the order given. What the list holds is the server's
+// (engine/compositor.js BLEND_MODES, pinned by its tests).
+const BLEND_MODES = [
+  { value: 'normal', label: 'Normal' },
+  { value: 'add', label: 'Add' },
+  { value: 'multiply', label: 'Multiply' },
+  { value: 'linear_light', label: 'Linear Light' },
+];
+
 function renderPanel(overrides = {}) {
   const props = {
     layer: LAYER,
     effect: EFFECT,
+    blendModes: BLEND_MODES,
     onUpdate: () => {},
     onCommit: () => {},
     onDelete: () => {},
@@ -103,10 +114,7 @@ test('the blend modes render as one wrapping row in the control column', () => {
   const row = container.querySelector('.control-row--enum .segmented[aria-label="Blend"]');
   expect(row).toBeTruthy();
   const items = [...row.querySelectorAll('.segmented-item')];
-  expect(items.length).toBe(11);
-  // ordered by what the mode does to the stack: adds light, removes it, both
-  expect(items.slice(0, 4).map((b) => b.textContent)).toEqual(['Normal', 'Add', 'Screen', 'Lighten']);
-  expect(items[10].textContent).toBe('Linear Light');
+  expect(items.map((b) => b.textContent)).toEqual(BLEND_MODES.map((m) => m.label));
   expect(screen.getByText('Add').classList.contains('segmented-item--on')).toBe(true);
 });
 

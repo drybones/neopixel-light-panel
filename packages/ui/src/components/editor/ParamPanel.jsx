@@ -9,32 +9,15 @@ import GradientStopsEditor from '../controls/GradientStopsEditor';
 import TextControl from '../controls/TextControl';
 import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 
-// Mirrors BLEND in the server's engine/compositor.js. Unlike effects, blend
-// modes are not discovered from the API, so this list has to be kept in step
-// by hand — a mode missing here is simply unreachable from the UI, and a mode
-// listed here that the server doesn't know falls back to `normal` on write.
-// Ordered by what the mode does to the stack, not by the server's ids: the
-// ones that only add light, the ones that only remove it, then the ones that
-// go both ways. The list wraps onto as many lines as the panel's width needs;
-// nothing here decides where the breaks fall.
-const BLEND_OPTIONS = [
-  { value: 'normal', label: 'Normal' },
-  { value: 'add', label: 'Add' },
-  { value: 'screen', label: 'Screen' },
-  { value: 'lighten', label: 'Lighten' },
-  { value: 'subtract', label: 'Subtract' },
-  { value: 'multiply', label: 'Multiply' },
-  { value: 'darken', label: 'Darken' },
-  { value: 'difference', label: 'Difference' },
-  { value: 'overlay', label: 'Overlay' },
-  { value: 'soft_light', label: 'Soft Light' },
-  { value: 'linear_light', label: 'Linear Light' },
-];
-
 // Schema-driven editor for the selected layer. Every effect gets blend +
 // opacity; the rest of the controls come from the effect's schema, so new
-// server-side effects get a UI for free.
-export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete, onDuplicate }) {
+// server-side effects get a UI for free. Blend modes are discovered the same
+// way (GET /api/blend-modes), labels and display order included, so a new
+// mode needs nothing here either. The list wraps onto as many lines as the
+// panel's width needs; nothing here decides where the breaks fall.
+export default function ParamPanel({
+  layer, effect, blendModes = [], onUpdate, onCommit, onDelete, onDuplicate,
+}) {
   const layerId = layer ? layer.id : null;
   // The XY pad's background is the selected layer's own live render (WS
   // v2); falls back to the composite until a layer frame arrives.
@@ -212,7 +195,7 @@ export default function ParamPanel({ layer, effect, onUpdate, onCommit, onDelete
       )}
       <EnumSelect
         label="Blend"
-        options={BLEND_OPTIONS}
+        options={blendModes}
         value={layer.blendMode}
         onChange={(v) => { onUpdate({ ...layer, blendMode: v }); onCommit(); }}
       />

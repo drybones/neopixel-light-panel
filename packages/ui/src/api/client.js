@@ -19,6 +19,7 @@ async function request(method, path, body) {
 
 export const api = {
   effects: () => request('GET', '/api/effects'),
+  blendModes: () => request('GET', '/api/blend-modes'),
   effectPreviews: () => request('GET', '/api/effects/previews'),
   scenes: () => request('GET', '/api/scenes'),
   scene: (id) => request('GET', `/api/scenes/${id}`),
