@@ -7,18 +7,17 @@
  */
 
 var jsonStore = require('./json-store');
+var { DebouncedDoc } = require('./debounced-doc');
 var power = require('./power');
 
 var SAVE_DEBOUNCE_MS = 1000;
 
-class SettingsStore {
+class SettingsStore extends DebouncedDoc {
     constructor(persistFile) {
-        this.persistFile = persistFile || null;
+        super(persistFile, { debounceMs: SAVE_DEBOUNCE_MS, label: 'settings' });
         this.brightness = 1;
         this.frameStatsEnabled = false;
         this.power = power.normaliseConfig(null);
-        this._saveTimer = null;
-        this._dirty = false;
     }
 
     // A hand-edited or corrupt file must not put NaN into client.brightness
@@ -55,31 +54,13 @@ class SettingsStore {
         return this.power;
     }
 
-    markDirty() {
-        this._dirty = true;
-        var self = this;
-        if (this._saveTimer) return;
-        this._saveTimer = setTimeout(function() {
-            self._saveTimer = null;
-            self.flush();
-        }, SAVE_DEBOUNCE_MS);
-        if (this._saveTimer.unref) this._saveTimer.unref();
-    }
-
-    async flush() {
-        if (!this._dirty || !this.persistFile) return;
-        this._dirty = false;
-        try {
-            jsonStore.save(this.persistFile, {
-                version: 1,
-                brightness: this.brightness,
-                frameStatsEnabled: this.frameStatsEnabled,
-                power: this.power,
-            });
-        } catch (err) {
-            console.error('Failed to persist settings:', err);
-            this._dirty = true;
-        }
+    toDocument() {
+        return {
+            version: 1,
+            brightness: this.brightness,
+            frameStatsEnabled: this.frameStatsEnabled,
+            power: this.power,
+        };
     }
 }
 
