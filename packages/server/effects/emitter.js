@@ -47,11 +47,13 @@ const panel = require('../engine/panel');
 // not derived from the panel's pixel count for that reason.
 const MAX_PARTICLES = 80;
 
-// The panel is 30x8 on a square pitch, so it is 4.1x wider than it is tall.
-// Emitted velocity and gravity are both stretched in x by this, which is what
-// makes an omnidirectional burst read as a circle rather than a tall ellipse,
-// and what makes a gravity angle and a travel angle of the same number point
-// the same way on screen.
+// Emitted velocity and gravity are both stretched in x by this. The pitch is
+// square, so without it an omnidirectional burst is a circle; 1.5 widens it
+// into an ellipse that spreads along the panel before it hits the top and
+// bottom rows. The number is candy_sparkler's, carried over when it became a
+// preset of this effect — a look, not derived from the 30x8 aspect. Stretching
+// both terms by the same factor is what makes a gravity angle and a travel
+// angle of the same number point the same way on screen.
 const X_STRETCH = 1.5;
 
 // A gap this long between renders means this layer was not being rendered —

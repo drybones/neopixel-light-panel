@@ -2,7 +2,7 @@
 
 Base URL: `http://<host>:3000`
 
-All endpoints use JSON for request/response bodies unless noted. CORS is enabled.
+All endpoints use JSON for request/response bodies unless noted. There is no authentication — the API is meant for a trusted LAN. Cross-origin access is refused: CORS is granted only to the Vite dev origin in virtual mode, and a non-GET request whose `Origin` header names a foreign page gets a `403` before any route runs. A request with no `Origin` at all (curl, a script) is allowed.
 
 ## Concepts
 
@@ -63,15 +63,15 @@ Returns every available effect with its parameter schema and defaults — enough
     "name": "Wavelet",
     "schema": [
       { "key": "color", "type": "color", "label": "Colour" },
-      { "key": "freq", "type": "number", "label": "Speed", "min": 0, "max": 2, "step": 0.01, "scale": "linear" },
+      { "key": "freq", "type": "number", "label": "Speed", "min": 0.01, "max": 5, "scale": "log", "zeroable": true },
       { "type": "xy", "label": "Position", "xKey": "x", "yKey": "y", "xRange": [-3.625, 3.625], "yRange": [-0.875, 0.875], "margin": 2, "farLimit": 1000 }
     ],
-    "defaults": { "color": "#ffffff", "freq": 0.2 }
+    "defaults": { "color": "#ffffff", "freq": 0.2, "x": 0, "y": 0 }
   }
 ]
 ```
 
-Schema entry types: `color`, `number` (with `min`/`max`/`step` and `scale: linear|atan|log`), `text` (a string, with `maxLength` and an optional `hint`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
+Schema entry types: `color`, `number` (with `min`/`max`/`step`, `scale: linear|atan|log` and optional `zeroable`), `text` (a string, with `maxLength` and an optional `hint`), `xy` (two params, `xKey`/`yKey`), `angle` (degrees, 0–360, rendered as a dial pointing along the direction of travel), `range` (min/max pair, `minKey`/`maxKey`), `enum` (with `options`), `gradientStops`, and `group`.
 
 `text` is the only entry whose value is a string, and the only entry type added since the UI's editor was written — which makes it the exception to "a new effect needs nothing in the UI". A new *effect* is free; a new *entry type* needs a control, and an older UI against a newer server renders an unrecognised entry as nothing at all rather than erroring, so the layer is editable except for that one param.
 

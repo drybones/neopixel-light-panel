@@ -39,9 +39,10 @@ function NumberEntry({ label, value, suffix, onChange }) {
  * while leaving the brightness fader alone.
  *
  * This used to also fit a tighter, IR-drop-aware cap from a voltage
- * measurement (tools/power-sweep.js). Dropped: the Pi's PMIC-ADC route to a
- * real reading isn't available on a standard Pi 4 Model B, and manual testing
- * at full white held up fine against the PSU cap alone.
+ * measurement, via a sweep script that never landed in the repo. Dropped: the
+ * Pi's PMIC-ADC route to a real reading isn't available on a standard Pi 4
+ * Model B, and manual testing at full white held up fine against the PSU cap
+ * alone.
  */
 export default function PowerSettings() {
   const power = useStore((s) => s.power);

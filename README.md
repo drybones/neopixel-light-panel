@@ -31,7 +31,7 @@ If you don't have the hardware, the server can run in **virtual mode** (`VIRTUAL
 
 ## Prerequisites
 
-- Node.js 18+ (the deployed Pi runs Node 24; the old Node 14 constraint no longer applies)
+- Node.js 24+ (what the Pi, CI and the lockfile use; `engines` in the root `package.json` says so)
 - npm 7+ (for workspace support)
 
 For hardware mode only:
@@ -84,7 +84,20 @@ The UI and server deploy the same way: `npm run deploy` runs `scripts/deploy-pi.
 npm run deploy
 ```
 
-This assumes the Pi is reachable via an SSH host alias named `blinky` (Node 18+, since the Pi builds the UI itself now), with passwordless sudo for restarting `lightpanel.service`, and the repo cloned to `/home/pi/github/neopixel-light-panel/`. Edit `scripts/deploy-pi.sh` to match your setup.
+This assumes the Pi is reachable via an SSH host alias named `blinky` (Node 24 via nvm, since the Pi builds the UI itself), with passwordless sudo for restarting `lightpanel.service`, and the repo cloned to `/home/pi/github/neopixel-light-panel/`. Edit `scripts/deploy-pi.sh` to match your setup.
+
+### Services on the Pi
+
+The systemd units live in `packages/server/`. The deploy script doesn't install them: copy a changed unit into `/etc/systemd/system/` yourself, then run `sudo systemctl daemon-reload` and restart it.
+
+| Unit | Runs | Needed |
+|------|------|--------|
+| `fcserver.service` | `fcserver` against the repo's `packages/server/fcserver.json`, the same file the power estimate reads its gamma from | yes |
+| `lightpanel.service` | `app.js` under the newest installed Node 24 (via `~/.nvm/nvm-exec`, so an `nvm install` of a patch release doesn't break it) | yes |
+| `power-watch.service` | `scripts/power-watch.sh`: follows the kernel log for undervoltage messages into `~/power-watch.log` | optional, for diagnosing supply sag |
+| `power-monitor.service` | `scripts/power-monitor.sh`: logs throttling flags, CPU temperature, brightness and active scene once a second to `~/power-monitor.log` | optional, for correlating sag with what was on screen |
+
+All four assume user `pi` and the repo at `/home/pi/github/neopixel-light-panel/`.
 
 ## Configuration
 
@@ -103,9 +116,9 @@ The project is an npm workspaces monorepo with two packages.
 
 ### `packages/server/` -- API server and animation engine
 
-The server is a small Express app (`app.js`) with a `setInterval` render loop running at 100 FPS. On each tick the compositor renders every layer of the active scene into its own buffer, blends them bottom→top (normal/add/multiply/screen/overlay with per-layer opacity), and writes the result out via the Open Pixel Control protocol.
+The server is a small Express app (`app.js`) with a `setInterval` render loop running at 100 FPS. On each tick the compositor renders every layer of the active scene into its own buffer, blends them bottom→top with per-layer opacity and one of eleven blend modes (normal, add, screen, lighten, subtract, multiply, darken, difference, overlay, soft light, linear light), and writes the result out via the Open Pixel Control protocol.
 
-Effects live in `effects/` as self-contained modules — each declares a parameter schema (which drives the UI), precomputes expensive work on the API write path, and keeps per-layer animation state in an instance, so two particle layers animate independently. Current effects: wavelet, plane wave, solid colour, linear gradient, radial gradient, emitter, particle trail, noise field, twinkle.
+Effects live in `effects/` as self-contained modules — each declares a parameter schema (which drives the UI), precomputes expensive work on the API write path, and keeps per-layer animation state in an instance, so two particle layers animate independently. Current effects: wavelet, plane wave, solid colour, linear gradient, radial gradient, emitter, particle trail, noise field, twinkle, text (including clocks).
 
 `opc.js` is the OPC client that talks to Fadecandy over TCP; `virtual-opc.js` is a drop-in replacement used when `VIRTUAL=1` is set. In both modes `engine/broadcast.js` streams pixel state over a WebSocket on port 3001 for the UI's live previews (composite at ~30 FPS, plus optional per-layer frames for the editor).
 
@@ -113,8 +126,12 @@ Scenes and settings (brightness, the frame-stats toggle) are persisted to crash-
 
 ### `packages/ui/` -- React control interface
 
-A React 18 app built with Vite (zustand for state). The default view is a scene switcher — a responsive card grid with a live preview on the active scene, designed to work well on a phone. Opening a scene switches to the editor: a large read-only live preview, a layer stack with animated per-layer thumbnails, and a parameter panel rendered from each effect's schema (colour swatches, XY pads, gradient-stop strips, perceptual sliders). Edits stream to the server as you drag — the panel itself is the ultimate preview. The cog in the header opens a settings page holding the power budget and whole-library import/export.
+A React 19 app built with Vite (zustand for state). The default view is a scene switcher — a responsive card grid with a live preview on the active scene, designed to work well on a phone. Opening a scene switches to the editor: a large read-only live preview, a layer stack with animated per-layer thumbnails, and a parameter panel rendered from each effect's schema (colour swatches, XY pads, gradient-stop strips, perceptual sliders). Edits stream to the server as you drag — the panel itself is the ultimate preview. The cog in the header opens a settings page holding the power budget and whole-library import/export.
 
 ## API
 
 See [API.md](API.md) for full HTTP API documentation, suitable for building your own integrations.
+
+## Contributing
+
+Before changing the code, read [CLAUDE.md](CLAUDE.md). It is written for Claude Code but is the architecture doc for humans too: the cross-module rules, the commands, and the repo's working conventions. Deeper rationale sits beside the code: in file header comments on the server, in [`packages/server/engine/CLAUDE.md`](packages/server/engine/CLAUDE.md) and [`packages/server/effects/CLAUDE.md`](packages/server/effects/CLAUDE.md), and in the nested `CLAUDE.md` files under `packages/ui/src/`. Outstanding work is tracked as GitHub issues.

@@ -23,7 +23,7 @@
  *
  * A request with no `Origin` is let through. Browsers send one on every
  * cross-origin request and on every same-origin one that isn't a GET or HEAD;
- * its absence means curl, a script like tools/power-sweep.js, or an old
+ * its absence means curl, a script on the Pi, or an old
  * same-origin browser, none of which is the threat here.
  *
  * Out of scope, and why: DNS rebinding makes an attacker's page same-origin

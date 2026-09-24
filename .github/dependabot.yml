@@ -19,16 +19,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-    ignore:
-      # The root package.json overrides pin react/react-dom to ^18.3.1, and
-      # Dependabot does not touch overrides — so a major bump can never bring
-      # the manifest and the lockfile back into sync, and the PR fails npm ci
-      # every week. Remove this block as part of #82. Minor and patch updates
-      # within 18.x keep flowing.
-      - dependency-name: "react"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
     # 10 was hit on the first run (11 npm PRs opened — security PRs are exempt
