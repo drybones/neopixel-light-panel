@@ -34,9 +34,9 @@
  * visible rather than silently missing.
  */
 
-var CELL_ROWS = 8;
+const CELL_ROWS = 8;
 
-var REGULAR = {
+const REGULAR = {
     ' ': ['...', '...', '...', '...', '...', '...', '...', '...'],
 
     '0': ['.###.', '#...#', '#..##', '#.#.#', '##..#', '#...#', '.###.', '.....'],
@@ -137,10 +137,10 @@ var REGULAR = {
     '}': ['##..', '..#.', '..#.', '..##', '..#.', '..#.', '##..', '....'],
     '~': ['.....', '.....', '.#...', '#.#.#', '...#.', '.....', '.....', '.....'],
 };
-var REGULAR_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#####', '.....'];
+const REGULAR_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#####', '.....'];
 
 // --- micro: 4x6, 1px stems, condensed ---------------------------------------
-var MICRO = {
+const MICRO = {
     ' ': ['..', '..', '..', '..', '..', '..'],
 
     '0': ['.##.', '#..#', '#.##', '##.#', '#..#', '.##.'],
@@ -196,10 +196,10 @@ var MICRO = {
     '=': ['...', '###', '...', '###', '...', '...'],
     '?': ['.##.', '#..#', '...#', '..#.', '....', '..#.'],
 };
-var MICRO_TOFU = ['####', '#..#', '#..#', '#..#', '#..#', '####'];
+const MICRO_TOFU = ['####', '#..#', '#..#', '#..#', '#..#', '####'];
 
 // --- compact: 5x6, 1px stems -------------------------------------------------
-var COMPACT = {
+const COMPACT = {
     ' ': ['..', '..', '..', '..', '..', '..'],
 
     '0': ['.###.', '#..##', '#.#.#', '#.#.#', '##..#', '.###.'],
@@ -255,10 +255,10 @@ var COMPACT = {
     '=': ['....', '####', '....', '####', '....', '....'],
     '?': ['.###.', '#...#', '...#.', '..#..', '.....', '..#..'],
 };
-var COMPACT_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#####'];
+const COMPACT_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#####'];
 
 // --- grotesk: 5x8, 1px stems, caps filling all eight rows --------------------
-var GROTESK = {
+const GROTESK = {
     ' ': ['..', '..', '..', '..', '..', '..', '..', '..'],
 
     '0': ['.###.', '#...#', '#...#', '#..##', '##..#', '#...#', '#...#', '.###.'],
@@ -314,10 +314,10 @@ var GROTESK = {
     '=': ['....', '....', '####', '....', '####', '....', '....', '....'],
     '?': ['.###.', '#...#', '....#', '...#.', '..#..', '..#..', '.....', '..#..'],
 };
-var GROTESK_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '#####'];
+const GROTESK_TOFU = ['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '#####'];
 
 // --- terminal: 6x8, 1px stems, square terminals and wide counters ------------
-var TERMINAL = {
+const TERMINAL = {
     ' ': ['..', '..', '..', '..', '..', '..', '..', '..'],
 
     '0': ['.####.', '#....#', '#...##', '#..#.#', '#.#..#', '##...#', '#....#', '.####.'],
@@ -373,10 +373,10 @@ var TERMINAL = {
     '=': ['....', '....', '####', '....', '####', '....', '....', '....'],
     '?': ['.####.', '#....#', '.....#', '....#.', '...#..', '...#..', '......', '...#..'],
 };
-var TERMINAL_TOFU = ['######', '#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '######'];
+const TERMINAL_TOFU = ['######', '#....#', '#....#', '#....#', '#....#', '#....#', '#....#', '######'];
 
 // --- bold: 6x8, 2px stems and 1px arms ---------------------------------------
-var BOLD = {
+const BOLD = {
     ' ': ['...', '...', '...', '...', '...', '...', '...', '...'],
 
     '0': ['.####.', '##..##', '##..##', '##.###', '###.##', '##..##', '##..##', '.####.'],
@@ -432,7 +432,7 @@ var BOLD = {
     '=': ['......', '......', '######', '......', '######', '......', '......', '......'],
     '?': ['.####.', '##..##', '....##', '...##.', '..##..', '..##..', '......', '..##..'],
 };
-var BOLD_TOFU = ['######', '##..##', '##..##', '##..##', '##..##', '##..##', '##..##', '######'];
+const BOLD_TOFU = ['######', '##..##', '##..##', '##..##', '##..##', '##..##', '##..##', '######'];
 
 /*
  * One byte per column, bit r = row r. Authored art is validated as it compiles:
@@ -440,38 +440,38 @@ var BOLD_TOFU = ['######', '##..##', '##..##', '##..##', '##..##', '##..##', '##
  * than render as a stray pixel somewhere down the line.
  */
 function compile(art, name, height) {
-    var width = art[0].length;
+    const width = art[0].length;
     if (art.length !== height) {
-        throw new Error('glyph ' + name + ': ' + art.length + ' rows, expected ' + height);
+        throw new Error(`glyph ${name}: ${art.length} rows, expected ${height}`);
     }
-    var cols = new Uint8Array(width);
-    for (var r = 0; r < height; r++) {
-        var row = art[r];
+    const cols = new Uint8Array(width);
+    for (let r = 0; r < height; r++) {
+        const row = art[r];
         if (row.length !== width) {
-            throw new Error('glyph ' + name + ': row ' + r + ' is ' + row.length + ' wide, expected ' + width);
+            throw new Error(`glyph ${name}: row ${r} is ${row.length} wide, expected ${width}`);
         }
-        for (var c = 0; c < width; c++) {
+        for (let c = 0; c < width; c++) {
             if (row[c] === '#') cols[c] |= 1 << r;
-            else if (row[c] !== '.') throw new Error('glyph ' + name + ": row " + r + " has '" + row[c] + "'");
+            else if (row[c] !== '.') throw new Error(`glyph ${name}: row ${r} has '${row[c]}'`);
         }
     }
-    return { width: width, cols: cols };
+    return { width, cols };
 }
 
 function buildFont(art, tofuArt, height, fold) {
-    var glyphs = {};
-    Object.keys(art).forEach(function(ch) { glyphs[ch] = compile(art[ch], ch, height); });
-    var tofu = compile(tofuArt, 'tofu', height);
+    const glyphs = {};
+    Object.keys(art).forEach((ch) => { glyphs[ch] = compile(art[ch], ch, height); });
+    const tofu = compile(tofuArt, 'tofu', height);
     return {
-        height: height,
-        fold: fold,
-        tofu: tofu,
-        glyphs: glyphs,
+        height,
+        fold,
+        tofu,
+        glyphs,
         // A face with no lowercase folds rather than boxing every small letter —
         // a caps-only rendering of what was typed is a reading of it; a line of
         // boxes is not.
-        glyph: function(ch) {
-            var g = glyphs[fold ? ch.toUpperCase() : ch];
+        glyph(ch) {
+            const g = glyphs[fold ? ch.toUpperCase() : ch];
             return g || tofu;
         },
     };
@@ -480,7 +480,7 @@ function buildFont(art, tofuArt, height, fold) {
 // The one list of faces: the lookup and the control that picks one are built
 // from it, so a face added here is reachable with no second edit. Ordered light
 // to heavy, which is the order they are worth trying in.
-var FACES = [
+const FACES = [
     { value: 'micro', label: '4×6 micro', font: buildFont(MICRO, MICRO_TOFU, 6, true) },
     { value: 'compact', label: '5×6 compact', font: buildFont(COMPACT, COMPACT_TOFU, 6, true) },
     { value: 'regular', label: '5×7 regular', font: buildFont(REGULAR, REGULAR_TOFU, 8, false) },
@@ -489,22 +489,22 @@ var FACES = [
     { value: 'bold', label: '6×8 bold', font: buildFont(BOLD, BOLD_TOFU, 8, true) },
 ];
 
-var FONTS = {};
-FACES.forEach(function(f) { FONTS[f.value] = f.font; });
+const FONTS = {};
+FACES.forEach((f) => { FONTS[f.value] = f.font; });
 
-var DEFAULT_FONT = 'regular';
+const DEFAULT_FONT = 'regular';
 
 // Exported beside the data, the way gradient-lut exports TILING_SCHEMA.
-var FONT_SCHEMA = {
+const FONT_SCHEMA = {
     key: 'font',
     type: 'enum',
     label: 'Font',
-    options: FACES.map(function(f) { return { value: f.value, label: f.label }; }),
+    options: FACES.map((f) => ({ value: f.value, label: f.label })),
 };
 
 module.exports = {
-    FONTS: FONTS,
-    FONT_SCHEMA: FONT_SCHEMA,
-    DEFAULT_FONT: DEFAULT_FONT,
-    CELL_ROWS: CELL_ROWS,
+    FONTS,
+    FONT_SCHEMA,
+    DEFAULT_FONT,
+    CELL_ROWS,
 };

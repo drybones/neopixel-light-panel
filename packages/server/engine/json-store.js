@@ -16,11 +16,11 @@
  * names — the new data orphaned, and the save silently undone.
  */
 
-var fs = require('fs');
-var path = require('path');
+const fs = require('fs');
+const path = require('path');
 
 function readJson(file) {
-    var raw;
+    let raw;
     try {
         raw = fs.readFileSync(file, 'utf8');
     } catch (err) {
@@ -37,27 +37,27 @@ function readJson(file) {
 // readable. Distinguishes "never existed" from "corrupt" via the second
 // argument to onWarn so callers can log appropriately.
 function load(file, onWarn) {
-    var main = readJson(file);
+    const main = readJson(file);
     if (main.data !== undefined) return main.data;
-    if (main.corrupt && onWarn) onWarn(file + ' is corrupt; trying backup');
+    if (main.corrupt && onWarn) onWarn(`${file} is corrupt; trying backup`);
 
-    var backup = readJson(file + '.bak');
+    const backup = readJson(`${file}.bak`);
     if (backup.data !== undefined) {
-        if (onWarn) onWarn('recovered from ' + file + '.bak');
+        if (onWarn) onWarn(`recovered from ${file}.bak`);
         return backup.data;
     }
-    if (backup.corrupt && onWarn) onWarn(file + '.bak is also corrupt');
+    if (backup.corrupt && onWarn) onWarn(`${file}.bak is also corrupt`);
     return null;
 }
 
 function save(file, data) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    var tmp = file + '.tmp';
-    var json = JSON.stringify(data);
-    var buf = Buffer.from(json, 'utf8');
-    var fd = fs.openSync(tmp, 'w');
+    const tmp = `${file}.tmp`;
+    const json = JSON.stringify(data);
+    const buf = Buffer.from(json, 'utf8');
+    const fd = fs.openSync(tmp, 'w');
     try {
-        var off = 0;
+        let off = 0;
         while (off < buf.length) {
             off += fs.writeSync(fd, buf, off, buf.length - off);
         }
@@ -66,14 +66,14 @@ function save(file, data) {
         fs.closeSync(fd);
     }
     if (fs.existsSync(file)) {
-        fs.renameSync(file, file + '.bak');
+        fs.renameSync(file, `${file}.bak`);
     }
     fs.renameSync(tmp, file);
     fsyncDir(path.dirname(file));
 }
 
 function fsyncDir(dir) {
-    var fd = fs.openSync(dir, 'r');
+    const fd = fs.openSync(dir, 'r');
     try {
         fs.fsyncSync(fd);
     } finally {

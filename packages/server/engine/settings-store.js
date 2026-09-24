@@ -6,11 +6,11 @@
  * pairs a second onto the SD card.
  */
 
-var jsonStore = require('./json-store');
-var { DebouncedDoc } = require('./debounced-doc');
-var power = require('./power');
+const jsonStore = require('./json-store');
+const { DebouncedDoc } = require('./debounced-doc');
+const power = require('./power');
 
-var SAVE_DEBOUNCE_MS = 1000;
+const SAVE_DEBOUNCE_MS = 1000;
 
 class SettingsStore extends DebouncedDoc {
     constructor(persistFile) {
@@ -26,7 +26,7 @@ class SettingsStore extends DebouncedDoc {
     // shape. A missing/unreadable file leaves the constructor defaults in
     // place and writes nothing.
     load() {
-        var doc = this.persistFile ? jsonStore.load(this.persistFile) : null;
+        const doc = this.persistFile ? jsonStore.load(this.persistFile) : null;
         if (!doc) return;
         if (typeof doc.brightness === 'number' && isFinite(doc.brightness)) {
             this.brightness = Math.min(1, Math.max(0, doc.brightness));

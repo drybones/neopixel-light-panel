@@ -10,11 +10,11 @@
  * the panel centre.
  */
 
-var HALF_X = 3.625;
-var HALF_Z = 0.875;
+const HALF_X = 3.625;
+const HALF_Z = 0.875;
 
 module.exports = {
-    HALF_X: HALF_X,
-    HALF_Z: HALF_Z,
+    HALF_X,
+    HALF_Z,
     RADIUS: Math.sqrt(HALF_X * HALF_X + HALF_Z * HALF_Z),
 };

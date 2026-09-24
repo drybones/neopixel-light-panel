@@ -8,13 +8,13 @@
  * reason they are two effects and this is one module.
  */
 
-var color = require('./color');
+const color = require('./color');
 
-var LUT_SIZE = 256;
+const LUT_SIZE = 256;
 
 // Resolved from the schema's string in prepare() so the render loop branches on
 // a small int rather than comparing strings 240 times a frame.
-var TILE = {
+const TILE = {
     hold: 0,
     repeat: 1,
     mirror: 2,
@@ -25,23 +25,23 @@ var TILE = {
 // one stop is a flat colour and none is black, rather than a throw that would
 // leave the layer unprepared.
 function buildLut(stops) {
-    var sorted = (Array.isArray(stops) ? stops : [])
-        .filter(function(s) { return s && typeof s.position === 'number' && isFinite(s.position); })
-        .sort(function(a, b) { return a.position - b.position; });
-    var lut = new Float32Array(LUT_SIZE * 3);
+    const sorted = (Array.isArray(stops) ? stops : [])
+        .filter((s) => s && typeof s.position === 'number' && isFinite(s.position))
+        .sort((a, b) => a.position - b.position);
+    const lut = new Float32Array(LUT_SIZE * 3);
     if (sorted.length === 0) return lut;
     // Parsed once per stop, not twice per entry: this runs on every throttled
     // drag of a gradient param.
-    var rgbs = sorted.map(function(s) { return color.hexToRgb(s.color); });
-    var si = 0;
-    for (var i = 0; i < LUT_SIZE; i++) {
-        var u = i / (LUT_SIZE - 1);
+    const rgbs = sorted.map((s) => color.hexToRgb(s.color));
+    let si = 0;
+    for (let i = 0; i < LUT_SIZE; i++) {
+        const u = i / (LUT_SIZE - 1);
         while (si < sorted.length - 2 && u > sorted[si + 1].position) si++;
-        var bi = Math.min(si + 1, sorted.length - 1);
-        var a = sorted[si], b = sorted[bi];
-        var span = b.position - a.position;
-        var f = span > 0 ? Math.min(1, Math.max(0, (u - a.position) / span)) : 0;
-        var ca = rgbs[si], cb = rgbs[bi];
+        const bi = Math.min(si + 1, sorted.length - 1);
+        const a = sorted[si], b = sorted[bi];
+        const span = b.position - a.position;
+        const f = span > 0 ? Math.min(1, Math.max(0, (u - a.position) / span)) : 0;
+        const ca = rgbs[si], cb = rgbs[bi];
         lut[i * 3] = ca.r + (cb.r - ca.r) * f;
         lut[i * 3 + 1] = ca.g + (cb.g - ca.g) * f;
         lut[i * 3 + 2] = ca.b + (cb.b - ca.b) * f;
@@ -85,17 +85,17 @@ function tile(u, mode) {
 
 // The schema entry both effects use, so the options and labels cannot drift
 // apart between them.
-var TILING_SCHEMA = { key: 'tiling', type: 'enum', label: 'Tiling', options: [
+const TILING_SCHEMA = { key: 'tiling', type: 'enum', label: 'Tiling', options: [
     { value: 'hold', label: 'Hold' },
     { value: 'repeat', label: 'Repeat' },
     { value: 'mirror', label: 'Mirror' },
 ]};
 
 module.exports = {
-    LUT_SIZE: LUT_SIZE,
-    TILE: TILE,
-    TILING_SCHEMA: TILING_SCHEMA,
-    buildLut: buildLut,
-    tileMode: tileMode,
-    tile: tile,
+    LUT_SIZE,
+    TILE,
+    TILING_SCHEMA,
+    buildLut,
+    tileMode,
+    tile,
 };

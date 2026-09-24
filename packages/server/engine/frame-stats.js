@@ -32,25 +32,25 @@
  * genuinely too expensive. Both are scoped to the active scene; see restart().
  */
 
-var performance = require('perf_hooks').performance;
+const performance = require('perf_hooks').performance;
 
 // A second or so of ticks at 100 FPS. The window is bounded by time (see
 // snapshot) rather than by this; the buffer just has to be big enough to
 // hold it.
-var CAPACITY = 256;
+const CAPACITY = 256;
 
 // Rolling window for the reported averages.
-var WINDOW_MS = 1000;
+const WINDOW_MS = 1000;
 
 // A tick gap at or beyond this multiple of the target counts as an overrun:
 // setInterval coalesced, or something blocked past the interval.
-var OVERRUN_FACTOR = 2;
+const OVERRUN_FACTOR = 2;
 
 // Window for the late-frame *rate*, deliberately much longer than WINDOW_MS.
 // At the ~91 FPS a 10ms setInterval actually delivers, a single late frame
 // inside a one-second window is 1.1%, so a perfectly healthy loop would
 // flicker between zero and one-ish percent. Ten seconds reads as a rate.
-var LATE_WINDOW_MS = 10000;
+const LATE_WINDOW_MS = 10000;
 
 // Lateness is tallied in per-second buckets rather than per frame. The
 // per-frame ring holds 2.8s at that rate and covering the window would want
@@ -58,21 +58,21 @@ var LATE_WINDOW_MS = 10000;
 // percentage to the individual frame. A bucket exists only if something
 // rendered during it, which is what keeps idle seconds out of the
 // denominator — they age out having never been counted.
-var BUCKET_MS = 1000;
-var BUCKETS = Math.ceil(LATE_WINDOW_MS / BUCKET_MS);
+const BUCKET_MS = 1000;
+const BUCKETS = Math.ceil(LATE_WINDOW_MS / BUCKET_MS);
 
 // A gap beyond this is the loop having been idle (scene off, startup), not a
 // slow frame. Emitter draws the same line, so it lives with the loop.
-var RESUME_MS = require('./render-loop').RESUME_MS;
+const RESUME_MS = require('./render-loop').RESUME_MS;
 
 // Below this the reported rate is stale — nothing has rendered recently.
-var IDLE_MS = 500;
+const IDLE_MS = 500;
 
 class FrameStats {
     constructor(options) {
         this.enabled = false;
         this.targetMs = (options && options.targetMs) || 10;
-        this._now = (options && options.now) || function() { return performance.now(); };
+        this._now = (options && options.now) || (() => performance.now());
 
         this._frameMs = new Float64Array(CAPACITY);  // gap since the previous tick
         this._renderMs = new Float64Array(CAPACITY); // compositor + sink write
@@ -105,12 +105,12 @@ class FrameStats {
     // End of the tick body — records one sample.
     end(started) {
         if (!started) return;
-        var now = this._now();
-        var tickMs = now - started;
-        var renderMs = this._pendingRenderMs;
+        const now = this._now();
+        const tickMs = now - started;
+        const renderMs = this._pendingRenderMs;
         this._pendingRenderMs = 0;
 
-        var frameMs = this._last ? started - this._last : 0;
+        const frameMs = this._last ? started - this._last : 0;
         this._last = started;
 
         // Resuming after an idle stretch: re-anchor, don't sample. Recording
@@ -120,7 +120,7 @@ class FrameStats {
             return;
         }
 
-        var i = this._head;
+        const i = this._head;
         this._frameMs[i] = frameMs;
         this._renderMs[i] = renderMs;
         this._tickMs[i] = tickMs;
@@ -129,7 +129,7 @@ class FrameStats {
 
         this.frames++;
         this._lastSampleAt = now;
-        var late = frameMs >= this.targetMs * OVERRUN_FACTOR;
+        const late = frameMs >= this.targetMs * OVERRUN_FACTOR;
         if (late) this.overruns++;
         if (frameMs > this.worstFrameMs) this.worstFrameMs = frameMs;
         if (renderMs > this.worstRenderMs) this.worstRenderMs = renderMs;
@@ -137,8 +137,8 @@ class FrameStats {
         // Tally into this second's bucket, clearing it first if the slot is
         // still holding an older second. Writes into pre-allocated arrays —
         // this runs every tick.
-        var id = Math.floor(now / BUCKET_MS);
-        var slot = id % BUCKETS;
+        const id = Math.floor(now / BUCKET_MS);
+        const slot = id % BUCKETS;
         if (this._bucketId[slot] !== id) {
             this._bucketId[slot] = id;
             this._bucketFrames[slot] = 0;
@@ -201,7 +201,7 @@ class FrameStats {
      * reads as a fault.
      */
     snapshot() {
-        var snap = {
+        const snap = {
             enabled: this.enabled,
             targetFps: 1000 / this.targetMs,
             idle: true,
@@ -227,8 +227,8 @@ class FrameStats {
         // makes the window granular at the head — it covers between
         // LATE_WINDOW_MS - BUCKET_MS and LATE_WINDOW_MS of rendering — which
         // costs a percentage nothing and is why a stall ages out on its own.
-        var oldest = Math.floor(this._now() / BUCKET_MS) - (BUCKETS - 1);
-        for (var b = 0; b < BUCKETS; b++) {
+        const oldest = Math.floor(this._now() / BUCKET_MS) - (BUCKETS - 1);
+        for (let b = 0; b < BUCKETS; b++) {
             if (this._bucketId[b] < oldest) continue;
             snap.windowFrames += this._bucketFrames[b];
             snap.lateFrames += this._bucketLate[b];
@@ -237,10 +237,10 @@ class FrameStats {
             snap.latePercent = (snap.lateFrames / snap.windowFrames) * 100;
         }
 
-        var frameTotal = 0, renderTotal = 0, tickTotal = 0, n = 0;
-        for (var k = 0; k < this._filled; k++) {
-            var i = (this._head - 1 - k + CAPACITY * 2) % CAPACITY;
-            var frameMs = this._frameMs[i];
+        let frameTotal = 0, renderTotal = 0, tickTotal = 0, n = 0;
+        for (let k = 0; k < this._filled; k++) {
+            const i = (this._head - 1 - k + CAPACITY * 2) % CAPACITY;
+            const frameMs = this._frameMs[i];
             // A zero gap marks the first tick of a run, which has no
             // predecessor to measure against — stop, don't average it in.
             if (frameMs === 0 && k > 0) break;
@@ -265,11 +265,11 @@ class FrameStats {
 }
 
 module.exports = {
-    FrameStats: FrameStats,
-    WINDOW_MS: WINDOW_MS,
-    LATE_WINDOW_MS: LATE_WINDOW_MS,
-    BUCKET_MS: BUCKET_MS,
-    RESUME_MS: RESUME_MS,
-    IDLE_MS: IDLE_MS,
-    OVERRUN_FACTOR: OVERRUN_FACTOR,
+    FrameStats,
+    WINDOW_MS,
+    LATE_WINDOW_MS,
+    BUCKET_MS,
+    RESUME_MS,
+    IDLE_MS,
+    OVERRUN_FACTOR,
 };

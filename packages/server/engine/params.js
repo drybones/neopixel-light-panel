@@ -20,14 +20,14 @@
  */
 
 // hexToRgb's own pattern: the leading # is optional there, so it is here.
-var HEX = /^#?[a-f\d]{6}$/i;
+const HEX = /^#?[a-f\d]{6}$/i;
 
 function finiteNumber(v) {
     if (typeof v === 'number') return isFinite(v) ? v : undefined;
     // A numeric string is a number that went through a text field somewhere;
     // "left" is not, and neither is "" (Number('') is 0).
     if (typeof v === 'string' && v.trim() !== '') {
-        var n = Number(v);
+        const n = Number(v);
         return isFinite(n) ? n : undefined;
     }
     return undefined;
@@ -42,12 +42,12 @@ function isPlainObject(v) {
 // gradient should cost that stop, not the gradient.
 function coerceStops(v, minStops) {
     if (!Array.isArray(v)) return undefined;
-    var out = [];
-    v.forEach(function(stop) {
+    const out = [];
+    v.forEach((stop) => {
         if (!isPlainObject(stop)) return;
-        var position = finiteNumber(stop.position);
+        const position = finiteNumber(stop.position);
         if (position === undefined || typeof stop.color !== 'string' || !HEX.test(stop.color)) return;
-        out.push(Object.assign({}, stop, { position: position }));
+        out.push(Object.assign({}, stop, { position }));
     });
     return out.length >= (minStops || 1) ? out : undefined;
 }
@@ -61,7 +61,7 @@ function coerceValue(entry, v) {
     case 'color':
         return typeof v === 'string' && HEX.test(v) ? v : undefined;
     case 'enum':
-        return entry.options.some(function(o) { return o.value === v; }) ? v : undefined;
+        return entry.options.some((o) => o.value === v) ? v : undefined;
     case 'text':
         if (typeof v === 'string') return v;
         return typeof v === 'number' && isFinite(v) ? String(v) : undefined;
@@ -72,7 +72,7 @@ function coerceValue(entry, v) {
     }
 }
 
-var NUMBER = { type: 'number' };
+const NUMBER = { type: 'number' };
 
 // The params a schema entry owns. `xy` and `range` each own two numbers under
 // their own key names; `group` owns none.
@@ -87,12 +87,12 @@ function fieldsOf(entry) {
 // type or replaced by a copy of its default. The copy matters for stops: handing
 // two layers the same defaults array would have them share it.
 function coerceParams(effect, params) {
-    var given = isPlainObject(params) ? params : {};
-    var out = Object.assign({}, effect.defaults, given);
-    effect.schema.forEach(function(entry) {
-        fieldsOf(entry).forEach(function(field) {
-            var key = field[0];
-            var v = Object.prototype.hasOwnProperty.call(given, key) ? coerceValue(field[1], given[key]) : undefined;
+    const given = isPlainObject(params) ? params : {};
+    const out = Object.assign({}, effect.defaults, given);
+    effect.schema.forEach((entry) => {
+        fieldsOf(entry).forEach((field) => {
+            const key = field[0];
+            const v = Object.hasOwn(given, key) ? coerceValue(field[1], given[key]) : undefined;
             out[key] = v !== undefined ? v : structuredClone(effect.defaults[key]);
         });
     });

@@ -24,10 +24,10 @@
  * bound loops that run inside the 10ms tick, so a typed-in absurdity has to be
  * caught here rather than merely pinned on a track.
  */
-var MAX_TEXT = 256;
-var MAX_TRACKING = 8;
-var MAX_GAP = 64;
-var MAX_SOFTNESS = 8;
+const MAX_TEXT = 256;
+const MAX_TRACKING = 8;
+const MAX_GAP = 64;
+const MAX_SOFTNESS = 8;
 
 /*
  * Clock tokens live *in the string*, so the Text field never stops meaning what
@@ -36,10 +36,10 @@ var MAX_SOFTNESS = 8;
  * unrecognised brace passes through verbatim so nothing is stolen from ordinary
  * text.
  */
-var TOKEN = /\{(HH|H|hh|h|mm|m|ss|s|a|A|DD|D|MM|M|YYYY|YY)\}/g;
+const TOKEN = /\{(HH|H|hh|h|mm|m|ss|s|a|A|DD|D|MM|M|YYYY|YY)\}/g;
 
 function pad2(n) {
-    return n < 10 ? '0' + n : '' + n;
+    return n < 10 ? `0${n}` : `${n}`;
 }
 
 /*
@@ -49,11 +49,11 @@ function pad2(n) {
  */
 function tokenPeriod(text) {
     if (typeof text !== 'string') return 0;
-    var period = 0;
-    var m;
+    let period = 0;
+    let m;
     TOKEN.lastIndex = 0;
     while ((m = TOKEN.exec(text)) !== null) {
-        var t = m[1];
+        const t = m[1];
         if (t === 'ss' || t === 's') return 1000;
         period = 60000;
     }
@@ -68,26 +68,26 @@ function tokenPeriod(text) {
 function resolveTokens(text, millis) {
     if (typeof text !== 'string') return '';
     if (text.indexOf('{') === -1) return text;
-    var d = new Date(millis);
-    return text.replace(TOKEN, function(all, t) {
-        var h24 = d.getHours();
-        var h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+    const d = new Date(millis);
+    return text.replace(TOKEN, (all, t) => {
+        const h24 = d.getHours();
+        const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
         switch (t) {
             case 'HH': return pad2(h24);
-            case 'H': return '' + h24;
+            case 'H': return `${h24}`;
             case 'hh': return pad2(h12);
-            case 'h': return '' + h12;
+            case 'h': return `${h12}`;
             case 'mm': return pad2(d.getMinutes());
-            case 'm': return '' + d.getMinutes();
+            case 'm': return `${d.getMinutes()}`;
             case 'ss': return pad2(d.getSeconds());
-            case 's': return '' + d.getSeconds();
+            case 's': return `${d.getSeconds()}`;
             case 'a': return h24 < 12 ? 'am' : 'pm';
             case 'A': return h24 < 12 ? 'AM' : 'PM';
             case 'DD': return pad2(d.getDate());
-            case 'D': return '' + d.getDate();
+            case 'D': return `${d.getDate()}`;
             case 'MM': return pad2(d.getMonth() + 1);
-            case 'M': return '' + (d.getMonth() + 1);
-            case 'YYYY': return '' + d.getFullYear();
+            case 'M': return `${d.getMonth() + 1}`;
+            case 'YYYY': return `${d.getFullYear()}`;
             case 'YY': return pad2(d.getFullYear() % 100);
             default: return all;
         }
@@ -101,24 +101,24 @@ function resolveTokens(text, millis) {
  * from.
  */
 function layoutLine(font, text, tracking) {
-    var t = tracking > 0 ? Math.round(tracking) : 0;
-    var chars = typeof text === 'string' ? text.slice(0, MAX_TEXT) : '';
-    var rows = font.height;
-    var width = 0;
-    var i;
+    const t = tracking > 0 ? Math.round(tracking) : 0;
+    const chars = typeof text === 'string' ? text.slice(0, MAX_TEXT) : '';
+    const rows = font.height;
+    let width = 0;
+    let i;
     for (i = 0; i < chars.length; i++) {
         if (i > 0) width += t;
         width += font.glyph(chars[i]).width;
     }
-    var cols = new Uint8Array(width);
-    var at = 0;
+    const cols = new Uint8Array(width);
+    let at = 0;
     for (i = 0; i < chars.length; i++) {
         if (i > 0) at += t;
-        var g = font.glyph(chars[i]);
+        const g = font.glyph(chars[i]);
         cols.set(g.cols, at);
         at += g.width;
     }
-    return { cols: cols, width: width, rows: rows };
+    return { cols, width, rows };
 }
 
 /*
@@ -127,7 +127,7 @@ function layoutLine(font, text, tracking) {
  * scroll 0 is then genuinely one static instance of the line.
  */
 function wrapPeriod(lineWidth, panelCols, gap) {
-    var g = Math.max(0, Math.min(MAX_GAP, Math.round(gap)));
+    const g = Math.max(0, Math.min(MAX_GAP, Math.round(gap)));
     return Math.max(1, Math.max(lineWidth, panelCols) + g);
 }
 
@@ -143,33 +143,33 @@ function wrapPeriod(lineWidth, panelCols, gap) {
  * of a glyph lands on the panel's top row.
  */
 function makeGrid(ctx, tolerance) {
-    var tol = tolerance || 0.05;
-    var n = ctx.numPixels;
-    var xs = uniqueSorted(ctx.modelX, n, tol);
-    var zs = uniqueSorted(ctx.modelZ, n, tol);
-    var colOf = new Int16Array(n);
-    var rowOf = new Int16Array(n);
-    for (var i = 0; i < n; i++) {
+    const tol = tolerance || 0.05;
+    const n = ctx.numPixels;
+    const xs = uniqueSorted(ctx.modelX, n, tol);
+    const zs = uniqueSorted(ctx.modelZ, n, tol);
+    const colOf = new Int16Array(n);
+    const rowOf = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
         colOf[i] = nearestIndex(xs, ctx.modelX[i]);
         rowOf[i] = nearestIndex(zs, ctx.modelZ[i]);
     }
-    return { cols: xs.length, rows: zs.length, colOf: colOf, rowOf: rowOf };
+    return { cols: xs.length, rows: zs.length, colOf, rowOf };
 }
 
 function uniqueSorted(values, n, tol) {
-    var sorted = Array.prototype.slice.call(values, 0, n).sort(function(a, b) { return a - b; });
-    var out = [];
-    for (var i = 0; i < sorted.length; i++) {
+    const sorted = Array.prototype.slice.call(values, 0, n).sort((a, b) => a - b);
+    const out = [];
+    for (let i = 0; i < sorted.length; i++) {
         if (out.length === 0 || sorted[i] - out[out.length - 1] > tol) out.push(sorted[i]);
     }
     return out;
 }
 
 function nearestIndex(sorted, v) {
-    var best = 0;
-    var bestD = Infinity;
-    for (var i = 0; i < sorted.length; i++) {
-        var d = Math.abs(sorted[i] - v);
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < sorted.length; i++) {
+        const d = Math.abs(sorted[i] - v);
         if (d < bestD) { bestD = d; best = i; }
     }
     return best;
@@ -179,9 +179,9 @@ function nearestIndex(sorted, v) {
 // switching font does not reallocate mid-render.
 function createSampler(gridCols, gridRows, maxRows) {
     return {
-        gridCols: gridCols,
-        gridRows: gridRows,
-        maxRows: maxRows,
+        gridCols,
+        gridRows,
+        maxRows,
         temp: new Float32Array(maxRows * gridCols),
         coverage: new Float32Array(gridRows * gridCols),
     };
@@ -200,20 +200,20 @@ function createSampler(gridCols, gridRows, maxRows) {
  * stop being a blur.
  */
 function sample(sampler, mask, period, originCol, originRow, softness) {
-    var gridCols = sampler.gridCols;
-    var gridRows = sampler.gridRows;
-    var rows = mask.rows;
-    var temp = sampler.temp;
-    var cov = sampler.coverage;
-    var c, r, m, w, wsum, lo, hi;
+    const gridCols = sampler.gridCols;
+    const gridRows = sampler.gridRows;
+    const rows = mask.rows;
+    const temp = sampler.temp;
+    const cov = sampler.coverage;
+    let c, r, m, w, wsum, lo, hi;
     temp.fill(0, 0, rows * gridCols);
     cov.fill(0, 0, gridRows * gridCols);
 
-    var R = 1 + Math.max(0, Math.min(MAX_SOFTNESS, softness));
+    const R = 1 + Math.max(0, Math.min(MAX_SOFTNESS, softness));
 
     // Horizontal pass: mask columns -> panel columns, at fractional positions.
     for (c = 0; c < gridCols; c++) {
-        var u = c - originCol;
+        const u = c - originCol;
         lo = Math.ceil(u - R);
         hi = Math.floor(u + R);
         wsum = 0;
@@ -221,7 +221,7 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
             w = 1 - Math.abs(m - u) / R;
             if (w <= 0) continue;
             wsum += w;
-            var bits = maskColumn(mask, m, period);
+            const bits = maskColumn(mask, m, period);
             if (bits === 0) continue;
             for (r = 0; r < rows; r++) {
                 if ((bits >> r) & 1) temp[r * gridCols + c] += w;
@@ -235,8 +235,8 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
     // Vertical pass: mask rows -> panel rows. No wrap here; a row off the top or
     // the bottom of the panel is simply gone.
     for (r = 0; r < gridRows; r++) {
-        var y = r - originRow;
-        var base = r * gridCols;
+        const y = r - originRow;
+        const base = r * gridCols;
         lo = Math.ceil(y - R);
         hi = Math.floor(y + R);
         wsum = 0;
@@ -245,7 +245,7 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
             if (w <= 0) continue;
             wsum += w;
             if (m < 0 || m >= rows) continue;
-            var from = m * gridCols;
+            const from = m * gridCols;
             for (c = 0; c < gridCols; c++) cov[base + c] += temp[from + c] * w;
         }
         if (wsum > 0 && wsum !== 1) {
@@ -259,21 +259,21 @@ function sample(sampler, mask, period, originCol, originRow, softness) {
 // end of the line, or in the wrap gap, which is the early-out that keeps a space
 // and the gap between repeats cheap.
 function maskColumn(mask, m, period) {
-    var mm = m % period;
+    let mm = m % period;
     if (mm < 0) mm += period;
     return mm < mask.width ? mask.cols[mm] : 0;
 }
 
 module.exports = {
-    MAX_TEXT: MAX_TEXT,
-    MAX_TRACKING: MAX_TRACKING,
-    MAX_GAP: MAX_GAP,
-    MAX_SOFTNESS: MAX_SOFTNESS,
-    tokenPeriod: tokenPeriod,
-    resolveTokens: resolveTokens,
-    layoutLine: layoutLine,
-    wrapPeriod: wrapPeriod,
-    makeGrid: makeGrid,
-    createSampler: createSampler,
-    sample: sample,
+    MAX_TEXT,
+    MAX_TRACKING,
+    MAX_GAP,
+    MAX_SOFTNESS,
+    tokenPeriod,
+    resolveTokens,
+    layoutLine,
+    wrapPeriod,
+    makeGrid,
+    createSampler,
+    sample,
 };

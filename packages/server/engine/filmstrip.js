@@ -20,17 +20,17 @@
  * the live compositor would jump them the next time it went active.
  */
 
-var { Compositor } = require('./compositor');
-var effects = require('../effects');
-var toByte = require('./color').toByte;
+const { Compositor } = require('./compositor');
+const effects = require('../effects');
+const toByte = require('./color').toByte;
 
 // 40 frames at 100ms is a 4.0s loop, ~38KB of base64 per scene. The length is
 // a compromise between the seam coming round often enough to notice and the
 // client's cost, which is all in the payload and the sprite sheet the UI
 // blooms from it (~3.7MB of canvas per visible card) — the render itself is
 // nothing next to the warm-up below.
-var FRAMES = 40;
-var INTERVAL_MS = 100;
+const FRAMES = 40;
+const INTERVAL_MS = 100;
 
 // The loop is not naturally cyclic — particle effects are not periodic at
 // all, and a multi-layer scene's period is an unusable LCM — so the last
@@ -48,7 +48,7 @@ var INTERVAL_MS = 100;
 // (noise, an aperiodic particle field), 6 frames brings the worst to 3.4x,
 // and 12 brings every effect inside 2x. 16 buys nothing and ghosts for
 // longer. See test/filmstrip.test.js.
-var FADE_FRAMES = 12;
+const FADE_FRAMES = 12;
 
 // Particle effects seed lazily, so frame 1 of a fresh instance is empty, and
 // an emitter additionally *ramps* — it fills from empty at count/life births
@@ -63,22 +63,22 @@ var FADE_FRAMES = 12;
 // step still fills at the right rate, but do not raise it past the shortest
 // lifetime a layer can have (0.2s) or a whole generation would live and die
 // inside one warm-up frame.
-var WARMUP_STEP_MS = 200;
-var DEFAULT_WARMUP_MS = 8000;
+const WARMUP_STEP_MS = 200;
+const DEFAULT_WARMUP_MS = 8000;
 // A typed lifetime is deliberately unclamped — a schema min/max is a slider
 // hint — so a layer can ask for any warm-up at all, and every millisecond of
 // it is renders on the same thread as the 10ms tick. The whole slider fits
 // under this (life 10s at lifeSpread 1 asks for 41s, ~200 renders, measured at
 // 22ms for a full-density emitter over the real panel); past it, a card
 // showing a still-filling layer is the better failure.
-var MAX_WARMUP_MS = 60000;
+const MAX_WARMUP_MS = 60000;
 
 function warmupMsFor(scene) {
-    var layers = scene._displayLayers || scene.layers || [];
-    var ms = 0;
-    for (var i = 0; i < layers.length; i++) {
-        var effect = effects.get(layers[i].effectType);
-        var want = effect && effect.warmupMs
+    const layers = scene._displayLayers || scene.layers || [];
+    let ms = 0;
+    for (let i = 0; i < layers.length; i++) {
+        const effect = effects.get(layers[i].effectType);
+        const want = effect && effect.warmupMs
             ? effect.warmupMs(layers[i]._prepared || {})
             : DEFAULT_WARMUP_MS;
         if (want > ms) ms = want;
@@ -91,31 +91,31 @@ function warmupMsFor(scene) {
 // time to decide whether a slot needs seeding would treat a born time of 0
 // as unseeded and re-seed it every single frame, rendering the layer black.
 // `emitter` carries an explicit `alive` flag for exactly this reason.
-var TIME_BASE = 1e6;
+const TIME_BASE = 1e6;
 
-var NULL_SINK = {
-    setPixel: function() {},
-    writePixels: function() {},
+const NULL_SINK = {
+    setPixel() {},
+    writePixels() {},
 };
 
 // How many renders run back to back before the async path hands the thread
 // back. A full-density emitter renders in ~0.1ms, so this is a couple of
 // milliseconds between chances for the 10ms tick — where a whole capped
 // warm-up (300 renders) done in one go would drop a few frames on the panel.
-var YIELD_EVERY = 16;
+const YIELD_EVERY = 16;
 
 // The render as a generator that yields every YIELD_EVERY renders and returns
 // the bytes, so the sync and async entry points below are one body.
 function* filmstripSteps(scene, model) {
-    var compositor = new Compositor(NULL_SINK, model);
+    const compositor = new Compositor(NULL_SINK, model);
     compositor.syncScene(scene);
 
-    var numPixels = model.length;
-    var stride = numPixels * 3;
+    const numPixels = model.length;
+    const stride = numPixels * 3;
 
-    var warmupFrames = Math.ceil(warmupMsFor(scene) / WARMUP_STEP_MS);
-    var t = TIME_BASE - warmupFrames * WARMUP_STEP_MS;
-    for (var w = 0; w < warmupFrames; w++) {
+    const warmupFrames = Math.ceil(warmupMsFor(scene) / WARMUP_STEP_MS);
+    let t = TIME_BASE - warmupFrames * WARMUP_STEP_MS;
+    for (let w = 0; w < warmupFrames; w++) {
         compositor.renderFrame(scene, t);
         t += WARMUP_STEP_MS;
         if ((w + 1) % YIELD_EVERY === 0) yield;
@@ -123,8 +123,8 @@ function* filmstripSteps(scene, model) {
 
     // Capture the loop plus its continuation, in float — the blend below wants
     // full precision, and rounding to bytes happens once on the way out.
-    var captured = new Float32Array((FRAMES + FADE_FRAMES) * stride);
-    for (var f = 0; f < FRAMES + FADE_FRAMES; f++) {
+    const captured = new Float32Array((FRAMES + FADE_FRAMES) * stride);
+    for (let f = 0; f < FRAMES + FADE_FRAMES; f++) {
         compositor.renderFrame(scene, TIME_BASE + f * INTERVAL_MS);
         captured.set(compositor.composite, f * stride);
         if ((f + 1) % YIELD_EVERY === 0) yield;
@@ -133,17 +133,17 @@ function* filmstripSteps(scene, model) {
     // Dissolve the continuation into the head. `a` runs 0→1 across the fade,
     // so frame 0 is nearly all continuation (and so follows frame FRAMES-1
     // almost exactly) and by the end of the fade it is the true frame again.
-    var out = new Uint8Array(FRAMES * stride);
-    for (var g = 0; g < FRAMES; g++) {
-        var base = g * stride;
+    const out = new Uint8Array(FRAMES * stride);
+    for (let g = 0; g < FRAMES; g++) {
+        const base = g * stride;
         if (g < FADE_FRAMES) {
-            var a = (g + 1) / (FADE_FRAMES + 1);
-            var tail = (FRAMES + g) * stride;
-            for (var i = 0; i < stride; i++) {
+            const a = (g + 1) / (FADE_FRAMES + 1);
+            const tail = (FRAMES + g) * stride;
+            for (let i = 0; i < stride; i++) {
                 out[base + i] = toByte(a * captured[base + i] + (1 - a) * captured[tail + i]);
             }
         } else {
-            for (var j = 0; j < stride; j++) {
+            for (let j = 0; j < stride; j++) {
                 out[base + j] = toByte(captured[base + j]);
             }
         }
@@ -155,8 +155,8 @@ function* filmstripSteps(scene, model) {
 // Renders `scene` (as held by SceneStore, i.e. already preprocessed) to a flat
 // Uint8Array of FRAMES * numPixels * 3 bytes, frame-major.
 function renderFilmstrip(scene, model) {
-    var steps = filmstripSteps(scene, model);
-    var r;
+    const steps = filmstripSteps(scene, model);
+    let r;
     do { r = steps.next(); } while (!r.done);
     return r.value;
 }
@@ -166,10 +166,10 @@ function renderFilmstrip(scene, model) {
 // layer it was never synced with, and the cache keys the result on the hash
 // taken before rendering, so a stale strip is replaced on the next request.
 async function renderFilmstripAsync(scene, model) {
-    var steps = filmstripSteps(scene, model);
-    var r;
+    const steps = filmstripSteps(scene, model);
+    let r;
     while (!(r = steps.next()).done) {
-        await new Promise(function(resolve) { setImmediate(resolve); });
+        await new Promise((resolve) => { setImmediate(resolve); });
     }
     return r.value;
 }
@@ -179,8 +179,8 @@ async function renderFilmstripAsync(scene, model) {
 // SceneStore because preprocess() would sync the layer into the *live*
 // compositor, and this scene is never going to be rendered by the panel.
 function effectScene(effect) {
-    var layer = {
-        id: 'effect-preview-' + effect.type,
+    const layer = {
+        id: `effect-preview-${effect.type}`,
         effectType: effect.type,
         params: effect.defaults,
         blendMode: 'normal',
@@ -190,7 +190,7 @@ function effectScene(effect) {
         _prepared: effect.prepare(effect.defaults),
         _blend: 0,
     };
-    var scene = { id: layer.id, name: effect.name, layers: [layer] };
+    const scene = { id: layer.id, name: effect.name, layers: [layer] };
     scene._displayLayers = scene.layers;
     return scene;
 }
@@ -204,14 +204,14 @@ function renderEffectFilmstripAsync(effect, model) {
 }
 
 module.exports = {
-    renderFilmstrip: renderFilmstrip,
-    renderFilmstripAsync: renderFilmstripAsync,
-    renderEffectFilmstrip: renderEffectFilmstrip,
-    renderEffectFilmstripAsync: renderEffectFilmstripAsync,
-    warmupMsFor: warmupMsFor,
-    FRAMES: FRAMES,
-    YIELD_EVERY: YIELD_EVERY,
-    INTERVAL_MS: INTERVAL_MS,
-    DEFAULT_WARMUP_MS: DEFAULT_WARMUP_MS,
-    MAX_WARMUP_MS: MAX_WARMUP_MS,
+    renderFilmstrip,
+    renderFilmstripAsync,
+    renderEffectFilmstrip,
+    renderEffectFilmstripAsync,
+    warmupMsFor,
+    FRAMES,
+    YIELD_EVERY,
+    INTERVAL_MS,
+    DEFAULT_WARMUP_MS,
+    MAX_WARMUP_MS,
 };

@@ -31,17 +31,17 @@
  * is an attachment to a frame, never a stream of its own.
  */
 
-var WebSocket = require('ws');
-var toByte = require('./color').toByte;
+const WebSocket = require('ws');
+const toByte = require('./color').toByte;
 
-var FRAME_INTERVAL_MS = 33;
-var LAYER_FRAME_INTERVAL_MS = 66;
+const FRAME_INTERVAL_MS = 33;
+const LAYER_FRAME_INTERVAL_MS = 66;
 
 // The only inbound messages are the two subscribe/unsubscribe objects, a few
 // dozen bytes each. ws's default cap is 100 MiB, buffered before parsing, and
 // CORS does not reach a WebSocket — the browser sends Origin, the server has
 // to care — so this is the one limit that bounds what a stray page can cost.
-var MAX_PAYLOAD_BYTES = 4096;
+const MAX_PAYLOAD_BYTES = 4096;
 
 class Broadcaster {
     constructor(compositor, numPixels, options) {
@@ -54,30 +54,29 @@ class Broadcaster {
         this._layerArrays = new Map(); // layerId → reusable [[r,g,b],...]
         this._layerArraysSceneId = null;
 
-        var port = options && options.port !== undefined ? options.port : 3001;
-        this.wss = new WebSocket.Server({ port: port, maxPayload: MAX_PAYLOAD_BYTES });
+        const port = options && options.port !== undefined ? options.port : 3001;
+        this.wss = new WebSocket.Server({ port, maxPayload: MAX_PAYLOAD_BYTES });
 
-        var self = this;
-        this.wss.on('listening', function() {
-            console.log('Pixel broadcaster: WebSocket listening on port ' + self.wss.address().port);
+        this.wss.on('listening', () => {
+            console.log(`Pixel broadcaster: WebSocket listening on port ${this.wss.address().port}`);
         });
         // A server without its previews is not a working server, and the
         // realistic cause (EADDRINUSE from a stale process) needs a human.
         // Exit with the reason on one line rather than an uncaught stack.
-        this.wss.on('error', function(err) {
-            console.error('Pixel broadcaster: ' + err.message);
+        this.wss.on('error', (err) => {
+            console.error(`Pixel broadcaster: ${err.message}`);
             process.exit(1);
         });
 
-        this.wss.on('connection', function(socket) {
+        this.wss.on('connection', (socket) => {
             socket._layerSceneId = null;
             // 'close' follows and the client set drops it; the listener is
             // here because without one ws *throws* the error, and a phone
             // walking out of wifi range mid-frame took the render loop with
             // it (#108). An over-size message arrives by this path too.
-            socket.on('error', function() {});
-            socket.on('message', function(data) {
-                var msg;
+            socket.on('error', () => {});
+            socket.on('message', (data) => {
+                let msg;
                 try { msg = JSON.parse(data); } catch (e) { return; }
                 if (msg && msg.type === 'subscribe_layers' && msg.sceneId) {
                     socket._layerSceneId = msg.sceneId;
@@ -85,19 +84,19 @@ class Broadcaster {
                     socket._layerSceneId = null;
                 }
             });
-            if (self._lastMsg) socket.send(self._lastMsg);
+            if (this._lastMsg) socket.send(this._lastMsg);
         });
     }
 
     _serialiseBuffer(buf, target) {
-        var n = this.numPixels;
+        const n = this.numPixels;
         if (!target || target.length !== n) {
             target = new Array(n);
-            for (var j = 0; j < n; j++) target[j] = [0, 0, 0];
+            for (let j = 0; j < n; j++) target[j] = [0, 0, 0];
         }
-        for (var i = 0; i < n; i++) {
-            var triple = target[i];
-            var o = i * 3;
+        for (let i = 0; i < n; i++) {
+            const triple = target[i];
+            const o = i * 3;
             triple[0] = toByte(buf[o]);
             triple[1] = toByte(buf[o + 1]);
             triple[2] = toByte(buf[o + 2]);
@@ -112,10 +111,10 @@ class Broadcaster {
      * is the last thing a client connecting to an idle panel will be sent.
      */
     tick(scene, force) {
-        var now = Date.now();
+        const now = Date.now();
         if (!force && now - this._lastSent < FRAME_INTERVAL_MS) return;
         if (this.wss.clients.size === 0 && !force) return;
-        var buf = this.compositor.composite;
+        const buf = this.compositor.composite;
         if (!buf) return;
         this._lastSent = now;
 
@@ -124,11 +123,11 @@ class Broadcaster {
         // has not subscribed to anything yet.
         this._lastMsg = JSON.stringify({ type: 'frame', composite: this._pixelArray });
 
-        var subscribers = this._layerSubscribers(scene);
-        var layerMsg = subscribers.length > 0 ? this._layerMessage(scene, now) : null;
+        const subscribers = this._layerSubscribers(scene);
+        const layerMsg = subscribers.length > 0 ? this._layerMessage(scene, now) : null;
 
-        var plain = this._lastMsg;
-        this.wss.clients.forEach(function(socket) {
+        const plain = this._lastMsg;
+        this.wss.clients.forEach((socket) => {
             if (socket.readyState !== WebSocket.OPEN) return;
             socket.send(layerMsg && socket._layerSceneId === scene.id ? layerMsg : plain);
         });
@@ -138,9 +137,9 @@ class Broadcaster {
     // subscriber to some other scene is an editor whose scene is not active;
     // it stays on the plain composite.
     _layerSubscribers(scene) {
-        var subscribers = [];
+        const subscribers = [];
         if (!scene) return subscribers;
-        this.wss.clients.forEach(function(socket) {
+        this.wss.clients.forEach((socket) => {
             if (socket.readyState === WebSocket.OPEN && socket._layerSceneId === scene.id) {
                 subscribers.push(socket);
             }
@@ -163,24 +162,24 @@ class Broadcaster {
             this._layerArraysSceneId = scene.id;
         }
 
-        var layers = {};
-        for (var i = 0; i < scene.layers.length; i++) {
-            var layer = scene.layers[i];
-            var layerBuf = this.compositor.getLayerBuffer(layer.id);
+        const layers = {};
+        for (let i = 0; i < scene.layers.length; i++) {
+            const layer = scene.layers[i];
+            const layerBuf = this.compositor.getLayerBuffer(layer.id);
             if (!layerBuf) continue;
-            var arr = this._serialiseBuffer(layerBuf, this._layerArrays.get(layer.id));
+            const arr = this._serialiseBuffer(layerBuf, this._layerArrays.get(layer.id));
             this._layerArrays.set(layer.id, arr);
             layers[layer.id] = arr;
         }
 
-        return JSON.stringify({ type: 'frame', composite: this._pixelArray, layers: layers });
+        return JSON.stringify({ type: 'frame', composite: this._pixelArray, layers });
     }
 
     // Tests only: wss.close() alone leaves connected clients open.
     close() {
-        var wss = this.wss;
-        wss.clients.forEach(function(socket) { socket.terminate(); });
-        return new Promise(function(resolve) { wss.close(resolve); });
+        const wss = this.wss;
+        wss.clients.forEach((socket) => { socket.terminate(); });
+        return new Promise((resolve) => { wss.close(resolve); });
     }
 }
 
