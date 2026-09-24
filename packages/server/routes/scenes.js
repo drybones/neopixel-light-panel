@@ -2,57 +2,57 @@
  * Scene / effect REST API. Express router; the store handles all state.
  */
 
-var express = require('express');
-var effects = require('../effects');
-var { BLEND_MODES } = require('../engine/compositor');
-var filmstrip = require('../engine/filmstrip');
+const express = require('express');
+const effects = require('../effects');
+const { BLEND_MODES } = require('../engine/compositor');
+const filmstrip = require('../engine/filmstrip');
 
 function createRouter(store, previewCache, effectPreviewCache) {
-    var router = express.Router();
+    const router = express.Router();
 
-    router.get('/effects', function(req, res) {
+    router.get('/effects', (req, res) => {
         res.json(effects.catalog());
     });
 
     // Discovered like effects, for the same reason: a mode the UI had to be
     // told about separately was a mode it could silently lack. The int id is
     // the compositor's business and stays behind.
-    router.get('/blend-modes', function(req, res) {
-        res.json(BLEND_MODES.map(function(m) { return { value: m.value, label: m.label }; }));
+    router.get('/blend-modes', (req, res) => {
+        res.json(BLEND_MODES.map((m) => ({ value: m.value, label: m.label })));
     });
 
     // Each effect at its defaults, so the picker can show what a layer will
     // look like rather than a swatch of its colours. Same payload shape as
     // the scene filmstrips, keyed by effect type instead of scene id.
-    router.get('/effects/previews', async function(req, res) {
-        var previews = await effectPreviewCache.all(effects.list());
+    router.get('/effects/previews', async (req, res) => {
+        const previews = await effectPreviewCache.all(effects.list());
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,
             intervalMs: filmstrip.INTERVAL_MS,
-            previews: previews,
+            previews,
         });
     });
 
-    router.get('/scenes', function(req, res) {
+    router.get('/scenes', (req, res) => {
         res.json(store.list());
     });
 
-    router.post('/scenes', function(req, res) {
-        var scene = store.create(req.body || {});
+    router.post('/scenes', (req, res) => {
+        const scene = store.create(req.body || {});
         res.status(201).json(scene);
     });
 
     // Empty the library. A DELETE on the collection, so — unlike reset below
     // — there is no id to be confused with; the store nulls the active scene
     // and the render loop falls to its one-black-frame fast exit.
-    router.delete('/scenes', function(req, res) {
+    router.delete('/scenes', (req, res) => {
         store.removeAll();
         res.json(store.list());
     });
 
     // Export/import before /scenes/:id so "export" isn't matched as an id
-    router.get('/scenes/export', function(req, res) {
+    router.get('/scenes/export', (req, res) => {
         res.json(store.exportAll());
     });
 
@@ -62,12 +62,12 @@ function createRouter(store, previewCache, effectPreviewCache) {
     // because the envelope is validated *before* the store is touched: a
     // rejected body leaves the library exactly as it was, where the
     // two-request version would already have thrown it away.
-    router.post('/scenes/import', function(req, res) {
-        var body = req.body;
+    router.post('/scenes/import', (req, res) => {
+        const body = req.body;
         if (!body || body.version !== 2 || !Array.isArray(body.scenes)) {
             return res.status(400).json({ error: 'Import body must be {version: 2, scenes: [...]}' });
         }
-        var mode = body.mode === undefined ? 'merge' : body.mode;
+        const mode = body.mode === undefined ? 'merge' : body.mode;
         if (mode !== 'merge' && mode !== 'replace') {
             return res.status(400).json({ error: 'mode must be "merge" or "replace"' });
         }
@@ -81,7 +81,7 @@ function createRouter(store, previewCache, effectPreviewCache) {
     // /scenes/:id alongside export/import/order/previews: there is no POST
     // /scenes/:id today, but the rule is the path shape, not the verb, and
     // adding one later would silently swallow this.
-    router.post('/scenes/reset', function(req, res) {
+    router.post('/scenes/reset', (req, res) => {
         store.resetToDefaults();
         res.json(store.list());
     });
@@ -89,8 +89,8 @@ function createRouter(store, previewCache, effectPreviewCache) {
     // Reorder, before /scenes/:id so "order" isn't matched as a scene id.
     // The whole id list, not a move — see SceneStore.reorder. The store's
     // 2s debounce is what makes this safe to call on every drop.
-    router.put('/scenes/order', function(req, res) {
-        var ids = req.body ? req.body.ids : undefined;
+    router.put('/scenes/order', (req, res) => {
+        const ids = req.body ? req.body.ids : undefined;
         if (!store.reorder(ids)) {
             return res.status(400).json({ error: 'Body must be {ids: [...]} listing every scene id exactly once' });
         }
@@ -104,20 +104,20 @@ function createRouter(store, previewCache, effectPreviewCache) {
     // owns the strip-order-to-grid mapping (ui/src/lib/panelGrid.js), and a
     // second copy of it travelling over the wire is how a preview ends up
     // rendered 180 degrees round.
-    router.get('/scenes/previews', async function(req, res) {
-        var previews = await previewCache.all(store.scenes);
+    router.get('/scenes/previews', async (req, res) => {
+        const previews = await previewCache.all(store.scenes);
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,
             intervalMs: filmstrip.INTERVAL_MS,
-            previews: previews,
+            previews,
         });
     });
 
-    router.get('/scenes/:id/preview', async function(req, res) {
-        var scene = store.get(req.params.id);
+    router.get('/scenes/:id/preview', async (req, res) => {
+        const scene = store.get(req.params.id);
         if (!scene) return res.sendStatus(404);
-        var preview = await previewCache.get(scene);
+        const preview = await previewCache.get(scene);
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,
@@ -126,35 +126,35 @@ function createRouter(store, previewCache, effectPreviewCache) {
         });
     });
 
-    router.get('/scenes/:id', function(req, res) {
-        var scene = store.getPublic(req.params.id);
+    router.get('/scenes/:id', (req, res) => {
+        const scene = store.getPublic(req.params.id);
         if (!scene) return res.sendStatus(404);
         res.json(scene);
     });
 
-    router.put('/scenes/:id', function(req, res) {
-        var scene = store.replace(req.params.id, req.body || {});
+    router.put('/scenes/:id', (req, res) => {
+        const scene = store.replace(req.params.id, req.body || {});
         if (!scene) return res.sendStatus(404);
         res.json(scene);
     });
 
-    router.delete('/scenes/:id', function(req, res) {
+    router.delete('/scenes/:id', (req, res) => {
         if (!store.remove(req.params.id)) return res.sendStatus(404);
         res.sendStatus(200);
     });
 
-    router.put('/scenes/:sceneId/layers/:layerId', function(req, res) {
-        var layer = store.replaceLayer(req.params.sceneId, req.params.layerId, req.body || {});
+    router.put('/scenes/:sceneId/layers/:layerId', (req, res) => {
+        const layer = store.replaceLayer(req.params.sceneId, req.params.layerId, req.body || {});
         if (!layer) return res.sendStatus(404);
         res.json(layer);
     });
 
-    router.get('/active_scene', function(req, res) {
+    router.get('/active_scene', (req, res) => {
         res.json({ id: store.activeSceneId });
     });
 
-    router.put('/active_scene', function(req, res) {
-        var id = req.body ? req.body.id : undefined;
+    router.put('/active_scene', (req, res) => {
+        const id = req.body ? req.body.id : undefined;
         if (id === undefined) return res.status(400).json({ error: 'Body must be {id: "..."} or {id: null}' });
         if (!store.setActive(id)) return res.sendStatus(404);
         res.json({ id: store.activeSceneId });

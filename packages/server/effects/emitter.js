@@ -31,9 +31,9 @@
  * ramp first, which is what warmupMs() below is for.
  */
 
-var color = require('../engine/color');
-var particles = require('../engine/particles');
-var panel = require('../engine/panel');
+const color = require('../engine/color');
+const particles = require('../engine/particles');
+const panel = require('../engine/panel');
 
 // The pool size and the top of the Density slider, which are the same number:
 // every slot is a particle the emitter can spawn into, pool[0..count-1]. The
@@ -45,14 +45,14 @@ var panel = require('../engine/panel');
 // cost: engine/particles walks 240 pixels per particle, linear in this, and a
 // scene can stack several emitter layers into one 10ms tick. It is deliberately
 // not derived from the panel's pixel count for that reason.
-var MAX_PARTICLES = 80;
+const MAX_PARTICLES = 80;
 
 // The panel is 30x8 on a square pitch, so it is 4.1x wider than it is tall.
 // Emitted velocity and gravity are both stretched in x by this, which is what
 // makes an omnidirectional burst read as a circle rather than a tall ellipse,
 // and what makes a gravity angle and a travel angle of the same number point
 // the same way on screen.
-var X_STRETCH = 1.5;
+const X_STRETCH = 1.5;
 
 // A gap this long between renders means this layer was not being rendered —
 // the loop only ever runs the active scene, and it fast-exits entirely when
@@ -64,19 +64,19 @@ var X_STRETCH = 1.5;
 // still hands back whatever died during it in one tick; at half a second that
 // is a tenth of the field ringing at 1.18x rather than a 2x burst, and it
 // needs a scene flipped away from and back inside half a second to see.
-var RESUME_MS = require('../engine/render-loop').RESUME_MS;
+const RESUME_MS = require('../engine/render-loop').RESUME_MS;
 
 // falloff is 1/size^2, so a size of 0 divides to Infinity and then
 // intensity / (1 + Infinity * 0) is NaN, straight into the layer buffer and
 // out through setPixel. The slider cannot reach 0 but the typed field is
 // deliberately unclamped — same guard as engine/wave's MIN_LAMBDA.
-var MIN_SIZE = 1e-3;
+const MIN_SIZE = 1e-3;
 
 // Extent maxes as a multiple of the panel, so they follow engine/panel rather
 // than being re-hardcoded here. Wider than the panel is useful: it thins the
 // particles out towards the edges instead of packing them all on-screen.
-var MAX_EXT_X = 4 * panel.HALF_X;
-var MAX_EXT_Y = 4 * panel.HALF_Z;
+const MAX_EXT_X = 4 * panel.HALF_X;
+const MAX_EXT_Y = 4 * panel.HALF_Z;
 
 function smoothstep(t) {
     return t * t * (3 - 2 * t);
@@ -184,9 +184,9 @@ module.exports = {
     ],
 
     prepare(params) {
-        var base = color.hexToHsv(params.color);
-        var ga = params.gravDir * Math.PI / 180;
-        var size = params.size > MIN_SIZE ? params.size : MIN_SIZE;
+        const base = color.hexToHsv(params.color);
+        const ga = params.gravDir * Math.PI / 180;
+        const size = params.size > MIN_SIZE ? params.size : MIN_SIZE;
         return {
             h: base.h, s: base.s, v: base.v,
             hueSpread: params.hueSpread,
@@ -225,8 +225,8 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var pool = new Array(MAX_PARTICLES);
-        for (var i = 0; i < MAX_PARTICLES; i++) {
+        const pool = new Array(MAX_PARTICLES);
+        for (let i = 0; i < MAX_PARTICLES; i++) {
             pool[i] = {
                 point: [0, 0, 0],
                 intensity: 0,
@@ -276,23 +276,23 @@ module.exports = {
         // in it back to virgin, and they ramp in again; whatever did survive
         // the gap keeps going, which is what makes this safe at any gap length
         // rather than only at ones long enough to guarantee an empty field.
-        var filling = false;
-        var nextBirth = 0;
-        var lastMillis = 0;
+        let filling = false;
+        let nextBirth = 0;
+        let lastMillis = 0;
         // millis is absolute and 0 is a legitimate value, so "have we rendered
         // before" is a flag, not a comparison against lastMillis.
-        var rendered = false;
+        let rendered = false;
 
         function spawn(q, millis, p) {
-            var speed = p.speed * (1 + (Math.random() - 0.5) * 2 * p.speedSpread);
-            var theta = p.dir + (Math.random() - 0.5) * 2 * p.halfSpread;
+            const speed = p.speed * (1 + (Math.random() - 0.5) * 2 * p.speedSpread);
+            const theta = p.dir + (Math.random() - 0.5) * 2 * p.halfSpread;
 
             q.ox = p.x + (Math.random() - 0.5) * p.extX;
             q.oz = p.y + (Math.random() - 0.5) * p.extY;
             q.vx = X_STRETCH * speed * Math.cos(theta);
             q.vz = speed * Math.sin(theta);
 
-            var hue = p.hueSpread >= 1
+            const hue = p.hueSpread >= 1
                 ? Math.random()
                 : p.h + p.hueSpread * (Math.random() - 0.5);
             color.hsvInto(q.color, hue, p.s, p.v);
@@ -308,29 +308,29 @@ module.exports = {
         // 95% of its life, and for a sparkler the tail is the visible streak.
         function envelope(f, swell) {
             if (f < 0 || f > 1) return 0;
-            var rise = swell <= 0 ? 1 : smoothstep(f < swell ? f / swell : 1);
-            var fall = swell >= 1 ? 1 : (1 - f) / (1 - swell);
+            const rise = swell <= 0 ? 1 : smoothstep(f < swell ? f / swell : 1);
+            const fall = swell >= 1 ? 1 : (1 - f) / (1 - swell);
             return rise * (fall > 1 ? 1 : fall);
         }
 
         return {
             render(out, millis, p) {
-                var active = p.count;
+                const active = p.count;
                 // count births per life, i.e. one every life/count ms.
-                var cadence = p.life / active;
+                const cadence = p.life / active;
 
                 // Resumed rather than ticked: this layer has not been rendered
                 // for a while, so anything whose time ran out in the meantime
                 // is gone rather than merely due for replacement. A backwards
                 // jump is the same thing — a different time base, so nothing
                 // on screen belongs to it.
-                var gap = millis - lastMillis;
+                const gap = millis - lastMillis;
                 lastMillis = millis;
                 if (!rendered) {
                     rendered = true;
                 } else if (gap < 0 || gap > RESUME_MS) {
-                    for (var r = 0; r < active; r++) {
-                        var slot = pool[r];
+                    for (let r = 0; r < active; r++) {
+                        const slot = pool[r];
                         if (!slot.alive || millis > slot.death) slot.virgin = true;
                     }
                 }
@@ -342,8 +342,8 @@ module.exports = {
                 // with an extra frame of delay. Breaking on the first virgin
                 // makes this O(1) while filling and one pass of comparisons
                 // when settled.
-                var virgins = false;
-                for (var v = 0; v < active; v++) {
+                let virgins = false;
+                for (let v = 0; v < active; v++) {
                     if (pool[v].virgin) { virgins = true; break; }
                 }
                 // Arm on the transition, which covers all three ways a fill
@@ -357,8 +357,8 @@ module.exports = {
                 if (virgins && !filling) nextBirth = millis;
                 filling = virgins;
 
-                for (var i = 0; i < active; i++) {
-                    var q = pool[i];
+                for (let i = 0; i < active; i++) {
+                    const q = pool[i];
 
                     if (!q.alive) {
                         if (filling && millis < nextBirth) {
@@ -383,9 +383,9 @@ module.exports = {
                     // A particle is born now, never on a schedule, so its age
                     // cannot be negative: the gate holds a slot dead until its
                     // turn rather than handing it a birth in the future.
-                    var age = (millis - q.born) / 1000;
+                    const age = (millis - q.born) / 1000;
 
-                    var half = 0.5 * age * age;
+                    const half = 0.5 * age * age;
                     q.point[0] = q.ox + q.vx * age + p.ax * half;
                     // Everything above is in *param* space, where y is up —
                     // which is what the pad and the dials show. modelZ runs the

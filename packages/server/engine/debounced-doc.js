@@ -42,7 +42,7 @@ class DebouncedDoc {
         try {
             jsonStore.save(this.persistFile, this.toDocument());
         } catch (err) {
-            console.error('Failed to persist ' + this._label + ':', err);
+            console.error(`Failed to persist ${this._label}:`, err);
             this._dirty = true;
         }
     }

@@ -97,7 +97,7 @@ class PixelSink {
     }
 
     // The one hook: where a finished, limited frame goes.
-    _send(buf) {}
+    _send(_buf) {}
 
     static loadModel(filename) {
         // Synchronously load a JSON model from a file on disk

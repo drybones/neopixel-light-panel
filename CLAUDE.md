@@ -20,6 +20,7 @@ npm install          # install all workspace deps
 npm run dev          # start server (VIRTUAL=1) + UI together via concurrently
 npm start            # start server with real Fadecandy hardware
 npm test             # both suites, server then UI
+npm run lint         # eslint over both packages (eslint.config.mjs), also run in CI
 ```
 
 From **`packages/ui/`**:

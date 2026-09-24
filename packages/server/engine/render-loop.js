@@ -12,7 +12,7 @@
 // One bad frame drops a frame, not the service. The log is rate-limited
 // because a persistent fault would otherwise write ~90 lines a second; the
 // scene id is the datum you want, since cost and faults are per scene.
-var TICK_ERROR_LOG_MS = 5000;
+const TICK_ERROR_LOG_MS = 5000;
 
 // A gap this long between two renders of the same thing means it was not
 // being rendered in between, not that a frame was slow: the loop renders
@@ -20,22 +20,22 @@ var TICK_ERROR_LOG_MS = 5000;
 // Shared, not restated, because two readers act on it — frame-stats stops
 // sampling across the gap, and emitter restarts a dead field's ramp — and
 // they have to agree on where a discontinuity is.
-var RESUME_MS = 500;
+const RESUME_MS = 500;
 
 function createTick(deps) {
-    var store = deps.store;
-    var compositor = deps.compositor;
-    var broadcaster = deps.broadcaster;
-    var frameStats = deps.frameStats;
-    var now = deps.now || Date.now;
-    var logError = deps.logError || console.error;
+    const store = deps.store;
+    const compositor = deps.compositor;
+    const broadcaster = deps.broadcaster;
+    const frameStats = deps.frameStats;
+    const now = deps.now || Date.now;
+    const logError = deps.logError || console.error;
 
-    var offRendered = false;
-    var statsSceneId = null;
-    var lastTickErrorAt = -Infinity;
+    let offRendered = false;
+    let statsSceneId = null;
+    let lastTickErrorAt = -Infinity;
 
     function renderTick() {
-        var scene = store.activeScene();
+        const scene = store.activeScene();
         if (scene) {
             // Frame stats are per scene: cost varies by what is being
             // rendered, and a switch is continuous, so without this a heavy
@@ -52,7 +52,7 @@ function createTick(deps) {
             // begin() returns 0 while the tracker is off, which makes every
             // other call here an early return — the instrumentation costs a
             // boolean test on the path that matters.
-            var t0 = frameStats.begin();
+            const t0 = frameStats.begin();
             compositor.renderFrame(scene, now());
             frameStats.endRender(t0);
             broadcaster.tick(scene);
@@ -72,10 +72,10 @@ function createTick(deps) {
         try {
             renderTick();
         } catch (err) {
-            var t = now();
+            const t = now();
             if (t - lastTickErrorAt >= TICK_ERROR_LOG_MS) {
                 lastTickErrorAt = t;
-                logError('Render tick failed (scene ' + statsSceneId + '):', err);
+                logError(`Render tick failed (scene ${statsSceneId}):`, err);
             }
         }
     };

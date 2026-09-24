@@ -3,7 +3,7 @@
  * Mostly useful as a base layer under multiply/overlay blends.
  */
 
-var color = require('../engine/color');
+const color = require('../engine/color');
 
 module.exports = {
     type: 'solid',
@@ -18,7 +18,7 @@ module.exports = {
     },
 
     prepare(params) {
-        var rgb = color.hexToRgb(params.color);
+        const rgb = color.hexToRgb(params.color);
         return {
             r: rgb.r * params.level,
             g: rgb.g * params.level,
@@ -27,10 +27,10 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var n = ctx.numPixels;
+        const n = ctx.numPixels;
         return {
             render(out, millis, p) {
-                for (var i = 0; i < n; i++) {
+                for (let i = 0; i < n; i++) {
                     out[i * 3] = p.r;
                     out[i * 3 + 1] = p.g;
                     out[i * 3 + 2] = p.b;

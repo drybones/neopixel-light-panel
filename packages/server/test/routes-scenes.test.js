@@ -218,7 +218,7 @@ test('a wrong-typed param is coerced to its default, and the response says so', 
     try {
         const created = await app.post('/api/scenes', { body: { layers: [{ effectType: 'emitter' }] } });
         const layerId = created.json.layers[0].id;
-        const res = await app.put('/api/scenes/' + created.json.id + '/layers/' + layerId, {
+        const res = await app.put(`/api/scenes/${created.json.id}/layers/${layerId}`, {
             body: { params: { x: 'left', y: 0.5 } },
         });
         assert.strictEqual(res.status, 200);
@@ -248,7 +248,7 @@ test('PUT /api/scenes/order takes a permutation and rejects anything else', asyn
 
         for (const body of [{ ids: ['s1'] }, { ids: ['s1', 's1'] }, { ids: ['s1', 'nope'] }, {}, { ids: 's1' }]) {
             assert.strictEqual((await app.put('/api/scenes/order', { body })).status, 400,
-                'expected 400 for ' + JSON.stringify(body));
+                `expected 400 for ${JSON.stringify(body)}`);
         }
         assert.strictEqual((await app.put('/api/scenes/order')).status, 400);
         // rejected whole, never applied in part
@@ -279,7 +279,7 @@ test('POST /api/scenes/import rejects every wrong shape with 400', async () => {
     try {
         for (const body of [{ version: 1, scenes: [] }, { version: 2 }, { version: 2, scenes: {} }, {}]) {
             assert.strictEqual((await app.post('/api/scenes/import', { body })).status, 400,
-                'expected 400 for ' + JSON.stringify(body));
+                `expected 400 for ${JSON.stringify(body)}`);
         }
         assert.strictEqual((await app.post('/api/scenes/import')).status, 400);
     } finally { await app.close(); }

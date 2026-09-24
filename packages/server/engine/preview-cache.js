@@ -14,9 +14,9 @@
  * cache of thumbnails.
  */
 
-var crypto = require('crypto');
-var { stripRuntime } = require('./scene-store');
-var filmstrip = require('./filmstrip');
+const crypto = require('crypto');
+const { stripRuntime } = require('./scene-store');
+const filmstrip = require('./filmstrip');
 
 function hashScene(scene) {
     return crypto.createHash('sha1')
@@ -38,19 +38,19 @@ class PreviewCache {
     // either would stall the panel, which is exactly the sort of hitch the
     // render loop exists to avoid.
     async get(scene) {
-        var hash = hashScene(scene);
-        var entry = this.entries.get(scene.id);
+        const hash = hashScene(scene);
+        let entry = this.entries.get(scene.id);
         if (!entry || entry.hash !== hash) {
-            var bytes = await filmstrip.renderFilmstripAsync(scene, this.model);
-            entry = { hash: hash, data: Buffer.from(bytes).toString('base64') };
+            const bytes = await filmstrip.renderFilmstripAsync(scene, this.model);
+            entry = { hash, data: Buffer.from(bytes).toString('base64') };
             this.entries.set(scene.id, entry);
         }
         return { id: scene.id, hash: entry.hash, data: entry.data };
     }
 
     async all(scenes) {
-        var out = [];
-        for (var i = 0; i < scenes.length; i++) {
+        const out = [];
+        for (let i = 0; i < scenes.length; i++) {
             out.push(await this.get(scenes[i]));
         }
         this.prune(scenes);
@@ -58,11 +58,10 @@ class PreviewCache {
     }
 
     prune(scenes) {
-        var live = Object.create(null);
-        scenes.forEach(function(s) { live[s.id] = true; });
-        var self = this;
-        this.entries.forEach(function(_entry, id) {
-            if (!live[id]) self.entries.delete(id);
+        const live = Object.create(null);
+        scenes.forEach((s) => { live[s.id] = true; });
+        this.entries.forEach((_entry, id) => {
+            if (!live[id]) this.entries.delete(id);
         });
     }
 }
@@ -81,9 +80,9 @@ class EffectPreviewCache {
     }
 
     async get(effect) {
-        var entry = this.entries.get(effect.type);
+        let entry = this.entries.get(effect.type);
         if (!entry) {
-            var bytes = await filmstrip.renderEffectFilmstripAsync(effect, this.model);
+            const bytes = await filmstrip.renderEffectFilmstripAsync(effect, this.model);
             entry = {
                 hash: crypto.createHash('sha1')
                     .update(JSON.stringify({ type: effect.type, defaults: effect.defaults }))
@@ -96,8 +95,8 @@ class EffectPreviewCache {
     }
 
     async all(effectModules) {
-        var out = [];
-        for (var i = 0; i < effectModules.length; i++) {
+        const out = [];
+        for (let i = 0; i < effectModules.length; i++) {
             out.push(await this.get(effectModules[i]));
         }
         return out;

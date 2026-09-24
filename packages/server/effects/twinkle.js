@@ -9,23 +9,23 @@
  * 240x240 distance loop to reproduce something this does in one pass.
  */
 
-var color = require('../engine/color');
+const color = require('../engine/color');
 
 // How many hues the spread is quantised into. The stars each hold a stable
 // per-pixel random already (the density lottery), so a LUT indexed by it keeps
 // the hot loop a table lookup and allocates nothing — the alternative was an
 // hsv() call per pixel per frame. 32 steps across a spread of 1 is ~11 degrees
 // of hue apart, finer than the eye separates at these brightnesses.
-var HUE_STEPS = 32;
+const HUE_STEPS = 32;
 
 function buildPalette(hex, spread) {
-    var base = color.hexToHsv(hex);
-    var lut = new Float32Array(HUE_STEPS * 3);
-    for (var i = 0; i < HUE_STEPS; i++) {
+    const base = color.hexToHsv(hex);
+    const lut = new Float32Array(HUE_STEPS * 3);
+    for (let i = 0; i < HUE_STEPS; i++) {
         // Symmetric about the chosen colour, so widening the spread does not
         // slide the average hue off the swatch.
-        var offset = spread * ((i / (HUE_STEPS - 1)) - 0.5);
-        var rgb = color.hsv(base.h + offset, base.s, base.v);
+        const offset = spread * ((i / (HUE_STEPS - 1)) - 0.5);
+        const rgb = color.hsv(base.h + offset, base.s, base.v);
         lut[i * 3] = rgb[0];
         lut[i * 3 + 1] = rgb[1];
         lut[i * 3 + 2] = rgb[2];
@@ -58,7 +58,7 @@ module.exports = {
     },
 
     prepare(params) {
-        var rgb = color.hexToRgb(params.color);
+        const rgb = color.hexToRgb(params.color);
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             // Only built when it would do something. A spread of 0 keeps the
@@ -82,11 +82,11 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var n = ctx.numPixels;
-        var phase = new Float32Array(n);
-        var period = new Float32Array(n);
-        var lottery = new Float32Array(n); // stable per-pixel random for density threshold
-        for (var i = 0; i < n; i++) {
+        const n = ctx.numPixels;
+        const phase = new Float32Array(n);
+        const period = new Float32Array(n);
+        const lottery = new Float32Array(n); // stable per-pixel random for density threshold
+        for (let i = 0; i < n; i++) {
             phase[i] = Math.random() * Math.PI * 2;
             period[i] = 1.5 + Math.random() * 4;
             lottery[i] = Math.random();
@@ -94,26 +94,26 @@ module.exports = {
 
         return {
             render(out, millis, p) {
-                var t = millis / 1000 * p.speed;
-                var lut = p.palette;
-                for (var i = 0; i < n; i++) {
-                    var level = p.background;
+                const t = millis / 1000 * p.speed;
+                const lut = p.palette;
+                for (let i = 0; i < n; i++) {
+                    let level = p.background;
                     if (lottery[i] < p.density) {
-                        var s = Math.sin(phase[i] + t * Math.PI * 2 / period[i]);
+                        const s = Math.sin(phase[i] + t * Math.PI * 2 / period[i]);
                         // Sharpen so pixels are dark most of the cycle.
                         // Math.pow is the price of a per-layer exponent,
                         // paid only on the lit pixels.
                         if (s > 0) level += p.swell * Math.pow(s, p.sharpness);
                     }
 
-                    var r = p.r, g = p.g, b = p.b;
+                    let r = p.r, g = p.g, b = p.b;
                     if (lut) {
                         // Reuses the density lottery as the hue draw. The two
                         // are correlated as a result — a star's colour is tied
                         // to how likely it was to be lit at all — but the
                         // lottery is uniform, so the hues still come out evenly
                         // spread across whichever stars are taking part.
-                        var li = (lottery[i] * HUE_STEPS) | 0;
+                        let li = (lottery[i] * HUE_STEPS) | 0;
                         if (li >= HUE_STEPS) li = HUE_STEPS - 1;
                         r = lut[li * 3];
                         g = lut[li * 3 + 1];

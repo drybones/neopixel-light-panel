@@ -34,9 +34,9 @@
  * subscribe messages in, so there is nothing there to change.
  */
 
-var cors = require('cors');
+const cors = require('cors');
 
-var SAFE_METHODS = { GET: true, HEAD: true, OPTIONS: true };
+const SAFE_METHODS = { GET: true, HEAD: true, OPTIONS: true };
 
 // Same-origin means the Origin names the host the request was sent to. The
 // port is part of `host`, so the dev server on 3002 is not same-origin with
@@ -52,11 +52,11 @@ function isSameOrigin(origin, req) {
 }
 
 function createOriginGuard(options) {
-    var allowed = (options && options.allowedOrigins) || [];
-    var corsMiddleware = allowed.length ? cors({ origin: allowed }) : null;
+    const allowed = (options && options.allowedOrigins) || [];
+    const corsMiddleware = allowed.length ? cors({ origin: allowed }) : null;
 
     return function originGuard(req, res, next) {
-        var origin = req.headers.origin;
+        const origin = req.headers.origin;
         if (origin && !SAFE_METHODS[req.method]
             && allowed.indexOf(origin) === -1 && !isSameOrigin(origin, req)) {
             return res.status(403).json({ error: 'Cross-origin request refused' });

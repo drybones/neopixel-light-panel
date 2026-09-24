@@ -63,8 +63,8 @@ test('flush() writes synchronously, so it works from an exit handler', () => {
 test('a failed write stays dirty and is retried on the next flush', (t) => {
     const file = tmpFile();
     // A path under a regular file: mkdir cannot make that a directory.
-    fs.writeFileSync(file + '.blocker', '');
-    const doc = new Counter(path.join(file + '.blocker', 'doc.json'));
+    fs.writeFileSync(`${file}.blocker`, '');
+    const doc = new Counter(path.join(`${file}.blocker`, 'doc.json'));
     t.mock.method(console, 'error', () => {});
     doc.bump();
     doc.flush();

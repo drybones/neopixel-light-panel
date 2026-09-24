@@ -3,7 +3,7 @@
  * and opc.js (hsv static) so effects don't depend on the OPC classes.
  */
 
-var WHITE = { r: 255, g: 255, b: 255 };
+const WHITE = { r: 255, g: 255, b: 255 };
 
 // http://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
 //
@@ -11,9 +11,9 @@ var WHITE = { r: 255, g: 255, b: 255 };
 // otherwise — right for ink, wrong for a ground, which is why text.js passes
 // black for its background.
 function hexToRgb(hex, fallback) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (!result) {
-        var f = fallback || WHITE;
+        const f = fallback || WHITE;
         return { r: f.r, g: f.g, b: f.b };
     }
     return {
@@ -48,12 +48,12 @@ function hsvInto(out, h, s, v) {
     h = (h % 1) * 6;
     if (h < 0) h += 6;
 
-    var i = h | 0,
-        f = h - i,
-        p = v * (1 - s),
-        q = v * (1 - f * s),
-        t = v * (1 - (1 - f) * s),
-        r, g, b;
+    const i = h | 0;
+    const f = h - i;
+    const p = v * (1 - s);
+    const q = v * (1 - f * s);
+    const t = v * (1 - (1 - f) * s);
+    let r, g, b;
 
     switch (i) {
         case 0: r = v; g = t; b = p; break;
@@ -85,12 +85,12 @@ function hsv(h, s, v) {
  * rather than swinging through a ramp the user never asked for.
  */
 function rgbToHsv(r, g, b) {
-    var rn = r / 255, gn = g / 255, bn = b / 255;
-    var max = Math.max(rn, gn, bn);
-    var min = Math.min(rn, gn, bn);
-    var d = max - min;
+    const rn = r / 255, gn = g / 255, bn = b / 255;
+    const max = Math.max(rn, gn, bn);
+    const min = Math.min(rn, gn, bn);
+    const d = max - min;
 
-    var h = 0;
+    let h = 0;
     if (d > 0) {
         if (max === rn) {
             h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
@@ -101,11 +101,11 @@ function rgbToHsv(r, g, b) {
         }
     }
 
-    return { h: h, s: max > 0 ? d / max : 0, v: max };
+    return { h, s: max > 0 ? d / max : 0, v: max };
 }
 
 function hexToHsv(hex) {
-    var rgb = hexToRgb(hex);
+    const rgb = hexToRgb(hex);
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
 }
 

@@ -13,9 +13,9 @@
  * of those are log sliders, which cannot express a negative at all.
  */
 
-var color = require('../engine/color');
-var panel = require('../engine/panel');
-var wave = require('../engine/wave');
+const color = require('../engine/color');
+const panel = require('../engine/panel');
+const wave = require('../engine/wave');
 
 module.exports = {
     type: 'wavelet',
@@ -52,7 +52,7 @@ module.exports = {
     },
 
     prepare(params) {
-        var rgb = color.hexToRgb(params.color);
+        const rgb = color.hexToRgb(params.color);
         // 1/lambda with the travel direction's sign baked in, so the render
         // loop is a multiply and neither branches nor divides. Anything but
         // 'inward' reads as outward — the default for a layer with no stored
@@ -61,11 +61,11 @@ module.exports = {
         // A lambda of 0 would divide to Infinity and put NaN in the pixel
         // buffer and out through setPixel; the slider can't reach 0, but the
         // typed field is deliberately unclamped.
-        var k = (params.direction === 'inward' ? -1 : 1) / (params.lambda || wave.MIN_LAMBDA);
+        const k = (params.direction === 'inward' ? -1 : 1) / (params.lambda || wave.MIN_LAMBDA);
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
-            k: k,
+            k,
             delta: params.delta,
             x: params.x,
             y: params.y,
@@ -75,17 +75,17 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var modelX = ctx.modelX;
-        var modelZ = ctx.modelZ;
-        var n = ctx.numPixels;
+        const modelX = ctx.modelX;
+        const modelZ = ctx.modelZ;
+        const n = ctx.numPixels;
 
         return {
             render(out, millis, p) {
-                var phase = wave.phase(millis, p);
-                for (var i = 0; i < n; i++) {
-                    var dx = modelX[i] - p.x;
-                    var dz = modelZ[i] + p.y;
-                    var r = Math.sqrt(dx * dx + dz * dz);
+                const phase = wave.phase(millis, p);
+                for (let i = 0; i < n; i++) {
+                    const dx = modelX[i] - p.x;
+                    const dz = modelZ[i] + p.y;
+                    const r = Math.sqrt(dx * dx + dz * dz);
                     wave.shade(out, i, phase - r * p.k, p);
                 }
             }

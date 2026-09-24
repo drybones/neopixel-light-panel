@@ -19,16 +19,16 @@
  * Outward is new — the effect this replaced only ever scrolled inward.
  */
 
-var panel = require('../engine/panel');
-var gradientLut = require('../engine/gradient-lut');
+const panel = require('../engine/panel');
+const gradientLut = require('../engine/gradient-lut');
 
-var LUT_SIZE = gradientLut.LUT_SIZE;
-var MAX_RADIUS = panel.RADIUS;
+const LUT_SIZE = gradientLut.LUT_SIZE;
+const MAX_RADIUS = panel.RADIUS;
 
 // Divided into dx below, so a 0 would put Infinity and then NaN in the pixel
 // buffer and out through setPixel. The slider cannot reach 0 but the typed
 // field is deliberately unclamped — the same guard as engine/wave's MIN_LAMBDA.
-var MIN_ASPECT = 1e-6;
+const MIN_ASPECT = 1e-6;
 
 module.exports = {
     type: 'gradient_radial',
@@ -95,27 +95,27 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var modelX = ctx.modelX;
-        var modelZ = ctx.modelZ;
-        var n = ctx.numPixels;
+        const modelX = ctx.modelX;
+        const modelZ = ctx.modelZ;
+        const n = ctx.numPixels;
 
         return {
             render(out, millis, p) {
-                var t = millis / 1000;
-                var lut = p.lut;
-                var tiling = p.tiling;
-                var invAspect = 1 / p.aspect;
-                var scale = p.repeats / MAX_RADIUS;
-                var offset = p.phase + p.scroll * t;
+                const t = millis / 1000;
+                const lut = p.lut;
+                const tiling = p.tiling;
+                const invAspect = 1 / p.aspect;
+                const scale = p.repeats / MAX_RADIUS;
+                const offset = p.phase + p.scroll * t;
 
-                for (var i = 0; i < n; i++) {
-                    var dx = (modelX[i] - p.cx) * invAspect;
+                for (let i = 0; i < n; i++) {
+                    const dx = (modelX[i] - p.cx) * invAspect;
                     // The pad draws +y up and modelZ runs the other way; this
                     // is the same negation wavelet spells as dz = modelZ + y.
-                    var dz = modelZ[i] + p.cy;
-                    var r = Math.sqrt(dx * dx + dz * dz);
-                    var u = gradientLut.tile(r * scale + offset, tiling);
-                    var li = (u * (LUT_SIZE - 1)) | 0;
+                    const dz = modelZ[i] + p.cy;
+                    const r = Math.sqrt(dx * dx + dz * dz);
+                    const u = gradientLut.tile(r * scale + offset, tiling);
+                    const li = (u * (LUT_SIZE - 1)) | 0;
                     out[i * 3] = lut[li * 3];
                     out[i * 3 + 1] = lut[li * 3 + 1];
                     out[i * 3 + 2] = lut[li * 3 + 2];

@@ -11,16 +11,16 @@
  * Document shape: { version: 2, activeSceneId, scenes: [...] }
  */
 
-var crypto = require('crypto');
-var fs = require('fs');
-var path = require('path');
-var effects = require('../effects');
-var compositorMod = require('./compositor');
-var jsonStore = require('./json-store');
-var { DebouncedDoc } = require('./debounced-doc');
-var { coerceParams, finiteNumber, isPlainObject } = require('./params');
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const effects = require('../effects');
+const compositorMod = require('./compositor');
+const jsonStore = require('./json-store');
+const { DebouncedDoc } = require('./debounced-doc');
+const { coerceParams, finiteNumber, isPlainObject } = require('./params');
 
-var SAVE_DEBOUNCE_MS = 2000;
+const SAVE_DEBOUNCE_MS = 2000;
 
 // The curated starting library, in the same {version: 2, scenes: [...]} shape
 // as an export. It lives in the *source tree*, not under data/: it is code —
@@ -28,14 +28,14 @@ var SAVE_DEBOUNCE_MS = 2000;
 // gitignored and owned by whatever is running there. One file feeds both the
 // fresh-install seed and resetToDefaults(), so "what a new panel looks like"
 // has a single definition.
-var DEFAULTS_FILE = path.join(__dirname, '..', 'default-scenes.json');
+const DEFAULTS_FILE = path.join(__dirname, '..', 'default-scenes.json');
 
 function newId() {
     return crypto.randomUUID().split('-')[0];
 }
 
 function warn(msg) {
-    console.warn('Scene store: ' + msg);
+    console.warn(`Scene store: ${msg}`);
 }
 
 // A refused write, in the http-errors shape (err.status) that routes/errors.js
@@ -43,7 +43,7 @@ function warn(msg) {
 // inside a good shape is coerced instead (engine/params). Always thrown before
 // the store is touched.
 function rejected(message) {
-    var err = new Error(message);
+    const err = new Error(message);
     err.status = 400;
     return err;
 }
@@ -63,14 +63,14 @@ function idOf(v) {
 // which is what makes resetting twice idempotent and a merging import of a
 // defaults file update rather than duplicate.
 function defaultScenes() {
-    var doc;
+    let doc;
     try {
         doc = JSON.parse(fs.readFileSync(DEFAULTS_FILE, 'utf8'));
     } catch (err) {
-        throw new Error('Cannot read the default scene set at ' + DEFAULTS_FILE + ': ' + err.message);
+        throw new Error(`Cannot read the default scene set at ${DEFAULTS_FILE}: ${err.message}`, { cause: err });
     }
     if (!doc || !Array.isArray(doc.scenes)) {
-        throw new Error('The default scene set at ' + DEFAULTS_FILE + ' is not {version: 2, scenes: [...]}');
+        throw new Error(`The default scene set at ${DEFAULTS_FILE} is not {version: 2, scenes: [...]}`);
     }
     return doc.scenes;
 }
@@ -100,14 +100,14 @@ function stripRuntime(scene) {
 // effect's schema; a layer whose effectType has no module keeps its params as
 // they are, and renders nothing (see the compositor).
 function normaliseLayer(layer) {
-    var effect = effects.get(layer.effectType);
-    var given = isPlainObject(layer.params) ? layer.params : {};
-    var opacity = finiteNumber(layer.opacity);
+    const effect = effects.get(layer.effectType);
+    const given = isPlainObject(layer.params) ? layer.params : {};
+    const opacity = finiteNumber(layer.opacity);
     return {
         id: idOf(layer.id),
         effectType: layer.effectType,
         params: effect ? coerceParams(effect, given) : Object.assign({}, given),
-        blendMode: Object.prototype.hasOwnProperty.call(compositorMod.BLEND, layer.blendMode) ? layer.blendMode : 'normal',
+        blendMode: Object.hasOwn(compositorMod.BLEND, layer.blendMode) ? layer.blendMode : 'normal',
         opacity: opacity === undefined ? 1 : Math.min(1, Math.max(0, opacity)),
         enabled: layer.enabled !== false,
         solo: !!layer.solo,
@@ -128,7 +128,7 @@ function prepareLayer(effect, layer) {
     try {
         return effect.prepare(layer.params);
     } catch (err) {
-        warn('layer ' + layer.id + ' (' + layer.effectType + ') failed to prepare, rendering its defaults: ' + err.message);
+        warn(`layer ${layer.id} (${layer.effectType}) failed to prepare, rendering its defaults: ${err.message}`);
         return effect.prepare(effect.defaults);
     }
 }
@@ -138,12 +138,12 @@ function prepareLayer(effect, layer) {
 // and prepare its whole result first and only then commit it: anything that
 // throws, throws before the library or the compositor has changed.
 function prepareScene(scene) {
-    var soloed = scene.layers.filter(function(l) { return l.solo && l.enabled; });
+    const soloed = scene.layers.filter((l) => l.solo && l.enabled);
     scene._displayLayers = soloed.length > 0
         ? soloed
-        : scene.layers.filter(function(l) { return l.enabled; });
-    scene.layers.forEach(function(l) {
-        var effect = effects.get(l.effectType);
+        : scene.layers.filter((l) => l.enabled);
+    scene.layers.forEach((l) => {
+        const effect = effects.get(l.effectType);
         l._prepared = effect ? prepareLayer(effect, l) : {};
         l._blend = compositorMod.BLEND[l.blendMode] || 0;
     });
@@ -174,12 +174,11 @@ class SceneStore extends DebouncedDoc {
     // the *incoming* layer a fresh id, never one already in the library.
     // `seen` accumulates, so duplicates within one write are caught as well.
     adoptLayers(rawLayers, seen) {
-        var self = this;
-        return (Array.isArray(rawLayers) ? rawLayers : []).filter(isPlainObject).map(function(raw) {
-            var layer = normaliseLayer(raw);
+        return (Array.isArray(rawLayers) ? rawLayers : []).filter(isPlainObject).map((raw) => {
+            const layer = normaliseLayer(raw);
             if (seen[layer.id]) {
                 layer.id = newId();
-                self._dirty = true;         // load() persists a repair it made
+                this._dirty = true;         // load() persists a repair it made
             }
             seen[layer.id] = true;
             return layer;
@@ -189,10 +188,10 @@ class SceneStore extends DebouncedDoc {
     // Every layer id in the library, bar the scenes a write is about to
     // replace — their ids are the write's to reuse.
     layerIdsExcept(sceneIds) {
-        var seen = Object.create(null);
-        this.scenes.forEach(function(s) {
+        const seen = Object.create(null);
+        this.scenes.forEach((s) => {
             if (sceneIds && sceneIds.indexOf(s.id) !== -1) return;
-            s.layers.forEach(function(l) { seen[l.id] = true; });
+            s.layers.forEach((l) => { seen[l.id] = true; });
         });
         return seen;
     }
@@ -200,13 +199,12 @@ class SceneStore extends DebouncedDoc {
     // A whole library from raw scenes, normalised and prepared but not yet
     // committed or synced.
     buildLibrary(rawScenes) {
-        var self = this;
-        var seen = Object.create(null);
-        return rawScenes.filter(isPlainObject).map(function(s) {
-            var scene = {
+        const seen = Object.create(null);
+        return rawScenes.filter(isPlainObject).map((s) => {
+            const scene = {
                 id: idOf(s.id),
                 name: s.name ? String(s.name) : 'Untitled',
-                layers: self.adoptLayers(s.layers, seen),
+                layers: this.adoptLayers(s.layers, seen),
             };
             prepareScene(scene);
             return scene;
@@ -214,9 +212,8 @@ class SceneStore extends DebouncedDoc {
     }
 
     commitLibrary(scenes) {
-        var self = this;
         this.scenes = scenes;
-        scenes.forEach(function(s) { self.compositor.syncScene(s); });
+        scenes.forEach((s) => { this.compositor.syncScene(s); });
     }
 
     // ---- persistence ----
@@ -230,7 +227,7 @@ class SceneStore extends DebouncedDoc {
     }
 
     load() {
-        var doc = this.persistFile ? jsonStore.load(this.persistFile, warn) : null;
+        const doc = this.persistFile ? jsonStore.load(this.persistFile, warn) : null;
         // Array.isArray, not `.length` — an *empty* scenes array is someone
         // who deleted their library, not a fresh install. Only the absence
         // of a usable scenes key means "seed the defaults." This is what
@@ -258,17 +255,15 @@ class SceneStore extends DebouncedDoc {
     // ---- queries ----
 
     list() {
-        return this.scenes.map(function(s) {
-            return { id: s.id, name: s.name, layerCount: s.layers.length };
-        });
+        return this.scenes.map((s) => ({ id: s.id, name: s.name, layerCount: s.layers.length }));
     }
 
     get(id) {
-        return this.scenes.find(function(s) { return s.id === id; }) || null;
+        return this.scenes.find((s) => s.id === id) || null;
     }
 
     getPublic(id) {
-        var scene = this.get(id);
+        const scene = this.get(id);
         return scene ? stripRuntime(scene) : null;
     }
 
@@ -281,7 +276,7 @@ class SceneStore extends DebouncedDoc {
     create(raw) {
         raw = isPlainObject(raw) ? raw : {};
         checkLayers(raw.layers);
-        var scene = {
+        const scene = {
             id: newId(),
             name: raw.name ? String(raw.name) : 'New scene',
             layers: this.adoptLayers(raw.layers, this.layerIdsExcept(null)),
@@ -293,19 +288,19 @@ class SceneStore extends DebouncedDoc {
     }
 
     replace(id, raw) {
-        var index = this.scenes.findIndex(function(s) { return s.id === id; });
+        const index = this.scenes.findIndex((s) => s.id === id);
         if (index === -1) return null;
         if (!isPlainObject(raw)) throw rejected('Body must be a scene object');
         checkLayers(raw.layers);
-        var old = this.scenes[index];
-        var scene = {
-            id: id,
+        const old = this.scenes[index];
+        const scene = {
+            id,
             name: raw.name !== undefined ? String(raw.name) : old.name,
             layers: this.adoptLayers(raw.layers, this.layerIdsExcept([id])),
         };
-        var removed = old.layers
-            .filter(function(l) { return !scene.layers.some(function(nl) { return nl.id === l.id; }); })
-            .map(function(l) { return l.id; });
+        const removed = old.layers
+            .filter((l) => !scene.layers.some((nl) => nl.id === l.id))
+            .map((l) => l.id);
         this.preprocess(scene);
         this.scenes[index] = scene;
         this.compositor.releaseLayers(removed);
@@ -324,20 +319,20 @@ class SceneStore extends DebouncedDoc {
     // Validate-then-commit, like replace(): the new scene is built and
     // prepared off to the side and swapped in only once that has succeeded.
     replaceLayer(sceneId, layerId, raw) {
-        var sceneIndex = this.scenes.findIndex(function(s) { return s.id === sceneId; });
+        const sceneIndex = this.scenes.findIndex((s) => s.id === sceneId);
         if (sceneIndex === -1) return null;
-        var scene = this.scenes[sceneIndex];
-        var index = scene.layers.findIndex(function(l) { return l.id === layerId; });
+        const scene = this.scenes[sceneIndex];
+        const index = scene.layers.findIndex((l) => l.id === layerId);
         if (index === -1) return null;
 
-        var old = scene.layers[index];
+        const old = scene.layers[index];
         if (!isPlainObject(raw)) throw rejected('Body must be a layer object');
         if (raw.params !== undefined && !isPlainObject(raw.params)) throw rejected('params must be an object');
         if (raw.effectType !== undefined && raw.effectType !== old.effectType) {
-            throw rejected('effectType cannot change through a layer PUT (this layer is "' + old.effectType + '"); PUT the whole scene instead');
+            throw rejected(`effectType cannot change through a layer PUT (this layer is "${old.effectType}"); PUT the whole scene instead`);
         }
 
-        var next = { id: scene.id, name: scene.name, layers: scene.layers.slice() };
+        const next = { id: scene.id, name: scene.name, layers: scene.layers.slice() };
         next.layers[index] = normaliseLayer(Object.assign({}, stripLayer(old), raw, {
             id: layerId,
             params: Object.assign({}, old.params, raw.params),
@@ -349,10 +344,10 @@ class SceneStore extends DebouncedDoc {
     }
 
     remove(id) {
-        var index = this.scenes.findIndex(function(s) { return s.id === id; });
+        const index = this.scenes.findIndex((s) => s.id === id);
         if (index === -1) return false;
-        var removed = this.scenes.splice(index, 1)[0];
-        this.compositor.releaseLayers(removed.layers.map(function(l) { return l.id; }));
+        const removed = this.scenes.splice(index, 1)[0];
+        this.compositor.releaseLayers(removed.layers.map((l) => l.id));
         if (this.activeSceneId === id) this.activeSceneId = null;
         this.markDirty();
         return true;
@@ -364,9 +359,9 @@ class SceneStore extends DebouncedDoc {
     // leaks an instance, permanently. Always called *before* the replacement
     // is synced, or it releases the instances just created.
     releaseAllLayers() {
-        var ids = [];
-        this.scenes.forEach(function(s) {
-            s.layers.forEach(function(l) { ids.push(l.id); });
+        const ids = [];
+        this.scenes.forEach((s) => {
+            s.layers.forEach((l) => { ids.push(l.id); });
         });
         this.compositor.releaseLayers(ids);
     }
@@ -387,7 +382,7 @@ class SceneStore extends DebouncedDoc {
     // library holding edited copies is the confusing case, where some scenes
     // revert and others don't depending on whether their ids happen to match.
     resetToDefaults() {
-        var scenes = this.buildLibrary(defaultScenes());
+        const scenes = this.buildLibrary(defaultScenes());
         this.releaseAllLayers();
         this.commitLibrary(scenes);
         this.activeSceneId = null;
@@ -403,8 +398,8 @@ class SceneStore extends DebouncedDoc {
     // old library is still whole — the route's promise that a rejected body
     // leaves it exactly as it was.
     importReplace(rawScenes) {
-        var scenes = this.buildLibrary(rawScenes);
-        var wasActive = this.activeSceneId;
+        const scenes = this.buildLibrary(rawScenes);
+        const wasActive = this.activeSceneId;
         this.releaseAllLayers();
         this.commitLibrary(scenes);
         this.activeSceneId = (wasActive && this.get(wasActive)) ? wasActive : null;
@@ -418,11 +413,11 @@ class SceneStore extends DebouncedDoc {
     // request that doesn't is rejected whole rather than applied in part.
     reorder(ids) {
         if (!Array.isArray(ids) || ids.length !== this.scenes.length) return false;
-        var byId = Object.create(null);
-        this.scenes.forEach(function(s) { byId[s.id] = s; });
-        var ordered = [];
-        for (var i = 0; i < ids.length; i++) {
-            var scene = byId[ids[i]];
+        const byId = Object.create(null);
+        this.scenes.forEach((s) => { byId[s.id] = s; });
+        const ordered = [];
+        for (let i = 0; i < ids.length; i++) {
+            const scene = byId[ids[i]];
             if (!scene) return false;       // unknown id, or the same id twice
             delete byId[ids[i]];
             ordered.push(scene);
@@ -456,32 +451,31 @@ class SceneStore extends DebouncedDoc {
     // no longer has. "No longer has" is checked against everything incoming,
     // not just its own replacement: another incoming scene may carry the id.
     importMerge(rawScenes) {
-        var self = this;
-        var incoming = rawScenes.filter(function(s) { return isPlainObject(s) && s.id; });
-        var seen = this.layerIdsExcept(incoming.map(function(s) { return idOf(s.id); }));
-        var built = incoming.map(function(raw) {
-            var scene = {
+        const incoming = rawScenes.filter((s) => isPlainObject(s) && s.id);
+        const seen = this.layerIdsExcept(incoming.map((s) => idOf(s.id)));
+        const built = incoming.map((raw) => {
+            const scene = {
                 id: idOf(raw.id),
                 name: raw.name ? String(raw.name) : 'Untitled',
-                layers: self.adoptLayers(raw.layers, seen),
+                layers: this.adoptLayers(raw.layers, seen),
             };
             prepareScene(scene);
             return scene;
         });
 
-        var released = [];
-        built.forEach(function(scene) {
-            var old = self.get(scene.id);
+        const released = [];
+        built.forEach((scene) => {
+            const old = this.get(scene.id);
             if (!old) return;
-            old.layers.forEach(function(l) { if (!seen[l.id]) released.push(l.id); });
+            old.layers.forEach((l) => { if (!seen[l.id]) released.push(l.id); });
         });
         this.compositor.releaseLayers(released);
 
-        built.forEach(function(scene) {
-            var index = self.scenes.findIndex(function(s) { return s.id === scene.id; });
-            if (index !== -1) self.scenes[index] = scene;
-            else self.scenes.push(scene);
-            self.compositor.syncScene(scene);
+        built.forEach((scene) => {
+            const index = this.scenes.findIndex((s) => s.id === scene.id);
+            if (index !== -1) this.scenes[index] = scene;
+            else this.scenes.push(scene);
+            this.compositor.syncScene(scene);
         });
         this.markDirty();
     }

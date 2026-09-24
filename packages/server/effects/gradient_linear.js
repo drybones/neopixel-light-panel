@@ -22,11 +22,11 @@
  * dial draws +y up.
  */
 
-var panel = require('../engine/panel');
-var gradientLut = require('../engine/gradient-lut');
+const panel = require('../engine/panel');
+const gradientLut = require('../engine/gradient-lut');
 
-var LUT_SIZE = gradientLut.LUT_SIZE;
-var HALF_X = panel.HALF_X;
+const LUT_SIZE = gradientLut.LUT_SIZE;
+const HALF_X = panel.HALF_X;
 
 module.exports = {
     type: 'gradient_linear',
@@ -86,27 +86,27 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var modelX = ctx.modelX;
-        var modelZ = ctx.modelZ;
-        var n = ctx.numPixels;
+        const modelX = ctx.modelX;
+        const modelZ = ctx.modelZ;
+        const n = ctx.numPixels;
 
         return {
             render(out, millis, p) {
-                var t = millis / 1000;
-                var lut = p.lut;
-                var tiling = p.tiling;
-                var angle = p.angle + p.spin * t * Math.PI * 2;
-                var ca = Math.cos(angle), sa = Math.sin(angle);
+                const t = millis / 1000;
+                const lut = p.lut;
+                const tiling = p.tiling;
+                const angle = p.angle + p.spin * t * Math.PI * 2;
+                const ca = Math.cos(angle), sa = Math.sin(angle);
                 // Everything constant across the panel, hoisted: the offset is
                 // 0.5 (the ramp's centre on the panel's centre) plus the static
                 // phase, minus the distance scrolled.
-                var scale = p.repeats / (2 * HALF_X);
-                var offset = 0.5 + p.phase - p.scroll * t;
+                const scale = p.repeats / (2 * HALF_X);
+                const offset = 0.5 + p.phase - p.scroll * t;
 
-                for (var i = 0; i < n; i++) {
-                    var proj = modelX[i] * ca - modelZ[i] * sa;
-                    var u = gradientLut.tile(proj * scale + offset, tiling);
-                    var li = (u * (LUT_SIZE - 1)) | 0;
+                for (let i = 0; i < n; i++) {
+                    const proj = modelX[i] * ca - modelZ[i] * sa;
+                    const u = gradientLut.tile(proj * scale + offset, tiling);
+                    const li = (u * (LUT_SIZE - 1)) | 0;
                     out[i * 3] = lut[li * 3];
                     out[i * 3 + 1] = lut[li * 3 + 1];
                     out[i * 3 + 2] = lut[li * 3 + 2];

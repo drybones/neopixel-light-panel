@@ -18,8 +18,8 @@
  * (syncScene), keyed by layer id; the per-frame path is allocation-free.
  */
 
-var effects = require('../effects');
-var clamp255 = require('./color').clamp255;
+const effects = require('../effects');
+const clamp255 = require('./color').clamp255;
 
 /*
  * The rule every mode obeys:
@@ -82,7 +82,7 @@ var clamp255 = require('./color').clamp255;
 // stack rather than by id: the ones that only add light, the ones that only
 // remove it, then the ones that go both ways. `id` is what blendInto switches
 // on, so it is fixed per mode and never renumbered; the order is free.
-var BLEND_MODES = [
+const BLEND_MODES = [
     { value: 'normal', label: 'Normal', id: 0 },
     { value: 'add', label: 'Add', id: 1 },
     { value: 'screen', label: 'Screen', id: 3 },
@@ -96,34 +96,34 @@ var BLEND_MODES = [
     { value: 'linear_light', label: 'Linear Light', id: 10 },
 ];
 
-var BLEND = {};
-BLEND_MODES.forEach(function(m) { BLEND[m.value] = m.id; });
+const BLEND = {};
+BLEND_MODES.forEach((m) => { BLEND[m.value] = m.id; });
 
 function blendInto(dst, src, mode, opacity, n) {
-    for (var i = 0; i < n * 3; i++) {
-        var a = dst[i];
-        var b = src[i];
-        var o;
+    for (let i = 0; i < n * 3; i++) {
+        const a = dst[i];
+        const b = src[i];
+        let o;
         switch (mode) {
             case 1:
                 o = a + b * opacity;
                 break;
             case 2: {
-                var bn = clamp255(b);
+                const bn = clamp255(b);
                 o = a + (a * bn / 255 - a) * opacity;
                 break;
             }
             case 3: {
-                var an3 = clamp255(a);
-                var bn3 = clamp255(b);
-                var s = 255 - (255 - an3) * (255 - bn3) / 255;
+                const an3 = clamp255(a);
+                const bn3 = clamp255(b);
+                const s = 255 - (255 - an3) * (255 - bn3) / 255;
                 o = a + (s - an3) * opacity;
                 break;
             }
             case 4: {
-                var an4 = clamp255(a);
-                var bn4 = clamp255(b);
-                var v = an4 < 128
+                const an4 = clamp255(a);
+                const bn4 = clamp255(b);
+                const v = an4 < 128
                     ? 2 * an4 * bn4 / 255
                     : 255 - 2 * (255 - an4) * (255 - bn4) / 255;
                 o = a + (v - an4) * opacity;
@@ -141,21 +141,21 @@ function blendInto(dst, src, mode, opacity, n) {
             // Against white this is an invert — the cheapest mask available
             // here, and the reason the mode earns its case.
             case 6: {
-                var an6 = clamp255(a);
-                var bn6 = clamp255(b);
-                var d = an6 - bn6;
+                const an6 = clamp255(a);
+                const bn6 = clamp255(b);
+                const d = an6 - bn6;
                 o = a + ((d < 0 ? -d : d) - an6) * opacity;
                 break;
             }
             case 7: {
-                var an7 = clamp255(a);
-                var bn7 = clamp255(b);
+                const an7 = clamp255(a);
+                const bn7 = clamp255(b);
                 o = a + ((an7 > bn7 ? an7 : bn7) - an7) * opacity;
                 break;
             }
             case 8: {
-                var an8 = clamp255(a);
-                var bn8 = clamp255(b);
+                const an8 = clamp255(a);
+                const bn8 = clamp255(b);
                 o = a + ((an8 < bn8 ? an8 : bn8) - an8) * opacity;
                 break;
             }
@@ -167,9 +167,9 @@ function blendInto(dst, src, mode, opacity, n) {
             // mid-grey pivot. Mid-grey is exactly identity, black squares the
             // backdrop and white is its complement.
             case 9: {
-                var an9 = clamp255(a);
-                var bn9 = clamp255(b);
-                var sl = (an9 * an9 * (255 - 2 * bn9) / 255 + 2 * an9 * bn9) / 255;
+                const an9 = clamp255(a);
+                const bn9 = clamp255(b);
+                const sl = (an9 * an9 * (255 - 2 * bn9) / 255 + 2 * an9 * bn9) / 255;
                 o = a + (sl - an9) * opacity;
                 break;
             }
@@ -186,7 +186,7 @@ function blendInto(dst, src, mode, opacity, n) {
             // only the source — the exact mirror of add and subtract, with a
             // mid-grey pivot instead of a black one.
             case 10: {
-                var bn10 = clamp255(b);
+                const bn10 = clamp255(b);
                 o = a + (2 * bn10 - 255) * opacity;
                 break;
             }
@@ -209,7 +209,7 @@ class Compositor {
             modelX: new Float32Array(this.numPixels),
             modelZ: new Float32Array(this.numPixels),
         };
-        for (var i = 0; i < this.numPixels; i++) {
+        for (let i = 0; i < this.numPixels; i++) {
             this.ctx.modelX[i] = model[i].point[0];
             this.ctx.modelZ[i] = model[i].point[2];
         }
@@ -221,15 +221,14 @@ class Compositor {
     // Write-path: make sure every layer in the scene has a buffer and an
     // effect instance; drop state for layers that no longer exist anywhere.
     syncScene(scene) {
-        var self = this;
-        (scene.layers || []).forEach(function(layer) {
-            var entry = self.layers.get(layer.id);
+        (scene.layers || []).forEach((layer) => {
+            const entry = this.layers.get(layer.id);
             if (!entry || entry.effectType !== layer.effectType) {
-                var effect = effects.get(layer.effectType);
+                const effect = effects.get(layer.effectType);
                 if (!effect) return;
-                self.layers.set(layer.id, {
-                    buffer: new Float32Array(self.numPixels * 3),
-                    instance: effect.createInstance(self.ctx),
+                this.layers.set(layer.id, {
+                    buffer: new Float32Array(this.numPixels * 3),
+                    instance: effect.createInstance(this.ctx),
                     effectType: layer.effectType,
                 });
             }
@@ -237,20 +236,19 @@ class Compositor {
     }
 
     releaseLayers(layerIds) {
-        var self = this;
-        layerIds.forEach(function(id) { self.layers.delete(id); });
+        layerIds.forEach((id) => { this.layers.delete(id); });
     }
 
     // Draw-path: renders scene into this.composite and writes to the client.
     // scene._displayLayers is precomputed on the write path (enabled/solo filter).
     renderFrame(scene, millis) {
-        var display = scene._displayLayers || scene.layers;
-        var comp = this.composite;
+        const display = scene._displayLayers || scene.layers;
+        const comp = this.composite;
         comp.fill(0);
 
-        for (var li = 0; li < display.length; li++) {
-            var layer = display[li];
-            var entry = this.layers.get(layer.id);
+        for (let li = 0; li < display.length; li++) {
+            const layer = display[li];
+            const entry = this.layers.get(layer.id);
             // A stale entry means some other scene claimed this layer id and
             // syncScene swapped the instance underneath us. Skipping loses one
             // layer; rendering would feed the wrong params in and push NaN to
@@ -269,15 +267,15 @@ class Compositor {
     }
 
     writeComposite() {
-        var comp = this.composite;
-        for (var i = 0; i < this.numPixels; i++) {
+        const comp = this.composite;
+        for (let i = 0; i < this.numPixels; i++) {
             this.client.setPixel(i, comp[i * 3], comp[i * 3 + 1], comp[i * 3 + 2]);
         }
         this.client.writePixels();
     }
 
     getLayerBuffer(layerId) {
-        var entry = this.layers.get(layerId);
+        const entry = this.layers.get(layerId);
         return entry ? entry.buffer : null;
     }
 }

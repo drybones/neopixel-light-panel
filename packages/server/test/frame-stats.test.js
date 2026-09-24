@@ -6,19 +6,19 @@ const { FrameStats, RESUME_MS, IDLE_MS, LATE_WINDOW_MS, BUCKET_MS } = require('.
 // A hand-cranked clock, so the assertions are about the arithmetic rather
 // than about how fast the test machine happens to be.
 function fakeClock() {
-    var t = 1000; // deliberately not 0 — 0 is the "no previous tick" sentinel
+    let t = 1000; // deliberately not 0 — 0 is the "no previous tick" sentinel
     return {
-        now: function() { return t; },
-        advance: function(ms) { t += ms; },
-        set: function(ms) { t = ms; },
+        now() { return t; },
+        advance(ms) { t += ms; },
+        set(ms) { t = ms; },
     };
 }
 
 function statsAt(rateMs, options) {
-    var clock = fakeClock();
-    var stats = new FrameStats(Object.assign({ now: clock.now }, options));
+    const clock = fakeClock();
+    const stats = new FrameStats(Object.assign({ now: clock.now }, options));
     stats.setEnabled(true);
-    return { stats: stats, clock: clock, rateMs: rateMs };
+    return { stats, clock, rateMs };
 }
 
 // One tick: `workMs` of render, `restMs` of broadcast, then wait out the rest
@@ -26,8 +26,8 @@ function statsAt(rateMs, options) {
 function runFrames(h, count, workMs, restMs) {
     workMs = workMs || 0;
     restMs = restMs || 0;
-    for (var i = 0; i < count; i++) {
-        var t0 = h.stats.begin();
+    for (let i = 0; i < count; i++) {
+        const t0 = h.stats.begin();
         h.clock.advance(workMs);
         h.stats.endRender(t0);
         h.clock.advance(restMs);
@@ -55,7 +55,7 @@ test('reports the achieved frame rate, not the nominal one', () => {
 
     const snap = h.stats.snapshot();
     assert.strictEqual(snap.idle, false);
-    assert.ok(Math.abs(snap.fps - 50) < 0.001, 'fps was ' + snap.fps);
+    assert.ok(Math.abs(snap.fps - 50) < 0.001, `fps was ${snap.fps}`);
     assert.strictEqual(snap.targetFps, 100);
     assert.ok(Math.abs(snap.frameMs - 20) < 0.001);
 });
@@ -65,8 +65,8 @@ test('separates render time from total tick time', () => {
     runFrames(h, 50, 3, 2); // 3ms render + 2ms broadcast
 
     const snap = h.stats.snapshot();
-    assert.ok(Math.abs(snap.renderMs - 3) < 0.001, 'renderMs was ' + snap.renderMs);
-    assert.ok(Math.abs(snap.tickMs - 5) < 0.001, 'tickMs was ' + snap.tickMs);
+    assert.ok(Math.abs(snap.renderMs - 3) < 0.001, `renderMs was ${snap.renderMs}`);
+    assert.ok(Math.abs(snap.tickMs - 5) < 0.001, `tickMs was ${snap.tickMs}`);
 });
 
 test('averages over a rolling window, so an old stall stops counting', () => {
@@ -75,7 +75,7 @@ test('averages over a rolling window, so an old stall stops counting', () => {
     runFrames(h, 300, 1);  // ...then three seconds of healthy frames
 
     const snap = h.stats.snapshot();
-    assert.ok(Math.abs(snap.renderMs - 1) < 0.001, 'window still holds the stall: ' + snap.renderMs);
+    assert.ok(Math.abs(snap.renderMs - 1) < 0.001, `window still holds the stall: ${snap.renderMs}`);
     // The cumulative counters do keep it.
     assert.ok(Math.abs(snap.worstRenderMs - 8) < 0.001);
 });
@@ -93,7 +93,7 @@ test('counts a tick gap of 2x the target as an overrun', () => {
 
     const snap = h.stats.snapshot();
     assert.strictEqual(snap.overruns, 1);
-    assert.ok(Math.abs(snap.worstFrameMs - 25) < 0.001, 'worstFrameMs was ' + snap.worstFrameMs);
+    assert.ok(Math.abs(snap.worstFrameMs - 25) < 0.001, `worstFrameMs was ${snap.worstFrameMs}`);
 });
 
 test('a gap under 2x the target is jitter, not an overrun', () => {
@@ -110,7 +110,7 @@ test('a gap under 2x the target is jitter, not an overrun', () => {
 
 // A tick that lands a whole period late, i.e. one dropped frame.
 function runLateFrames(h, count) {
-    for (var i = 0; i < count; i++) {
+    for (let i = 0; i < count; i++) {
         h.clock.advance(h.rateMs * 2);
         runFrames(h, 1, 1);
     }
@@ -125,7 +125,7 @@ test('reports late frames as a rate over a window, not just a running total', ()
     assert.strictEqual(snap.overruns, 10);
     assert.strictEqual(snap.lateFrames, 10);
     assert.strictEqual(snap.windowFrames, 100);
-    assert.ok(Math.abs(snap.latePercent - 10) < 0.001, 'latePercent was ' + snap.latePercent);
+    assert.ok(Math.abs(snap.latePercent - 10) < 0.001, `latePercent was ${snap.latePercent}`);
     assert.strictEqual(snap.lateWindowMs, LATE_WINDOW_MS);
 });
 
@@ -197,7 +197,7 @@ test('resuming after an idle stretch is a discontinuity, not a dropped frame', (
 
     const snap = h.stats.snapshot();
     assert.strictEqual(snap.overruns, 0, 'the idle gap was billed as a dropped frame');
-    assert.ok(Math.abs(snap.fps - 100) < 0.001, 'fps was ' + snap.fps);
+    assert.ok(Math.abs(snap.fps - 100) < 0.001, `fps was ${snap.fps}`);
     assert.ok(snap.worstFrameMs < RESUME_MS, 'the idle gap became the worst frame');
     assert.ok(snap.frames > before.frames);
 });
@@ -221,7 +221,7 @@ test('survives more samples than the ring buffer holds', () => {
 
     const snap = h.stats.snapshot();
     assert.strictEqual(snap.frames, 5000);
-    assert.ok(Math.abs(snap.fps - 100) < 0.001, 'fps was ' + snap.fps);
+    assert.ok(Math.abs(snap.fps - 100) < 0.001, `fps was ${snap.fps}`);
     assert.ok(Math.abs(snap.renderMs - 2) < 0.001);
 });
 
@@ -255,5 +255,5 @@ test('does not allocate per frame', () => {
 
     // 100k frames through a per-frame allocation of even one small object
     // would be megabytes. A little movement is other test noise.
-    assert.ok(grown < 1024 * 1024, 'heap grew ' + grown + ' bytes over 100k frames');
+    assert.ok(grown < 1024 * 1024, `heap grew ${grown} bytes over 100k frames`);
 });

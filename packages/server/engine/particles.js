@@ -10,19 +10,19 @@
  */
 
 function renderParticles(out, particles, count, modelX, modelZ, numPixels) {
-    for (var i = 0; i < numPixels; i++) {
-        var px = modelX[i];
-        var pz = modelZ[i];
-        var r = 0, g = 0, b = 0;
+    for (let i = 0; i < numPixels; i++) {
+        const px = modelX[i];
+        const pz = modelZ[i];
+        let r = 0, g = 0, b = 0;
 
-        for (var pi = 0; pi < count; pi++) {
-            var particle = particles[pi];
-            var dx = (px - particle.point[0]) || 0;
-            var dy = (0 - particle.point[1]) || 0;
-            var dz = (pz - particle.point[2]) || 0;
-            var dist2 = dx * dx + dy * dy + dz * dz;
+        for (let pi = 0; pi < count; pi++) {
+            const particle = particles[pi];
+            const dx = (px - particle.point[0]) || 0;
+            const dy = (0 - particle.point[1]) || 0;
+            const dz = (pz - particle.point[2]) || 0;
+            const dist2 = dx * dx + dy * dy + dz * dz;
 
-            var intensity = particle.intensity / (1 + particle.falloff * dist2);
+            const intensity = particle.intensity / (1 + particle.falloff * dist2);
             r += particle.color[0] * intensity;
             g += particle.color[1] * intensity;
             b += particle.color[2] * intensity;

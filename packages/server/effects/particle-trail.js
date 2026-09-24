@@ -4,14 +4,14 @@
  * the instance just owns a pre-allocated particle pool.
  */
 
-var color = require('../engine/color');
-var particles = require('../engine/particles');
+const color = require('../engine/color');
+const particles = require('../engine/particles');
 
 // The pool size. The count stops one short of it throughout because pool[0] is
 // the head particle and the trail fills pool[1..count], so the render below
 // hands over count + 1 slots. The -1 is that head, not a fencepost to tidy
 // away: emitter.js has no head and deliberately does not carry one.
-var MAX_PARTICLES = 80;
+const MAX_PARTICLES = 80;
 
 module.exports = {
     type: 'particle_trail',
@@ -39,28 +39,28 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var pool = new Array(MAX_PARTICLES);
+        const pool = new Array(MAX_PARTICLES);
         pool[0] = { point: [], intensity: 0.1, falloff: 0, color: [0, 0, 0] };
-        for (var i = 1; i < MAX_PARTICLES; i++) {
+        for (let i = 1; i < MAX_PARTICLES; i++) {
             pool[i] = { point: [0, 0, 0], intensity: 0, falloff: 100, color: [0, 0, 0] };
         }
 
         return {
             render(out, millis, p) {
-                var time = 0.009 * millis * p.speed;
-                var numParticles = p.count;
+                const time = 0.009 * millis * p.speed;
+                const numParticles = p.count;
 
                 pool[0].intensity = p.glow;
                 color.hsvInto(pool[0].color, time * 0.01, p.saturation * 0.6, 0.8);
 
-                for (var i = 1; i <= numParticles; i++) {
-                    var s = i / numParticles;
-                    var radius = 0.2 + 0.8 * s;
-                    var theta = time + 8 * s;
-                    var x = 1.5 * radius * Math.cos(theta) + 1.0 * Math.sin(time * 0.05);
-                    var y = radius * Math.sin(theta + 10.0 * Math.sin(theta * 0.15));
+                for (let i = 1; i <= numParticles; i++) {
+                    const s = i / numParticles;
+                    const radius = 0.2 + 0.8 * s;
+                    const theta = time + 8 * s;
+                    const x = 1.5 * radius * Math.cos(theta) + 1.0 * Math.sin(time * 0.05);
+                    const y = radius * Math.sin(theta + 10.0 * Math.sin(theta * 0.15));
 
-                    var q = pool[i];
+                    const q = pool[i];
                     q.point[0] = x;
                     q.point[2] = y;
                     q.intensity = 50.0 / numParticles * s;

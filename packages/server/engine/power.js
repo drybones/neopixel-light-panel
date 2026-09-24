@@ -43,32 +43,32 @@
 // Same line frame-stats draws for "nothing has rendered lately". It is the
 // same fact about the same loop — when no scene is active the tick renders
 // one black frame and fast-exits — so it is deliberately not re-hardcoded.
-var fs = require('fs');
-var path = require('path');
-var IDLE_MS = require('./frame-stats').IDLE_MS;
+const fs = require('fs');
+const path = require('path');
+const IDLE_MS = require('./frame-stats').IDLE_MS;
 
 // Rolling window for the reported figures, matching frame-stats: an
 // instantaneous sample off a fast animation jitters unreadably.
-var WINDOW_MS = 1000;
+const WINDOW_MS = 1000;
 
 // ~2.5s of headroom at 100 FPS; the window is bounded by time, not by this.
-var CAPACITY = 256;
+const CAPACITY = 256;
 
 // The limiter never returns 0. A budget that cannot be met still shows
 // something rather than a dead panel that looks like a fault. One count of
 // 255 is WLED's floor too — but *not* its `+1`, which exists only to dodge
 // integer truncation and makes the result exceed the limit.
-var MIN_SCALE = 1 / 255;
+const MIN_SCALE = 1 / 255;
 
 // The config fcserver runs: fcserver.service points it at this file, so the
 // curve read here is the curve applied to the panel.
-var FCSERVER_CONFIG = path.join(__dirname, '..', 'fcserver.json');
+const FCSERVER_CONFIG = path.join(__dirname, '..', 'fcserver.json');
 
 // fcserver's own behaviour when a config has no color block: no curve, no
 // whitepoint. Also the fallback when the file cannot be read at all, which
 // errs the safe way — a linear curve over-estimates the current of every
 // value below 255, so the limiter dims early rather than late.
-var FCSERVER_DEFAULT_COLOUR = { gamma: 1, whitepoint: [1, 1, 1] };
+const FCSERVER_DEFAULT_COLOUR = { gamma: 1, whitepoint: [1, 1, 1] };
 
 /*
  * fcserver's colour curve, from its config file. Every failure degrades to
@@ -76,31 +76,31 @@ var FCSERVER_DEFAULT_COLOUR = { gamma: 1, whitepoint: [1, 1, 1] };
  * module load, and a throw here would take the render loop's sink with it.
  */
 function readFcserverColour(file, onWarn) {
-    var warn = onWarn || function(msg) { console.warn('Power meter: ' + msg); };
-    var doc;
+    const warn = onWarn || ((msg) => { console.warn(`Power meter: ${msg}`); });
+    let doc;
     try {
         doc = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (err) {
-        warn('cannot read ' + file + ' (' + err.message + '); estimating with a linear curve, which reads high');
+        warn(`cannot read ${file} (${err.message}); estimating with a linear curve, which reads high`);
         return copyColour(FCSERVER_DEFAULT_COLOUR);
     }
-    var color = (doc && doc.color) || {};
-    var gamma = num(color.gamma, FCSERVER_DEFAULT_COLOUR.gamma, 0.1, 10);
-    var whitepoint = normaliseWhitepoint(color.whitepoint, FCSERVER_DEFAULT_COLOUR.whitepoint);
+    const color = (doc && doc.color) || {};
+    const gamma = num(color.gamma, FCSERVER_DEFAULT_COLOUR.gamma, 0.1, 10);
+    const whitepoint = normaliseWhitepoint(color.whitepoint, FCSERVER_DEFAULT_COLOUR.whitepoint);
     if (color.gamma !== undefined && gamma !== color.gamma) {
-        warn('gamma ' + JSON.stringify(color.gamma) + ' in ' + file + ' is not usable; using ' + gamma);
+        warn(`gamma ${JSON.stringify(color.gamma)} in ${file} is not usable; using ${gamma}`);
     }
     if (color.whitepoint !== undefined && JSON.stringify(whitepoint) !== JSON.stringify(color.whitepoint)) {
-        warn('whitepoint ' + JSON.stringify(color.whitepoint) + ' in ' + file + ' is not usable; using ' + JSON.stringify(whitepoint));
+        warn(`whitepoint ${JSON.stringify(color.whitepoint)} in ${file} is not usable; using ${JSON.stringify(whitepoint)}`);
     }
-    return { gamma: gamma, whitepoint: whitepoint };
+    return { gamma, whitepoint };
 }
 
 function copyColour(c) {
     return { gamma: c.gamma, whitepoint: c.whitepoint.slice() };
 }
 
-var DEFAULTS = {
+const DEFAULTS = {
     // Act on the estimate, not just report it.
     limit: true,
     // 5V/20A supply.
@@ -128,9 +128,9 @@ function num(value, fallback, min, max) {
  * panel with no error anywhere.
  */
 function normaliseConfig(input, base) {
-    var from = base || DEFAULTS;
-    var raw = input || {};
-    var cfg = {
+    const from = base || DEFAULTS;
+    const raw = input || {};
+    const cfg = {
         limit: typeof raw.limit === 'boolean' ? raw.limit : from.limit,
         maxMilliamps: num(raw.maxMilliamps, from.maxMilliamps, 0, 1e6),
         overheadMilliamps: num(raw.overheadMilliamps, from.overheadMilliamps, 0, 1e6),
@@ -142,12 +142,12 @@ function normaliseConfig(input, base) {
 
 function normaliseWhitepoint(value, fallback) {
     if (!Array.isArray(value) || value.length !== 3) return fallback.slice();
-    var out = [];
-    for (var i = 0; i < 3; i++) out.push(num(value[i], fallback[i], 0, 1));
+    const out = [];
+    for (let i = 0; i < 3; i++) out.push(num(value[i], fallback[i], 0, 1));
     return out;
 }
 
-var FCSERVER_COLOUR = readFcserverColour(FCSERVER_CONFIG);
+const FCSERVER_COLOUR = readFcserverColour(FCSERVER_CONFIG);
 
 /*
  * fcserver's colour LUT, as duty cycle per channel value: what fraction of
@@ -156,10 +156,10 @@ var FCSERVER_COLOUR = readFcserverColour(FCSERVER_CONFIG);
  * Math.pow.
  */
 function buildDutyLut(gamma, whitepoint) {
-    var luts = [];
-    for (var c = 0; c < 3; c++) {
-        var lut = new Float32Array(256);
-        for (var v = 0; v < 256; v++) {
+    const luts = [];
+    for (let c = 0; c < 3; c++) {
+        const lut = new Float32Array(256);
+        for (let v = 0; v < 256; v++) {
             lut[v] = Math.pow(v / 255, gamma) * whitepoint[c];
         }
         luts.push(lut);
@@ -194,20 +194,20 @@ function budgetFor(cfg) {
  * showing a near-black panel with no explanation.
  */
 function scaleFor(milliamps, numLeds, cfg, gamma) {
-    var budget = budgetFor(cfg);
+    const budget = budgetFor(cfg);
     if (!cfg.limit || milliamps <= budget) return { scale: 1, floored: false };
 
-    var standby = numLeds * cfg.standbyMilliamps;
-    var budgetLed = budget - standby;
+    const standby = numLeds * cfg.standbyMilliamps;
+    const budgetLed = budget - standby;
     if (budgetLed <= 0) return { scale: MIN_SCALE, floored: true };
 
-    var estimateLed = milliamps - standby;
+    const estimateLed = milliamps - standby;
     if (estimateLed <= 0) return { scale: 1, floored: false };
 
-    var scale = Math.pow(budgetLed / estimateLed, 1 / gamma);
+    let scale = Math.pow(budgetLed / estimateLed, 1 / gamma);
     if (scale < MIN_SCALE) scale = MIN_SCALE;
     if (scale > 1) scale = 1;
-    return { scale: scale, floored: false };
+    return { scale, floored: false };
 }
 
 /*
@@ -225,8 +225,8 @@ function scaleFor(milliamps, numLeds, cfg, gamma) {
  */
 class PowerMeter {
     constructor(options) {
-        var opts = options || {};
-        this._now = opts.now || function() { return Date.now(); };
+        const opts = options || {};
+        this._now = opts.now || (() => Date.now());
         this.numLeds = opts.numLeds || 0;
         this._milliamps = new Float64Array(CAPACITY);  // post-limit, per frame
         this._requested = new Float64Array(CAPACITY);  // pre-limit
@@ -242,7 +242,7 @@ class PowerMeter {
         // Fixed for the meter's life: fcserver reads its config once at
         // start-up too. Injectable so tests can pin a curve.
         this.colour = opts.colour ? copyColour(opts.colour) : copyColour(FCSERVER_COLOUR);
-        var luts = buildDutyLut(this.colour.gamma, this.colour.whitepoint);
+        const luts = buildDutyLut(this.colour.gamma, this.colour.whitepoint);
         // Held as three fields rather than an array of arrays: this is the
         // innermost thing in the render path.
         this._lutR = luts[0];
@@ -277,24 +277,24 @@ class PowerMeter {
      * pass only happens on frames that actually exceed the budget.
      */
     endFrame() {
-        var requested = milliampsFor(this._dutySum, this.numLeds, this.config);
+        const requested = milliampsFor(this._dutySum, this.numLeds, this.config);
         this._dutySum = 0;
 
-        var gamma = this.colour.gamma;
-        var result = scaleFor(requested, this.numLeds, this.config, gamma);
+        const gamma = this.colour.gamma;
+        const result = scaleFor(requested, this.numLeds, this.config, gamma);
         this.scale = result.scale;
         this.floored = result.floored;
 
         // Scaling values by k scales the LED-driven current by k^gamma, by
         // construction — so a limited frame lands on the budget rather than
         // somewhere under it.
-        var standby = this.numLeds * this.config.standbyMilliamps;
-        var delivered = result.scale === 1
+        const standby = this.numLeds * this.config.standbyMilliamps;
+        const delivered = result.scale === 1
             ? requested
             : standby + (requested - standby) * Math.pow(result.scale, gamma);
 
-        var now = this._now();
-        var i = this._head;
+        const now = this._now();
+        const i = this._head;
         this._milliamps[i] = delivered;
         this._requested[i] = requested;
         this._at[i] = now;
@@ -311,9 +311,9 @@ class PowerMeter {
      * ones taken rather than a live reading of a dark panel.
      */
     snapshot() {
-        var cfg = this.config;
-        var now = this._now();
-        var snap = {
+        const cfg = this.config;
+        const now = this._now();
+        const snap = {
             limit: cfg.limit,
             maxMilliamps: cfg.maxMilliamps,
             overheadMilliamps: cfg.overheadMilliamps,
@@ -340,9 +340,9 @@ class PowerMeter {
 
         snap.idle = now - this._lastSampleAt > IDLE_MS;
 
-        var total = 0, requestedTotal = 0, peak = 0, n = 0;
-        for (var k = 0; k < this._filled; k++) {
-            var i = (this._head - 1 - k + CAPACITY * 2) % CAPACITY;
+        let total = 0, requestedTotal = 0, peak = 0, n = 0;
+        for (let k = 0; k < this._filled; k++) {
+            const i = (this._head - 1 - k + CAPACITY * 2) % CAPACITY;
             if (now - this._at[i] > WINDOW_MS) break;
             total += this._milliamps[i];
             requestedTotal += this._requested[i];
@@ -352,7 +352,7 @@ class PowerMeter {
         // An idle window has no samples in it at all; report the last frame
         // rendered rather than nothing.
         if (n === 0) {
-            var last = (this._head - 1 + CAPACITY) % CAPACITY;
+            const last = (this._head - 1 + CAPACITY) % CAPACITY;
             total = this._milliamps[last];
             requestedTotal = this._requested[last];
             peak = this._milliamps[last];
@@ -369,22 +369,22 @@ class PowerMeter {
     // What the panel would draw with every LED at 255 — the headline figure
     // for "how much of the supply can this thing actually ask for".
     fullWhiteMilliamps() {
-        var wp = this.colour.whitepoint;
+        const wp = this.colour.whitepoint;
         return milliampsFor(this.numLeds * (wp[0] + wp[1] + wp[2]), this.numLeds, this.config);
     }
 }
 
 module.exports = {
-    PowerMeter: PowerMeter,
-    DEFAULTS: DEFAULTS,
-    FCSERVER_COLOUR: FCSERVER_COLOUR,
-    FCSERVER_DEFAULT_COLOUR: FCSERVER_DEFAULT_COLOUR,
-    readFcserverColour: readFcserverColour,
-    normaliseConfig: normaliseConfig,
-    buildDutyLut: buildDutyLut,
-    milliampsFor: milliampsFor,
-    budgetFor: budgetFor,
-    scaleFor: scaleFor,
-    WINDOW_MS: WINDOW_MS,
-    MIN_SCALE: MIN_SCALE,
+    PowerMeter,
+    DEFAULTS,
+    FCSERVER_COLOUR,
+    FCSERVER_DEFAULT_COLOUR,
+    readFcserverColour,
+    normaliseConfig,
+    buildDutyLut,
+    milliampsFor,
+    budgetFor,
+    scaleFor,
+    WINDOW_MS,
+    MIN_SCALE,
 };

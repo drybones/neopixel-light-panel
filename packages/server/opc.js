@@ -43,11 +43,11 @@ class OPC extends PixelSink {
         if (now < this._nextAttemptAt) return;
         this._nextAttemptAt = now + this.reconnectMs;
 
-        var socket = new net.Socket();
+        const socket = new net.Socket();
         this.socket = socket;
         this.connected = false;
 
-        var drop = () => {
+        const drop = () => {
             // A later attempt may already own this.socket; only clear our own.
             if (this.socket !== socket) return;
             socket.destroy();
@@ -59,7 +59,7 @@ class OPC extends PixelSink {
             // fcserver absence is one journal line, not one a second.
             if (!this._outageLogged) {
                 this._outageLogged = true;
-                console.error('fcserver connection failed: ' + (e.code || e.message));
+                console.error(`fcserver connection failed: ${e.code || e.message}`);
             }
             drop();
         });
@@ -69,7 +69,7 @@ class OPC extends PixelSink {
         });
 
         socket.connect(this.port, this.host, () => {
-            console.log('Connected to fcserver at ' + socket.remoteAddress);
+            console.log(`Connected to fcserver at ${socket.remoteAddress}`);
             this.connected = true;
             this._outageLogged = false;
             socket.setNoDelay();

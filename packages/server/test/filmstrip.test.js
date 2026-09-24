@@ -47,7 +47,7 @@ test('a static scene renders its own colour on every frame', () => {
         const o = f * MODEL.length * 3;
         assert.deepStrictEqual(
             [strip[o], strip[o + 1], strip[o + 2]], [0x20, 0x40, 0x80],
-            'frame ' + f + ' should be the layer colour',
+            `frame ${f} should be the layer colour`,
         );
     }
 });
@@ -107,7 +107,7 @@ test('particle effects are lit by the time capture starts', () => {
         const stride = MODEL.length * 3;
         let lit = 0;
         for (let i = 0; i < stride; i++) if (strip[i] > 0) lit++;
-        assert.ok(lit > 0, effectType + ' should not be black on the first captured frame');
+        assert.ok(lit > 0, `${effectType} should not be black on the first captured frame`);
     }
 });
 
@@ -218,10 +218,10 @@ test('every registered effect renders a lit filmstrip from its defaults', () => 
     assert.ok(catalog.length > 0);
     for (const effect of catalog) {
         const strip = renderEffectFilmstrip(effect, MODEL);
-        assert.strictEqual(strip.length, FRAMES * MODEL.length * 3, effect.type + ' length');
+        assert.strictEqual(strip.length, FRAMES * MODEL.length * 3, `${effect.type} length`);
         let lit = 0;
         for (let i = 0; i < strip.length; i++) if (strip[i] > 0) lit++;
-        assert.ok(lit > 0, effect.type + ' should render something at its defaults');
+        assert.ok(lit > 0, `${effect.type} should render something at its defaults`);
     }
 });
 

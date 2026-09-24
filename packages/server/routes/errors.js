@@ -17,10 +17,10 @@
 // in the signature even where it is not called.
 function errorHandler(err, req, res, next) {
     if (res.headersSent) return next(err);
-    var status = err.status || err.statusCode;
+    let status = err.status || err.statusCode;
     if (!(status >= 400 && status < 600)) status = 500;
     if (status >= 500) {
-        console.error('API ' + req.method + ' ' + req.originalUrl + ' failed:', err);
+        console.error(`API ${req.method} ${req.originalUrl} failed:`, err);
         return res.status(status).json({ error: 'Internal server error' });
     }
     res.status(status).json({ error: err.message });
