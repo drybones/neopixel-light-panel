@@ -23,7 +23,6 @@ const api = vi.hoisted(() => ({
   virtual: vi.fn(),
   fps: vi.fn(),
   power: vi.fn(),
-  exportScenes: vi.fn(),
   scenePreviews: vi.fn(),
   scenePreview: vi.fn(),
   createScene: vi.fn(),
@@ -51,7 +50,6 @@ function serverUp() {
   api.virtual.mockResolvedValue({ virtual: true });
   api.fps.mockResolvedValue(null);
   api.power.mockResolvedValue(null);
-  api.exportScenes.mockResolvedValue({ scenes: [SERVER_SCENE] });
   api.scenePreviews.mockResolvedValue(EMPTY_PREVIEWS);
   api.scenePreview.mockResolvedValue(EMPTY_PREVIEWS);
 }

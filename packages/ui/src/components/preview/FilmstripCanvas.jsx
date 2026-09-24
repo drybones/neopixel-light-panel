@@ -23,13 +23,23 @@ import { currentFrame, queueBuild, subscribeFrames } from '../../lib/filmstripCl
 //
 // `id` only sets the loop phase — see phaseFor. It is not an identity for the
 // strip; changing it restarts nothing but where in the loop this canvas sits.
+//
+// The strip's identity is its `hash`, the server's hash of the content it was
+// rendered from, not the object: every previews refresh decodes a fresh object
+// per scene, and keying the rebuild on that would re-bloom every card on screen
+// when nothing about them changed. The strip itself is read through a ref, so
+// the effect always sees the latest one without being keyed on it.
 export default function FilmstripCanvas({
   strip, frames, id, width = 300, height = 80, className, style,
 }) {
   const canvasRef = useRef(null);
+  const stripRef = useRef(strip);
+  stripRef.current = strip;
+  const stripKey = strip ? (strip.hash ?? strip) : null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const strip = stripRef.current;
     if (!canvas || !strip || !frames) return undefined;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = BG;
@@ -105,7 +115,7 @@ export default function FilmstripCanvas({
       if (unsubFrames) unsubFrames();
       sheet = null;
     };
-  }, [strip, frames, id, width, height]);
+  }, [stripKey, frames, id, width, height]);
 
   return (
     <canvas

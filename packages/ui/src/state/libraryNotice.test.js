@@ -16,7 +16,6 @@ import {
 const api = vi.hoisted(() => ({
   scenes: vi.fn(),
   activeScene: vi.fn(),
-  exportScenes: vi.fn(),
   scenePreviews: vi.fn(),
   deleteAllScenes: vi.fn(),
   resetScenes: vi.fn(),
@@ -32,8 +31,7 @@ function serverHolds(n) {
     Array.from({ length: n }, (_, i) => ({ id: `s${i}`, name: `S${i}`, layerCount: 1 })),
   );
   api.activeScene.mockResolvedValue({ id: null });
-  // reloadLibrary fires these without awaiting them; they must not reject.
-  api.exportScenes.mockResolvedValue({ scenes: [] });
+  // reloadLibrary fires this without awaiting it; it must not reject.
   api.scenePreviews.mockResolvedValue({ version: 1, frames: 0, intervalMs: 100, previews: [] });
 }
 
@@ -53,6 +51,17 @@ test('restore defaults counts what it restored', async () => {
   await useStore.getState().resetLibrary();
 
   expect(useStore.getState().libraryNotice).toBe('Restored the 12 default scenes.');
+});
+
+// A reset keeps its ids fixed, so a cached detail for one of them is the
+// pre-reset scene under the same key — the editor would open on it.
+test('a library reload drops cached scene details', async () => {
+  useStore.setState({ sceneDetails: { s0: { id: 's0', name: 'Edited', layers: [] } } });
+  api.resetScenes.mockResolvedValue([]);
+  serverHolds(3);
+  await useStore.getState().resetLibrary();
+
+  expect(useStore.getState().sceneDetails).toEqual({});
 });
 
 test('a merging import gives both numbers — what came in, and the total', async () => {

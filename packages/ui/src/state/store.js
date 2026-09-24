@@ -88,19 +88,13 @@ export const useStore = create((set, get) => ({
       } finally {
         initInFlight = null;
       }
-      // Both have fallbacks — the editor fetches a missing scene itself, and
-      // a card without a strip is the ordinary first paint.
-      get().loadAllDetails().catch(() => {});
+      // A card without a strip is the ordinary first paint. Scene details are
+      // not fetched here at all: only the editor reads them, and it loads the
+      // one scene it opens (loadSceneDetail) rather than every layer of every
+      // scene at boot.
       get().loadPreviews().catch(() => {});
     })();
     return initInFlight;
-  },
-
-  async loadAllDetails() {
-    const { scenes } = await api.exportScenes();
-    const details = {};
-    scenes.forEach((s) => { details[s.id] = s; });
-    set({ sceneDetails: details });
   },
 
   // Scene-card filmstrips. The server caches them by scene content, so asking
@@ -305,21 +299,23 @@ export const useStore = create((set, get) => ({
   // the active id, which a reset nulls and a replacing import may or may not
   // have kept.
   //
-  // Details and previews are *replaced* when they land rather than blanked
-  // first. Both maps are keyed by scene id, so a leftover entry for a scene
-  // that just vanished is never read and a surviving scene keeps a usable
-  // card in the meantime; blanking them would flash every card in the
-  // switcher empty for the length of a round trip.
+  // Previews are *replaced* when they land rather than blanked first. The map
+  // is keyed by scene id, so a leftover entry for a scene that just vanished
+  // is never read and a surviving scene keeps a usable card in the meantime;
+  // blanking them would flash every card in the switcher empty for the length
+  // of a round trip. Details are the opposite case: nothing on the switcher
+  // shows them, and a reset keeps its ids fixed (`default-sun`), so a kept
+  // entry would open the editor on the pre-reset layers. They are dropped, and
+  // the editor fetches whichever scene it opens.
   //
   // It resolves as soon as the scene *list* is known, and does not wait for
-  // details or filmstrips: a reset invalidates every strip, so awaiting them
+  // filmstrips: a reset invalidates every strip, so awaiting them
   // would hold the button for as long as the Pi takes to render the whole
   // library. Cards mount without a strip and fill in when it lands, which is
   // the ordinary first paint anyway.
   async reloadLibrary() {
     const [scenes, active] = await Promise.all([api.scenes(), api.activeScene()]);
-    set({ scenes, activeSceneId: active.id });
-    get().loadAllDetails().catch(() => {});
+    set({ scenes, activeSceneId: active.id, sceneDetails: {} });
     get().loadPreviews().catch(() => {});
   },
 
