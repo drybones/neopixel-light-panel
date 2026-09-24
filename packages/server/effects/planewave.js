@@ -30,8 +30,8 @@
  * units) still leaves a little measurable curvature.
  */
 
-var color = require('../engine/color');
-var wave = require('../engine/wave');
+const color = require('../engine/color');
+const wave = require('../engine/wave');
 
 module.exports = {
     type: 'planewave',
@@ -55,8 +55,8 @@ module.exports = {
     },
 
     prepare(params) {
-        var rgb = color.hexToRgb(params.color);
-        var a = params.angle * Math.PI / 180;
+        const rgb = color.hexToRgb(params.color);
+        const a = params.angle * Math.PI / 180;
         return {
             r: rgb.r, g: rgb.g, b: rgb.b,
             freq: params.freq,
@@ -72,15 +72,15 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var modelX = ctx.modelX;
-        var modelZ = ctx.modelZ;
-        var n = ctx.numPixels;
+        const modelX = ctx.modelX;
+        const modelZ = ctx.modelZ;
+        const n = ctx.numPixels;
 
         return {
             render(out, millis, p) {
-                var phase = wave.phase(millis, p);
-                for (var i = 0; i < n; i++) {
-                    var proj = modelX[i] * p.ca - modelZ[i] * p.sa;
+                const phase = wave.phase(millis, p);
+                for (let i = 0; i < n; i++) {
+                    const proj = modelX[i] * p.ca - modelZ[i] * p.sa;
                     wave.shade(out, i, phase - proj / p.lambda, p);
                 }
             }

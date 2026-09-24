@@ -8,7 +8,7 @@
  *                         recreated only when a layer's effectType changes
  */
 
-var modules = [
+const modules = [
     require('./wavelet'),
     require('./planewave'),
     require('./solid'),
@@ -23,8 +23,8 @@ var modules = [
 
 // No prototype: a layer's effectType comes straight off the API, and a plain
 // object would answer "constructor" or "toString" with a function.
-var byType = Object.create(null);
-modules.forEach(function(m) { byType[m.type] = m; });
+const byType = Object.create(null);
+modules.forEach((m) => { byType[m.type] = m; });
 
 function get(type) {
     return byType[type] || null;
@@ -40,19 +40,17 @@ function list() {
 // affect the picker — it is the set of starting points the layer editor
 // offers as buttons.
 function catalog() {
-    return modules.map(function(m) {
-        return {
+    return modules.map((m) => ({
             type: m.type,
             name: m.name,
             schema: m.schema,
             defaults: m.defaults,
             presets: m.presets || null,
-        };
-    });
+        }));
 }
 
 module.exports = {
-    get: get,
-    list: list,
-    catalog: catalog,
+    get,
+    list,
+    catalog,
 };

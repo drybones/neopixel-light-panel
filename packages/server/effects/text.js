@@ -30,22 +30,22 @@
  * and static text never.
  */
 
-var color = require('../engine/color');
-var textFont = require('../engine/text-font');
-var raster = require('../engine/text-raster');
+const color = require('../engine/color');
+const textFont = require('../engine/text-font');
+const raster = require('../engine/text-raster');
 
-var MAX_ROWS = textFont.CELL_ROWS;
-var DEFAULT_SOFTNESS = 0.2;
+const MAX_ROWS = textFont.CELL_ROWS;
+const DEFAULT_SOFTNESS = 0.2;
 
 function clamp(v, lo, hi, fallback) {
-    var n = typeof v === 'number' && isFinite(v) ? v : fallback;
+    const n = typeof v === 'number' && isFinite(v) ? v : fallback;
     return n < lo ? lo : (n > hi ? hi : n);
 }
 
 // hexToRgb answers white for anything unparseable, which is right for ink and
 // wrong for a ground: a bad background would light the whole panel. Black there
 // degrades to ordinary type instead.
-var BLACK = { r: 0, g: 0, b: 0 };
+const BLACK = { r: 0, g: 0, b: 0 };
 
 module.exports = {
     type: 'text',
@@ -120,14 +120,14 @@ module.exports = {
      * called directly, by the filmstrip and the tests.
      */
     prepare(params) {
-        var text = typeof params.text === 'string' ? params.text.slice(0, raster.MAX_TEXT) : '';
-        var font = textFont.FONTS[params.font] ? params.font : textFont.DEFAULT_FONT;
-        var rgb = color.hexToRgb(params.color);
-        var bg = color.hexToRgb(params.background, BLACK);
-        var level = clamp(params.level, 0, 8, 1);
+        const text = typeof params.text === 'string' ? params.text.slice(0, raster.MAX_TEXT) : '';
+        const font = textFont.FONTS[params.font] ? params.font : textFont.DEFAULT_FONT;
+        const rgb = color.hexToRgb(params.color);
+        const bg = color.hexToRgb(params.background, BLACK);
+        const level = clamp(params.level, 0, 8, 1);
         return {
-            text: text,
-            font: font,
+            text,
+            font,
             tokenMs: raster.tokenPeriod(text),
             r: rgb.r * level,
             g: rgb.g * level,
@@ -152,14 +152,14 @@ module.exports = {
     },
 
     createInstance(ctx) {
-        var grid = raster.makeGrid(ctx);
-        var sampler = raster.createSampler(grid.cols, grid.rows, MAX_ROWS);
-        var n = ctx.numPixels;
-        var maskKey = null;
-        var mask = null;
-        var resolved = '';
-        var resolvedAt = null;
-        var resolvedFrom = null;
+        const grid = raster.makeGrid(ctx);
+        const sampler = raster.createSampler(grid.cols, grid.rows, MAX_ROWS);
+        const n = ctx.numPixels;
+        let maskKey = null;
+        let mask = null;
+        let resolved = '';
+        let resolvedAt = null;
+        let resolvedFrom = null;
 
         return {
             render(out, millis, p) {
@@ -178,40 +178,40 @@ module.exports = {
                 // be reset on the token-free path too — otherwise removing a
                 // token and putting it back inside one minute leaves a stale
                 // bucket matching, and the layer renders neither string.
-                var bucket = p.tokenMs === 0 ? 0 : Math.floor(millis / p.tokenMs);
+                const bucket = p.tokenMs === 0 ? 0 : Math.floor(millis / p.tokenMs);
                 if (bucket !== resolvedAt || p.text !== resolvedFrom) {
                     resolved = p.tokenMs === 0 ? p.text : raster.resolveTokens(p.text, millis);
                     resolvedAt = bucket;
                     resolvedFrom = p.text;
                 }
-                var key = p.font + '|' + p.tracking + '|' + resolved;
+                const key = `${p.font}|${p.tracking}|${resolved}`;
                 if (key !== maskKey) {
                     mask = raster.layoutLine(textFont.FONTS[p.font], resolved, p.tracking);
                     maskKey = key;
                 }
 
-                var period = raster.wrapPeriod(mask.width, grid.cols, p.gap);
+                const period = raster.wrapPeriod(mask.width, grid.cols, p.gap);
                 // Positive scroll reads right-to-left, the default reading
                 // direction: the origin walks left, so a fixed LED sees later
                 // mask columns as time passes.
-                var phase = (p.scroll * (millis / 1000)) % period;
+                const phase = (p.scroll * (millis / 1000)) % period;
                 // The centring term is *rounded to a whole column*: half of an
                 // odd remainder would leave every static line permanently
                 // smeared across two columns at half brightness, which reads as
                 // a soft font rather than as an off-by-half-a-cell.
-                var originCol = Math.round((grid.cols - mask.width) / 2) - phase;
+                const originCol = Math.round((grid.cols - mask.width) / 2) - phase;
                 // Rounded to a whole row: the six-row faces sit one row down,
                 // and a half-row offset would smear every line across two rows
                 // the way a half-column one smears it across two columns.
-                var originRow = Math.round((grid.rows - mask.rows) / 2);
+                const originRow = Math.round((grid.rows - mask.rows) / 2);
 
-                var cov = raster.sample(sampler, mask, period, originCol, originRow, p.softness);
-                var cols = grid.cols;
-                var dr = p.r - p.bgR;
-                var dg = p.g - p.bgG;
-                var db = p.b - p.bgB;
-                for (var i = 0; i < n; i++) {
-                    var a = cov[grid.rowOf[i] * cols + grid.colOf[i]];
+                const cov = raster.sample(sampler, mask, period, originCol, originRow, p.softness);
+                const cols = grid.cols;
+                const dr = p.r - p.bgR;
+                const dg = p.g - p.bgG;
+                const db = p.b - p.bgB;
+                for (let i = 0; i < n; i++) {
+                    const a = cov[grid.rowOf[i] * cols + grid.colOf[i]];
                     out[i * 3] = p.bgR + a * dr;
                     out[i * 3 + 1] = p.bgG + a * dg;
                     out[i * 3 + 2] = p.bgB + a * db;
