@@ -9,30 +9,30 @@
  * built a real OPC client — so none of them were reachable from a test.
  */
 
-var express = require('express');
+const express = require('express');
 
 function createRouter(deps) {
-    var settings = deps.settings;
-    var client = deps.client;
-    var frameStats = deps.frameStats;
-    var isVirtual = !!deps.isVirtual;
+    const settings = deps.settings;
+    const client = deps.client;
+    const frameStats = deps.frameStats;
+    const isVirtual = !!deps.isVirtual;
 
-    var router = express.Router();
+    const router = express.Router();
 
-    router.get('/virtual', function(req, res) {
+    router.get('/virtual', (req, res) => {
         res.json({ virtual: isVirtual });
     });
 
-    router.get('/brightness/', function(req, res) {
+    router.get('/brightness/', (req, res) => {
         res.send(settings.brightness.toString()); // Cast to string; a number implies an http status code
     });
-    router.put('/brightness/:brightness', function(req, res) {
+    router.put('/brightness/:brightness', (req, res) => {
         // parseFloat returns NaN for junk, and NaN survives both clamps —
         // Math.min(1, Math.max(0, NaN)) is NaN. opc.js multiplies every byte
         // by this, so an unguarded value blacks the panel out with no error
         // and no failed request. SettingsStore.load guards the same hazard on
         // the file path; this is the other way in.
-        var value = parseFloat(req.params.brightness);
+        const value = parseFloat(req.params.brightness);
         if (!isFinite(value)) {
             return res.status(400).json({ error: 'brightness must be a number between 0 and 1' });
         }
@@ -46,14 +46,14 @@ function createRouter(deps) {
     // but virtual-opc does no hardware write, so a dev-machine rate is not
     // comparable to the Pi's and the UI has to label it as such.
     function frameStatsSnapshot() {
-        var snap = frameStats.snapshot();
+        const snap = frameStats.snapshot();
         snap.virtual = isVirtual;
         return snap;
     }
-    router.get('/fps', function(req, res) {
+    router.get('/fps', (req, res) => {
         res.json(frameStatsSnapshot());
     });
-    router.put('/fps', function(req, res) {
+    router.put('/fps', (req, res) => {
         if (!req.body || typeof req.body.enabled !== 'boolean') {
             return res.status(400).json({ error: 'expected {enabled: boolean}' });
         }
@@ -71,10 +71,10 @@ function createRouter(deps) {
      * The measurement runs unconditionally; `limit` only decides whether it acts.
      * Reading the headroom is the point of having it at all.
      */
-    router.get('/power', function(req, res) {
+    router.get('/power', (req, res) => {
         res.json(client.power.snapshot());
     });
-    router.put('/power', function(req, res) {
+    router.put('/power', (req, res) => {
         if (!req.body || typeof req.body !== 'object') {
             return res.status(400).json({ error: 'expected a power config object' });
         }
