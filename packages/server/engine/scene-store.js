@@ -67,7 +67,7 @@ function defaultScenes() {
     try {
         doc = JSON.parse(fs.readFileSync(DEFAULTS_FILE, 'utf8'));
     } catch (err) {
-        throw new Error('Cannot read the default scene set at ' + DEFAULTS_FILE + ': ' + err.message);
+        throw new Error('Cannot read the default scene set at ' + DEFAULTS_FILE + ': ' + err.message, { cause: err });
     }
     if (!doc || !Array.isArray(doc.scenes)) {
         throw new Error('The default scene set at ' + DEFAULTS_FILE + ' is not {version: 2, scenes: [...]}');

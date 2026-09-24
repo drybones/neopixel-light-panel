@@ -52,7 +52,7 @@ function buildLut(stops) {
 // Anything unrecognised reads as mirror, which is what every layer stored
 // before this control existed was rendered with.
 function tileMode(name) {
-    return TILE.hasOwnProperty(name) ? TILE[name] : TILE.mirror;
+    return Object.hasOwn(TILE, name) ? TILE[name] : TILE.mirror;
 }
 
 // The three ways a ramp position outside 0..1 can be resolved, and the reason

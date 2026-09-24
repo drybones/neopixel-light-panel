@@ -168,19 +168,23 @@ export default function XYPad({ entry, x, y, color, decor, subscribe, onChange, 
     }
   }
 
+  // Subscribed per geometry on purpose, so `draw` here is the one captured
+  // then: anything it reads that a param edit changes must come through a ref
+  // (see decorRef, and the stale-closure note in the root CLAUDE.md).
   useEffect(() => {
     if (!subscribe) { draw(); return undefined; }
     return subscribe((frame) => { frameRef.current = frame; draw(); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
   }, [subscribe, geo, canvasH]);
 
   // The decor deps are spelled out as primitives rather than passing `decor`,
   // which is a fresh object every render and would redraw on every keystroke
   // anywhere in the panel. A subscribed pad repaints at the stream rate anyway;
   // this is what keeps an unsubscribed one current.
-  useEffect(draw, [
-    geo, canvasH, x, y, color,
-    decor && decor.extX, decor && decor.extY,
-  ]);
+  const extX = decor && decor.extX;
+  const extY = decor && decor.extY;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  useEffect(draw, [geo, canvasH, x, y, color, extX, extY]);
 
   function apply(e) {
     const rect = padRef.current.getBoundingClientRect();

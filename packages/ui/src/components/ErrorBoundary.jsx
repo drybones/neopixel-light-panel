@@ -28,7 +28,6 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, info) {
-    // eslint-disable-next-line no-console
     console.error('View crashed:', error, info && info.componentStack);
   }
 
