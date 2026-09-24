@@ -1,6 +1,7 @@
 {
-  "name": "neopixel-light-panel",
+  "name": "neopixel-light-panel-server",
   "version": "1.0.0",
+  "private": true,
   "description": "Simple web controlled NeoPixel light panel",
   "main": "app.js",
   "dependencies": {
@@ -13,14 +14,6 @@
     "dev": "VIRTUAL=1 node app.js",
     "test": "node --test"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/drybones/NeoPixelLightPanel.git"
-  },
   "author": "drybones",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/drybones/NeoPixelLightPanel/issues"
-  },
-  "homepage": "https://github.com/drybones/NeoPixelLightPanel#readme"
+  "license": "ISC"
 }
