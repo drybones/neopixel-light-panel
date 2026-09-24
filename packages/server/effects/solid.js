@@ -10,7 +10,7 @@ module.exports = {
     name: 'Solid colour',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
-        { key: 'level', type: 'number', label: 'Level', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'level', type: 'number', label: 'Level', min: 0, max: 1, step: 0.01, scale: 'linear' },
     ],
     defaults: {
         color: '#404060',

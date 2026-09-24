@@ -9,13 +9,7 @@
  * fallback reproduces.
  */
 
-function defaultFalloff(distanceSq, intensity, falloff) {
-    return intensity / (1 + falloff * distanceSq);
-}
-
-function renderParticles(out, particles, count, modelX, modelZ, numPixels, intensityFn) {
-    var fn = intensityFn || defaultFalloff;
-
+function renderParticles(out, particles, count, modelX, modelZ, numPixels) {
     for (var i = 0; i < numPixels; i++) {
         var px = modelX[i];
         var pz = modelZ[i];
@@ -28,7 +22,7 @@ function renderParticles(out, particles, count, modelX, modelZ, numPixels, inten
             var dz = (pz - particle.point[2]) || 0;
             var dist2 = dx * dx + dy * dy + dz * dz;
 
-            var intensity = fn(dist2, particle.intensity, particle.falloff);
+            var intensity = particle.intensity / (1 + particle.falloff * dist2);
             r += particle.color[0] * intensity;
             g += particle.color[1] * intensity;
             b += particle.color[2] * intensity;
@@ -40,4 +34,4 @@ function renderParticles(out, particles, count, modelX, modelZ, numPixels, inten
     }
 }
 
-module.exports = { renderParticles, defaultFalloff };
+module.exports = { renderParticles };

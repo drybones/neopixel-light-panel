@@ -17,10 +17,10 @@ module.exports = {
     type: 'particle_trail',
     name: 'Particle trail',
     schema: [
-        { key: 'count', type: 'number', label: 'Trail length', min: 5, max: MAX_PARTICLES - 1, step: 1, scale: 'linear', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 4, scale: 'log', modulatable: true },
-        { key: 'saturation', type: 'number', label: 'Colourfulness', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'glow', type: 'number', label: 'Glow', min: 0.01, max: 0.5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'count', type: 'number', label: 'Trail length', min: 5, max: MAX_PARTICLES - 1, step: 1, scale: 'linear' },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 4, scale: 'log' },
+        { key: 'saturation', type: 'number', label: 'Colourfulness', min: 0, max: 1, step: 0.01, scale: 'linear' },
+        { key: 'glow', type: 'number', label: 'Glow', min: 0.01, max: 0.5, scale: 'log', zeroable: true },
     ],
     defaults: {
         count: 49,
@@ -51,7 +51,7 @@ module.exports = {
                 var numParticles = p.count;
 
                 pool[0].intensity = p.glow;
-                pool[0].color = color.hsv(time * 0.01, p.saturation * 0.6, 0.8);
+                color.hsvInto(pool[0].color, time * 0.01, p.saturation * 0.6, 0.8);
 
                 for (var i = 1; i <= numParticles; i++) {
                     var s = i / numParticles;
@@ -64,7 +64,7 @@ module.exports = {
                     q.point[0] = x;
                     q.point[2] = y;
                     q.intensity = 50.0 / numParticles * s;
-                    q.color = color.hsv(time * 0.01 + s * 0.2, p.saturation, 0.8);
+                    color.hsvInto(q.color, time * 0.01 + s * 0.2, p.saturation, 0.8);
                 }
 
                 particles.renderParticles(out, pool, numParticles + 1, ctx.modelX, ctx.modelZ, ctx.numPixels);

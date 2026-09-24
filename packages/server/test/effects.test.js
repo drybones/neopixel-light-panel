@@ -10,6 +10,7 @@ const noise = require('../effects/noise');
 const twinkle = require('../effects/twinkle');
 const effects = require('../effects');
 const { panelCtx } = require('./support/panel-ctx');
+const { RAD_PER_MS } = require('../engine/wave');
 
 const ctx2 = {
     numPixels: 2,
@@ -71,9 +72,9 @@ test('wavelet crests run outward by default and inward when asked', () => {
     const out = new Float32Array(n * 3);
     // Times are quoted as the wave's own phase (wt), which is what puts the
     // crest somewhere legible; millis is just the inverse of the render loop's
-    // wt = millis * 0.00628 * freq.
+    // wt = millis * RAD_PER_MS * freq.
     const crestAt = (direction, wt) => {
-        instance.render(out, wt / (0.00628 * freq), wavelet.prepare({
+        instance.render(out, wt / (RAD_PER_MS * freq), wavelet.prepare({
             ...wavelet.defaults, color: '#ffffff', x: 0, y: 0,
             freq, lambda, delta: 0, min: 0, max: 1, direction,
         }));

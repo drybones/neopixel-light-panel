@@ -22,6 +22,7 @@
 
 var { Compositor } = require('./compositor');
 var effects = require('../effects');
+var toByte = require('./color').toByte;
 
 // 40 frames at 100ms is a 4.0s loop, ~38KB of base64 per scene. The length is
 // a compromise between the seam coming round often enough to notice and the
@@ -97,13 +98,15 @@ var NULL_SINK = {
     writePixels: function() {},
 };
 
-function clamp255(v) {
-    return v < 0 ? 0 : (v > 255 ? 255 : v | 0);
-}
+// How many renders run back to back before the async path hands the thread
+// back. A full-density emitter renders in ~0.1ms, so this is a couple of
+// milliseconds between chances for the 10ms tick — where a whole capped
+// warm-up (300 renders) done in one go would drop a few frames on the panel.
+var YIELD_EVERY = 16;
 
-// Renders `scene` (as held by SceneStore, i.e. already preprocessed) to a flat
-// Uint8Array of FRAMES * numPixels * 3 bytes, frame-major.
-function renderFilmstrip(scene, model) {
+// The render as a generator that yields every YIELD_EVERY renders and returns
+// the bytes, so the sync and async entry points below are one body.
+function* filmstripSteps(scene, model) {
     var compositor = new Compositor(NULL_SINK, model);
     compositor.syncScene(scene);
 
@@ -115,6 +118,7 @@ function renderFilmstrip(scene, model) {
     for (var w = 0; w < warmupFrames; w++) {
         compositor.renderFrame(scene, t);
         t += WARMUP_STEP_MS;
+        if ((w + 1) % YIELD_EVERY === 0) yield;
     }
 
     // Capture the loop plus its continuation, in float — the blend below wants
@@ -123,6 +127,7 @@ function renderFilmstrip(scene, model) {
     for (var f = 0; f < FRAMES + FADE_FRAMES; f++) {
         compositor.renderFrame(scene, TIME_BASE + f * INTERVAL_MS);
         captured.set(compositor.composite, f * stride);
+        if ((f + 1) % YIELD_EVERY === 0) yield;
     }
 
     // Dissolve the continuation into the head. `a` runs 0→1 across the fade,
@@ -135,11 +140,11 @@ function renderFilmstrip(scene, model) {
             var a = (g + 1) / (FADE_FRAMES + 1);
             var tail = (FRAMES + g) * stride;
             for (var i = 0; i < stride; i++) {
-                out[base + i] = clamp255(a * captured[base + i] + (1 - a) * captured[tail + i]);
+                out[base + i] = toByte(a * captured[base + i] + (1 - a) * captured[tail + i]);
             }
         } else {
             for (var j = 0; j < stride; j++) {
-                out[base + j] = clamp255(captured[base + j]);
+                out[base + j] = toByte(captured[base + j]);
             }
         }
     }
@@ -147,11 +152,33 @@ function renderFilmstrip(scene, model) {
     return out;
 }
 
+// Renders `scene` (as held by SceneStore, i.e. already preprocessed) to a flat
+// Uint8Array of FRAMES * numPixels * 3 bytes, frame-major.
+function renderFilmstrip(scene, model) {
+    var steps = filmstripSteps(scene, model);
+    var r;
+    do { r = steps.next(); } while (!r.done);
+    return r.value;
+}
+
+// The same, yielding to the event loop between batches of renders. The scene
+// may be edited while this is suspended; the throwaway compositor skips a
+// layer it was never synced with, and the cache keys the result on the hash
+// taken before rendering, so a stale strip is replaced on the next request.
+async function renderFilmstripAsync(scene, model) {
+    var steps = filmstripSteps(scene, model);
+    var r;
+    while (!(r = steps.next()).done) {
+        await new Promise(function(resolve) { setImmediate(resolve); });
+    }
+    return r.value;
+}
+
 // One effect at its defaults, as a scene of one layer — what the effect
 // picker offers you when you add a layer. Built here rather than through
 // SceneStore because preprocess() would sync the layer into the *live*
 // compositor, and this scene is never going to be rendered by the panel.
-function renderEffectFilmstrip(effect, model) {
+function effectScene(effect) {
     var layer = {
         id: 'effect-preview-' + effect.type,
         effectType: effect.type,
@@ -165,14 +192,25 @@ function renderEffectFilmstrip(effect, model) {
     };
     var scene = { id: layer.id, name: effect.name, layers: [layer] };
     scene._displayLayers = scene.layers;
-    return renderFilmstrip(scene, model);
+    return scene;
+}
+
+function renderEffectFilmstrip(effect, model) {
+    return renderFilmstrip(effectScene(effect), model);
+}
+
+function renderEffectFilmstripAsync(effect, model) {
+    return renderFilmstripAsync(effectScene(effect), model);
 }
 
 module.exports = {
     renderFilmstrip: renderFilmstrip,
+    renderFilmstripAsync: renderFilmstripAsync,
     renderEffectFilmstrip: renderEffectFilmstrip,
+    renderEffectFilmstripAsync: renderEffectFilmstripAsync,
     warmupMsFor: warmupMsFor,
     FRAMES: FRAMES,
+    YIELD_EVERY: YIELD_EVERY,
     INTERVAL_MS: INTERVAL_MS,
     DEFAULT_WARMUP_MS: DEFAULT_WARMUP_MS,
     MAX_WARMUP_MS: MAX_WARMUP_MS,

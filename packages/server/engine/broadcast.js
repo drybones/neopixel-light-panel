@@ -9,7 +9,7 @@
  * and only the panel itself dims.
  *
  * Since #92 the sink clamps before it multiplies, which makes that meter
- * exact rather than merely useful: clamp255 here and the sink's ceiling
+ * exact rather than merely useful: toByte here and the sink's ceiling
  * are the same operation, so the panel is this preview scaled by the
  * fader, and nothing appears on one that cannot appear on the other.
  *
@@ -32,6 +32,7 @@
  */
 
 var WebSocket = require('ws');
+var toByte = require('./color').toByte;
 
 var FRAME_INTERVAL_MS = 33;
 var LAYER_FRAME_INTERVAL_MS = 66;
@@ -41,10 +42,6 @@ var LAYER_FRAME_INTERVAL_MS = 66;
 // CORS does not reach a WebSocket — the browser sends Origin, the server has
 // to care — so this is the one limit that bounds what a stray page can cost.
 var MAX_PAYLOAD_BYTES = 4096;
-
-function clamp255(v) {
-    return v < 0 ? 0 : (v > 255 ? 255 : v | 0);
-}
 
 class Broadcaster {
     constructor(compositor, numPixels, options) {
@@ -101,9 +98,9 @@ class Broadcaster {
         for (var i = 0; i < n; i++) {
             var triple = target[i];
             var o = i * 3;
-            triple[0] = clamp255(buf[o]);
-            triple[1] = clamp255(buf[o + 1]);
-            triple[2] = clamp255(buf[o + 2]);
+            triple[0] = toByte(buf[o]);
+            triple[1] = toByte(buf[o + 1]);
+            triple[2] = toByte(buf[o + 2]);
         }
         return target;
     }

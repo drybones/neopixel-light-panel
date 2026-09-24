@@ -3,14 +3,35 @@
  * and opc.js (hsv static) so effects don't depend on the OPC classes.
  */
 
+var WHITE = { r: 255, g: 255, b: 255 };
+
 // http://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
-function hexToRgb(hex) {
+//
+// Anything unparseable answers `fallback`, white unless the caller says
+// otherwise — right for ink, wrong for a ground, which is why text.js passes
+// black for its background.
+function hexToRgb(hex, fallback) {
     var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result ? {
+    if (!result) {
+        var f = fallback || WHITE;
+        return { r: f.r, g: f.g, b: f.b };
+    }
+    return {
         r: parseInt(result[1], 16),
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
-    } : { r: 255, g: 255, b: 255 };
+    };
+}
+
+// Channel clamps. clamp255 keeps the fraction, for float layer buffers and
+// blend sources; toByte truncates on top, for anything headed out as a
+// Uint8 (the WebSocket frames, the filmstrip bytes). NaN reads as 0 in toByte.
+function clamp255(v) {
+    return v < 0 ? 0 : (v > 255 ? 255 : v);
+}
+
+function toByte(v) {
+    return v < 0 ? 0 : (v > 255 ? 255 : v | 0);
 }
 
 /*
@@ -19,7 +40,11 @@ function hexToRgb(hex) {
  * Colors may extend outside these bounds. Hue values will wrap.
  * Based on tinycolor: https://github.com/bgrins/TinyColor
  */
-function hsv(h, s, v) {
+//
+// hsvInto writes into a caller-owned [r, g, b] and allocates nothing, which is
+// the one to use from a render loop; hsv() is the allocating convenience for
+// prepare() and other cold paths.
+function hsvInto(out, h, s, v) {
     h = (h % 1) * 6;
     if (h < 0) h += 6;
 
@@ -28,11 +53,25 @@ function hsv(h, s, v) {
         p = v * (1 - s),
         q = v * (1 - f * s),
         t = v * (1 - (1 - f) * s),
-        r = [v, q, p, p, t, v][i],
-        g = [t, v, v, q, p, p][i],
-        b = [p, p, t, v, v, q][i];
+        r, g, b;
 
-    return [r * 255, g * 255, b * 255];
+    switch (i) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        default: r = v; g = p; b = q;
+    }
+
+    out[0] = r * 255;
+    out[1] = g * 255;
+    out[2] = b * 255;
+    return out;
+}
+
+function hsv(h, s, v) {
+    return hsvInto([0, 0, 0], h, s, v);
 }
 
 /*
@@ -70,4 +109,4 @@ function hexToHsv(hex) {
     return rgbToHsv(rgb.r, rgb.g, rgb.b);
 }
 
-module.exports = { hexToRgb, hsv, rgbToHsv, hexToHsv };
+module.exports = { hexToRgb, clamp255, toByte, hsv, hsvInto, rgbToHsv, hexToHsv };

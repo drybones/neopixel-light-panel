@@ -69,7 +69,7 @@ var RESUME_MS = require('../engine/render-loop').RESUME_MS;
 // falloff is 1/size^2, so a size of 0 divides to Infinity and then
 // intensity / (1 + Infinity * 0) is NaN, straight into the layer buffer and
 // out through setPixel. The slider cannot reach 0 but the typed field is
-// deliberately unclamped — same guard as wavelet's MIN_LAMBDA.
+// deliberately unclamped — same guard as engine/wave's MIN_LAMBDA.
 var MIN_SIZE = 1e-3;
 
 // Extent maxes as a multiple of the panel, so they follow engine/panel rather
@@ -95,7 +95,7 @@ module.exports = {
         // 1 is a fully random hue per particle, which is candy sparkler's
         // rainbow. The swatch's saturation and brightness still apply there —
         // only its hue is overridden — so a pale swatch gives pastel sparks.
-        { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear' },
 
         { type: 'group', label: 'Source' },
         { type: 'xy', label: 'Origin', xKey: 'x', yKey: 'y',
@@ -103,38 +103,38 @@ module.exports = {
           margin: 2, extXKey: 'extX', extYKey: 'extY' },
         // Full width and height of the box births scatter across, not half-
         // extents. Both 0 is a point source.
-        { key: 'extX', type: 'number', label: 'Width', min: 0, max: MAX_EXT_X, step: 0.05, scale: 'linear', modulatable: true },
-        { key: 'extY', type: 'number', label: 'Height', min: 0, max: MAX_EXT_Y, step: 0.05, scale: 'linear', modulatable: true },
+        { key: 'extX', type: 'number', label: 'Width', min: 0, max: MAX_EXT_X, step: 0.05, scale: 'linear' },
+        { key: 'extY', type: 'number', label: 'Height', min: 0, max: MAX_EXT_Y, step: 0.05, scale: 'linear' },
 
         { type: 'group', label: 'Emission' },
-        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES, step: 1, scale: 'linear', modulatable: true },
+        { key: 'count', type: 'number', label: 'Density', min: 1, max: MAX_PARTICLES, step: 1, scale: 'linear' },
         // How many and how big sit together: they are the two knobs you trade
         // against each other to fill the panel. A radius in world units — the
         // LED pitch is 0.25, so 0.25 is one LED across. Log because 1/size^2
         // means this is two decades of the quantity that reaches the pixels.
-        { key: 'size', type: 'number', label: 'Size', min: 0.06, max: 0.6, scale: 'log', modulatable: true },
-        { key: 'life', type: 'number', label: 'Lifetime', min: 0.2, max: 10, scale: 'log', modulatable: true },
-        { key: 'lifeSpread', type: 'number', label: 'Life spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'size', type: 'number', label: 'Size', min: 0.06, max: 0.6, scale: 'log' },
+        { key: 'life', type: 'number', label: 'Lifetime', min: 0.2, max: 10, scale: 'log' },
+        { key: 'lifeSpread', type: 'number', label: 'Life spread', min: 0, max: 1, step: 0.01, scale: 'linear' },
         // The fraction of a particle's life spent brightening; the rest is the
         // fade. Not called "attack" — this codebase says Colourfulness, not
         // saturation, and Levels, not contrast.
-        { key: 'swell', type: 'number', label: 'Swell', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true, modulatable: true },
+        { key: 'swell', type: 'number', label: 'Swell', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true },
 
         { type: 'group', label: 'Motion' },
         // Labelled to match wavelet and planewave, which both use Travel for
         // the direction the thing goes rather than where it comes from.
-        { key: 'dir', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1, render: 'cone', spreadKey: 'spread', modulatable: true },
+        { key: 'dir', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1, render: 'cone', spreadKey: 'spread' },
         // The cone angle in degrees. Log because the look changes fast at the
         // narrow end — 5 to 60 degrees is the whole range from a jet to a
         // fountain, and the top half of a linear track would all read as
         // "basically omnidirectional".
-        { key: 'spread', type: 'number', label: 'Spread', min: 1, max: 360, scale: 'log', zeroable: true, modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 6, scale: 'log', zeroable: true, modulatable: true },
-        { key: 'speedSpread', type: 'number', label: 'Speed spread', min: 0, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'grav', type: 'number', label: 'Gravity', min: 0.02, max: 4, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'spread', type: 'number', label: 'Spread', min: 1, max: 360, scale: 'log', zeroable: true },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 6, scale: 'log', zeroable: true },
+        { key: 'speedSpread', type: 'number', label: 'Speed spread', min: 0, max: 1, step: 0.01, scale: 'linear' },
+        { key: 'grav', type: 'number', label: 'Gravity', min: 0.02, max: 4, scale: 'log', zeroable: true },
         // Plain arrow rather than the wavefront stripes: this is not a wave,
         // and it must not look like the Travel dial three rows above it.
-        { key: 'gravDir', type: 'angle', label: 'Gravity angle', min: 0, max: 360, step: 1, render: 'arrow', modulatable: true },
+        { key: 'gravDir', type: 'angle', label: 'Gravity angle', min: 0, max: 360, step: 1, render: 'arrow' },
     ],
 
     defaults: {
@@ -295,7 +295,7 @@ module.exports = {
             var hue = p.hueSpread >= 1
                 ? Math.random()
                 : p.h + p.hueSpread * (Math.random() - 0.5);
-            q.color = color.hsv(hue, p.s, p.v);
+            color.hsvInto(q.color, hue, p.s, p.v);
 
             q.virgin = false;
             q.born = millis;

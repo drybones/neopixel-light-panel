@@ -114,10 +114,10 @@ function createRouter(store, previewCache, effectPreviewCache) {
         });
     });
 
-    router.get('/scenes/:id/preview', function(req, res) {
+    router.get('/scenes/:id/preview', async function(req, res) {
         var scene = store.get(req.params.id);
         if (!scene) return res.sendStatus(404);
-        var preview = previewCache.get(scene);
+        var preview = await previewCache.get(scene);
         res.json({
             version: 1,
             frames: filmstrip.FRAMES,

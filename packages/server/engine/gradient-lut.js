@@ -30,14 +30,18 @@ function buildLut(stops) {
         .sort(function(a, b) { return a.position - b.position; });
     var lut = new Float32Array(LUT_SIZE * 3);
     if (sorted.length === 0) return lut;
+    // Parsed once per stop, not twice per entry: this runs on every throttled
+    // drag of a gradient param.
+    var rgbs = sorted.map(function(s) { return color.hexToRgb(s.color); });
     var si = 0;
     for (var i = 0; i < LUT_SIZE; i++) {
         var u = i / (LUT_SIZE - 1);
         while (si < sorted.length - 2 && u > sorted[si + 1].position) si++;
-        var a = sorted[si], b = sorted[Math.min(si + 1, sorted.length - 1)];
+        var bi = Math.min(si + 1, sorted.length - 1);
+        var a = sorted[si], b = sorted[bi];
         var span = b.position - a.position;
         var f = span > 0 ? Math.min(1, Math.max(0, (u - a.position) / span)) : 0;
-        var ca = color.hexToRgb(a.color), cb = color.hexToRgb(b.color);
+        var ca = rgbs[si], cb = rgbs[bi];
         lut[i * 3] = ca.r + (cb.r - ca.r) * f;
         lut[i * 3 + 1] = ca.g + (cb.g - ca.g) * f;
         lut[i * 3 + 2] = ca.b + (cb.b - ca.b) * f;

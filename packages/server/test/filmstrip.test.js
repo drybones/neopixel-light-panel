@@ -4,8 +4,8 @@ const assert = require('node:assert');
 const { Compositor } = require('../engine/compositor');
 const { SceneStore } = require('../engine/scene-store');
 const {
-    renderFilmstrip, renderEffectFilmstrip, warmupMsFor, FRAMES,
-    DEFAULT_WARMUP_MS, MAX_WARMUP_MS,
+    renderFilmstrip, renderFilmstripAsync, renderEffectFilmstrip, warmupMsFor, FRAMES,
+    DEFAULT_WARMUP_MS, MAX_WARMUP_MS, YIELD_EVERY,
 } = require('../engine/filmstrip');
 const { PreviewCache, EffectPreviewCache } = require('../engine/preview-cache');
 const effects = require('../effects');
@@ -181,16 +181,32 @@ test('rendering a scene does not disturb the live compositor', () => {
     assert.strictEqual(before, after, 'the live layer buffer should be untouched');
 });
 
-test('the cache re-renders only when scene content changes', () => {
+// The async path exists so a long warm-up cannot hold the thread the 10ms tick
+// runs on: it must hand the event loop back mid-render, not only between
+// scenes, and must not change a byte of what it renders.
+test('the async render yields within a scene and matches the sync one', async () => {
+    const { scene } = sceneWith([{ effectType: 'wavelet', params: { color: '#ffffff' } }]);
+    assert.ok(Math.ceil(warmupMsFor(scene) / 200) > YIELD_EVERY, 'the warm-up should span several batches');
+
+    let ticks = 0;
+    const counter = setInterval(() => { ticks++; }, 0);
+    const bytes = await renderFilmstripAsync(scene, MODEL);
+    clearInterval(counter);
+
+    assert.ok(ticks > 0, 'no timer ran while the scene rendered');
+    assert.deepStrictEqual(bytes, renderFilmstrip(scene, MODEL));
+});
+
+test('the cache re-renders only when scene content changes', async () => {
     const { store, scene } = sceneWith([{ effectType: 'solid', params: { color: '#204080' } }]);
     const cache = new PreviewCache(MODEL);
 
-    const first = cache.get(scene);
-    assert.strictEqual(cache.get(scene).data, first.data, 'an unchanged scene should hit the cache');
+    const first = await cache.get(scene);
+    assert.strictEqual((await cache.get(scene)).data, first.data, 'an unchanged scene should hit the cache');
 
     scene.layers[0].params.color = '#ff0000';
     store.preprocess(scene);
-    const edited = cache.get(scene);
+    const edited = await cache.get(scene);
     assert.notStrictEqual(edited.hash, first.hash);
     assert.strictEqual(Buffer.from(edited.data, 'base64')[0], 255);
 });
@@ -216,7 +232,7 @@ test('effect previews are keyed by type and rendered once', async () => {
     assert.deepStrictEqual(all.map((p) => p.id), list.map((e) => e.type));
 
     const solid = effects.get('solid');
-    assert.strictEqual(cache.get(solid).data, cache.get(solid).data);
+    assert.strictEqual((await cache.get(solid)).data, (await cache.get(solid)).data);
     assert.strictEqual(cache.entries.size, list.length);
 });
 

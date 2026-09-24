@@ -45,11 +45,7 @@ function clamp(v, lo, hi, fallback) {
 // hexToRgb answers white for anything unparseable, which is right for ink and
 // wrong for a ground: a bad background would light the whole panel. Black there
 // degrades to ordinary type instead.
-function bgToRgb(hex) {
-    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) return { r: 0, g: 0, b: 0 };
-    return color.hexToRgb(hex);
-}
+var BLACK = { r: 0, g: 0, b: 0 };
 
 module.exports = {
     type: 'text',
@@ -64,13 +60,13 @@ module.exports = {
         // Black is "no background". Anything else and the layer covers the whole
         // panel, which is what a negative mask needs it to do.
         { key: 'background', type: 'color', label: 'Background' },
-        { key: 'level', type: 'number', label: 'Level', min: 0, max: 2, step: 0.01, scale: 'linear', modulatable: true },
+        { key: 'level', type: 'number', label: 'Level', min: 0, max: 2, step: 0.01, scale: 'linear' },
 
         { type: 'group', label: 'Shape' },
         // 0 is plain linear interpolation, which is already sub-pixel — this is
         // the aesthetic part on top of it. Linear, not log: it spans one order,
         // and 0 has to be reachable without `zeroable` gymnastics.
-        { key: 'softness', type: 'number', label: 'Softness', min: 0, max: 1.5, step: 0.05, scale: 'linear', modulatable: true },
+        { key: 'softness', type: 'number', label: 'Softness', min: 0, max: 1.5, step: 0.05, scale: 'linear' },
         { key: 'tracking', type: 'number', label: 'Tracking', min: 0, max: 4, step: 1, scale: 'linear' },
 
         { type: 'group', label: 'Motion' },
@@ -78,7 +74,7 @@ module.exports = {
         // reason: it does not span decades, and a log track cannot reach a
         // negative at all — which would need a direction enum beside it for a
         // quantity with no other use for one. Positive reads right-to-left.
-        { key: 'scroll', type: 'number', label: 'Scroll', min: -40, max: 40, step: 0.5, scale: 'linear', modulatable: true },
+        { key: 'scroll', type: 'number', label: 'Scroll', min: -40, max: 40, step: 0.5, scale: 'linear' },
         // Blank columns between the end of the line and its next repeat. Only
         // does anything while scrolling.
         { key: 'gap', type: 'number', label: 'Gap', min: 0, max: 40, step: 1, scale: 'linear' },
@@ -127,7 +123,7 @@ module.exports = {
         var text = typeof params.text === 'string' ? params.text.slice(0, raster.MAX_TEXT) : '';
         var font = textFont.FONTS[params.font] ? params.font : textFont.DEFAULT_FONT;
         var rgb = color.hexToRgb(params.color);
-        var bg = bgToRgb(params.background);
+        var bg = color.hexToRgb(params.background, BLACK);
         var level = clamp(params.level, 0, 8, 1);
         return {
             text: text,

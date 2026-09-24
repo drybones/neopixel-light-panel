@@ -27,7 +27,7 @@ var MAX_RADIUS = panel.RADIUS;
 
 // Divided into dx below, so a 0 would put Infinity and then NaN in the pixel
 // buffer and out through setPixel. The slider cannot reach 0 but the typed
-// field is deliberately unclamped — the same guard as wavelet's MIN_LAMBDA.
+// field is deliberately unclamped — the same guard as engine/wave's MIN_LAMBDA.
 var MIN_ASPECT = 1e-6;
 
 module.exports = {
@@ -44,16 +44,16 @@ module.exports = {
         { type: 'xy', label: 'Centre', xKey: 'cx', yKey: 'cy',
           xRange: [-panel.HALF_X, panel.HALF_X], yRange: [-panel.HALF_Z, panel.HALF_Z], margin: 2 },
         // Width against height. 1 is a circle; the panel's own ratio is 4.14.
-        { key: 'aspect', type: 'number', label: 'Aspect', min: 0.25, max: 8, scale: 'log', modulatable: true },
+        { key: 'aspect', type: 'number', label: 'Aspect', min: 0.25, max: 8, scale: 'log' },
         // How many times the stop list is traversed between the centre and the
         // farthest corner. 1 is what the effect this replaced hardcoded.
-        { key: 'repeats', type: 'number', label: 'Repeats', min: 0.1, max: 16, scale: 'log', modulatable: true },
+        { key: 'repeats', type: 'number', label: 'Repeats', min: 0.1, max: 16, scale: 'log' },
         gradientLut.TILING_SCHEMA,
         // In ramps rather than radians — see gradient_linear.
-        { key: 'phase', type: 'number', label: 'Phase', min: 0, max: 1, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'phase', type: 'number', label: 'Phase', min: 0, max: 1, step: 0.005, scale: 'linear' },
 
         { type: 'group', label: 'Motion' },
-        { key: 'scroll', type: 'number', label: 'Scroll', min: 0.002, max: 2, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'scroll', type: 'number', label: 'Scroll', min: 0.002, max: 2, scale: 'log', zeroable: true },
         // Labelled to match wavelet, which uses Travel for the direction the
         // rings go rather than where they come from.
         { key: 'travel', type: 'enum', label: 'Travel', options: [
