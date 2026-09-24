@@ -7,6 +7,13 @@
  *
  * rename() is atomic on ext4, so at every instant there is a complete
  * good copy on disk: worst case after a crash is falling back to .bak.
+ *
+ * Two details make that true rather than nearly true. writeSync may write
+ * fewer bytes than it was given, so the write loops until the whole buffer
+ * is down before the fsync. And a rename is a change to the *directory*, not
+ * the file: the fsync on the file makes its contents durable, but until the
+ * directory is fsynced too a power cut can still come back with the old
+ * names — the new data orphaned, and the save silently undone.
  */
 
 var fs = require('fs');
@@ -47,9 +54,13 @@ function save(file, data) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     var tmp = file + '.tmp';
     var json = JSON.stringify(data);
+    var buf = Buffer.from(json, 'utf8');
     var fd = fs.openSync(tmp, 'w');
     try {
-        fs.writeSync(fd, json);
+        var off = 0;
+        while (off < buf.length) {
+            off += fs.writeSync(fd, buf, off, buf.length - off);
+        }
         fs.fsyncSync(fd);
     } finally {
         fs.closeSync(fd);
@@ -58,6 +69,16 @@ function save(file, data) {
         fs.renameSync(file, file + '.bak');
     }
     fs.renameSync(tmp, file);
+    fsyncDir(path.dirname(file));
+}
+
+function fsyncDir(dir) {
+    var fd = fs.openSync(dir, 'r');
+    try {
+        fs.fsyncSync(fd);
+    } finally {
+        fs.closeSync(fd);
+    }
 }
 
 module.exports = { load, save };

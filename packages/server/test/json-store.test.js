@@ -30,6 +30,45 @@ test('save creates its target directory if missing', () => {
     assert.deepStrictEqual(jsonStore.load(file), { n: 1 });
 });
 
+// writeSync is allowed to write less than it was given. Forced to dribble a few
+// bytes a call, the save must still land the whole document.
+test('save completes a document across short writes', (t) => {
+    const file = tmpFile('doc.json');
+    const real = fs.writeSync;
+    let calls = 0;
+    t.mock.method(fs, 'writeSync', (fd, buf, off, len) => {
+        calls++;
+        return real(fd, buf, off, Math.min(len, 7));
+    });
+    const doc = { version: 2, scenes: [{ id: 'ab12cd34', name: 'long enough to need many writes' }] };
+    jsonStore.save(file, doc);
+    t.mock.restoreAll();
+
+    assert.ok(calls > 5, `expected many short writes, got ${calls}`);
+    assert.deepStrictEqual(jsonStore.load(file), doc);
+});
+
+// The renames are a change to the directory; without an fsync on it a power
+// cut can undo a save whose file contents were already durable.
+test('save fsyncs the directory after renaming into place', (t) => {
+    const file = tmpFile('doc.json');
+    const dir = path.dirname(file);
+    const opened = new Map();
+    const realOpen = fs.openSync;
+    t.mock.method(fs, 'openSync', (p, flags) => {
+        const fd = realOpen(p, flags);
+        opened.set(fd, p);
+        return fd;
+    });
+    const synced = [];
+    const realFsync = fs.fsyncSync;
+    t.mock.method(fs, 'fsyncSync', (fd) => { synced.push(opened.get(fd)); return realFsync(fd); });
+    jsonStore.save(file, { n: 1 });
+    t.mock.restoreAll();
+
+    assert.deepStrictEqual(synced, [file + '.tmp', dir]);
+});
+
 test('a second save keeps the previous version as .bak', () => {
     const file = tmpFile('doc.json');
     jsonStore.save(file, { n: 1 });
