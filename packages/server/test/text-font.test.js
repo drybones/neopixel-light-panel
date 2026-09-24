@@ -94,12 +94,6 @@ test('the font schema offers exactly the faces that exist', () => {
     assert.ok(textFont.FONTS[textFont.DEFAULT_FONT], 'the default font must exist');
 });
 
-test('get falls back to the default face for an unknown key', () => {
-    assert.strictEqual(textFont.get('bold'), textFont.FONTS.bold);
-    assert.strictEqual(textFont.get('nope'), textFont.FONTS[textFont.DEFAULT_FONT]);
-    assert.strictEqual(textFont.get(undefined), textFont.FONTS[textFont.DEFAULT_FONT]);
-});
-
 // Every caps-only face carries the same marks, so changing face never makes a
 // character that was on the panel vanish.
 test('the caps-only faces agree on their coverage', () => {

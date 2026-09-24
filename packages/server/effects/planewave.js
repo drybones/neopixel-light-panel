@@ -31,20 +31,18 @@
  */
 
 var color = require('../engine/color');
-
-// See wavelet.js — guards the division by lambda against an unclamped 0.
-var MIN_LAMBDA = 1e-6;
+var wave = require('../engine/wave');
 
 module.exports = {
     type: 'planewave',
     name: 'Plane Wave',
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
-        { key: 'freq', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true, modulatable: true },
-        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.001, max: 50, scale: 'log', modulatable: true },
-        { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'angle', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1, modulatable: true },
-        { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
+        { key: 'freq', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true },
+        { key: 'lambda', type: 'number', label: 'Wavelength', min: 0.001, max: 50, scale: 'log' },
+        { key: 'delta', type: 'number', label: 'Phase', min: 0, max: 6.28, step: 0.01, scale: 'linear' },
+        { key: 'angle', type: 'angle', label: 'Travel', min: 0, max: 360, step: 1 },
+        { type: 'range', label: 'Brightness', minKey: 'min', maxKey: 'max', scale: 'atan' },
     ],
     defaults: {
         color: '#ffffff',
@@ -64,7 +62,7 @@ module.exports = {
             freq: params.freq,
             // Divided into `proj` below — 0 would render the layer as NaN.
             // The typed field is unclamped, so this can arrive as 0.
-            lambda: params.lambda || MIN_LAMBDA,
+            lambda: params.lambda || wave.MIN_LAMBDA,
             delta: params.delta,
             ca: Math.cos(a),
             sa: Math.sin(a),
@@ -80,18 +78,10 @@ module.exports = {
 
         return {
             render(out, millis, p) {
-                var phase = millis * 0.00628 * p.freq + p.delta;
+                var phase = wave.phase(millis, p);
                 for (var i = 0; i < n; i++) {
                     var proj = modelX[i] * p.ca - modelZ[i] * p.sa;
-                    var theta = phase - proj / p.lambda;
-                    var brightness = p.min + (p.max - p.min) * 0.5 * (Math.sin(theta) + 1);
-
-                    var wr = p.r * brightness;
-                    var wg = p.g * brightness;
-                    var wb = p.b * brightness;
-                    out[i * 3] = wr < 0 ? 0 : (wr > 255 ? 255 : wr);
-                    out[i * 3 + 1] = wg < 0 ? 0 : (wg > 255 ? 255 : wg);
-                    out[i * 3 + 2] = wb < 0 ? 0 : (wb > 255 ? 255 : wb);
+                    wave.shade(out, i, phase - proj / p.lambda, p);
                 }
             }
         };

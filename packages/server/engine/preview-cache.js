@@ -31,26 +31,27 @@ class PreviewCache {
     }
 
     // { id, hash, data } for one scene; renders on a miss or a content change.
-    get(scene) {
+    //
+    // Async because the render yields to the 10ms tick every few frames (see
+    // filmstrip.YIELD_EVERY). A cold library is a few thousand layer renders,
+    // and even one scene's capped warm-up is a few hundred; done synchronously
+    // either would stall the panel, which is exactly the sort of hitch the
+    // render loop exists to avoid.
+    async get(scene) {
         var hash = hashScene(scene);
         var entry = this.entries.get(scene.id);
         if (!entry || entry.hash !== hash) {
-            var bytes = filmstrip.renderFilmstrip(scene, this.model);
+            var bytes = await filmstrip.renderFilmstripAsync(scene, this.model);
             entry = { hash: hash, data: Buffer.from(bytes).toString('base64') };
             this.entries.set(scene.id, entry);
         }
         return { id: scene.id, hash: entry.hash, data: entry.data };
     }
 
-    // Every scene's strip, yielding between scenes so the 10ms render tick can
-    // run. A cold library is a few thousand layer renders; done synchronously
-    // it would stall the panel for the whole burst, which is exactly the sort
-    // of hitch the render loop exists to avoid.
     async all(scenes) {
         var out = [];
         for (var i = 0; i < scenes.length; i++) {
-            out.push(this.get(scenes[i]));
-            await new Promise(function(resolve) { setImmediate(resolve); });
+            out.push(await this.get(scenes[i]));
         }
         this.prune(scenes);
         return out;
@@ -79,10 +80,10 @@ class EffectPreviewCache {
         this.entries = new Map(); // effect type → { hash, data }
     }
 
-    get(effect) {
+    async get(effect) {
         var entry = this.entries.get(effect.type);
         if (!entry) {
-            var bytes = filmstrip.renderEffectFilmstrip(effect, this.model);
+            var bytes = await filmstrip.renderEffectFilmstripAsync(effect, this.model);
             entry = {
                 hash: crypto.createHash('sha1')
                     .update(JSON.stringify({ type: effect.type, defaults: effect.defaults }))
@@ -97,8 +98,7 @@ class EffectPreviewCache {
     async all(effectModules) {
         var out = [];
         for (var i = 0; i < effectModules.length; i++) {
-            out.push(this.get(effectModules[i]));
-            await new Promise(function(resolve) { setImmediate(resolve); });
+            out.push(await this.get(effectModules[i]));
         }
         return out;
     }

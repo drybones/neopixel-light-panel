@@ -477,43 +477,34 @@ function buildFont(art, tofuArt, height, fold) {
     };
 }
 
-var FONTS = {
-    micro: buildFont(MICRO, MICRO_TOFU, 6, true),
-    compact: buildFont(COMPACT, COMPACT_TOFU, 6, true),
-    regular: buildFont(REGULAR, REGULAR_TOFU, 8, false),
-    grotesk: buildFont(GROTESK, GROTESK_TOFU, 8, true),
-    terminal: buildFont(TERMINAL, TERMINAL_TOFU, 8, true),
-    bold: buildFont(BOLD, BOLD_TOFU, 8, true),
-};
+// The one list of faces: the lookup and the control that picks one are built
+// from it, so a face added here is reachable with no second edit. Ordered light
+// to heavy, which is the order they are worth trying in.
+var FACES = [
+    { value: 'micro', label: '4×6 micro', font: buildFont(MICRO, MICRO_TOFU, 6, true) },
+    { value: 'compact', label: '5×6 compact', font: buildFont(COMPACT, COMPACT_TOFU, 6, true) },
+    { value: 'regular', label: '5×7 regular', font: buildFont(REGULAR, REGULAR_TOFU, 8, false) },
+    { value: 'grotesk', label: '5×8 grotesk', font: buildFont(GROTESK, GROTESK_TOFU, 8, true) },
+    { value: 'terminal', label: '6×8 terminal', font: buildFont(TERMINAL, TERMINAL_TOFU, 8, true) },
+    { value: 'bold', label: '6×8 bold', font: buildFont(BOLD, BOLD_TOFU, 8, true) },
+];
+
+var FONTS = {};
+FACES.forEach(function(f) { FONTS[f.value] = f.font; });
 
 var DEFAULT_FONT = 'regular';
 
-// Exported beside the data, the way gradient-lut exports TILING_SCHEMA: the list
-// of faces and the control that picks one are the same fact, and a face added
-// here should not need a second edit in the effect to be reachable. Ordered
-// light to heavy, which is the order they are worth trying in.
+// Exported beside the data, the way gradient-lut exports TILING_SCHEMA.
 var FONT_SCHEMA = {
     key: 'font',
     type: 'enum',
     label: 'Font',
-    options: [
-        { value: 'micro', label: '4×6 micro' },
-        { value: 'compact', label: '5×6 compact' },
-        { value: 'regular', label: '5×7 regular' },
-        { value: 'grotesk', label: '5×8 grotesk' },
-        { value: 'terminal', label: '6×8 terminal' },
-        { value: 'bold', label: '6×8 bold' },
-    ],
+    options: FACES.map(function(f) { return { value: f.value, label: f.label }; }),
 };
-
-function get(key) {
-    return FONTS[key] || FONTS[DEFAULT_FONT];
-}
 
 module.exports = {
     FONTS: FONTS,
     FONT_SCHEMA: FONT_SCHEMA,
     DEFAULT_FONT: DEFAULT_FONT,
     CELL_ROWS: CELL_ROWS,
-    get: get,
 };

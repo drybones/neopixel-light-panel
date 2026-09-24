@@ -39,14 +39,14 @@ module.exports = {
     schema: [
         { key: 'color', type: 'color', label: 'Colour' },
         // 0 is every star the same colour — the default.
-        { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true, modulatable: true },
-        { key: 'density', type: 'number', label: 'Density', min: 0.02, max: 1, step: 0.01, scale: 'linear', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 5, scale: 'log', modulatable: true },
+        { key: 'hueSpread', type: 'number', label: 'Hue spread', min: 0, max: 1, step: 0.01, scale: 'linear', zeroable: true },
+        { key: 'density', type: 'number', label: 'Density', min: 0.02, max: 1, step: 0.01, scale: 'linear' },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.05, max: 5, scale: 'log' },
         // Log because the interesting range is 1 (a soft sine swell) to about
         // 16 (a hard blink), and the difference between 1 and 2 is far bigger
         // than between 12 and 16.
-        { key: 'sharpness', type: 'number', label: 'Sharpness', min: 0.5, max: 16, scale: 'log', modulatable: true },
-        { key: 'background', type: 'number', label: 'Backglow', min: 0.01, max: 0.5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'sharpness', type: 'number', label: 'Sharpness', min: 0.5, max: 16, scale: 'log' },
+        { key: 'background', type: 'number', label: 'Backglow', min: 0.01, max: 0.5, scale: 'log', zeroable: true },
     ],
     defaults: {
         color: '#ffe9c4',

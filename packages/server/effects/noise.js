@@ -68,11 +68,11 @@ module.exports = {
     schema: [
         { key: 'c1', type: 'color', label: 'Low colour' },
         { key: 'c2', type: 'color', label: 'High colour' },
-        { key: 'scale', type: 'number', label: 'Scale', min: 0.1, max: 8, scale: 'log', modulatable: true },
-        { key: 'speed', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'scale', type: 'number', label: 'Scale', min: 0.1, max: 8, scale: 'log' },
+        { key: 'speed', type: 'number', label: 'Speed', min: 0.01, max: 5, scale: 'log', zeroable: true },
         // Levels, not Brightness: v is a position in the c1..c2 ramp, not a
         // light level. Unbounded on purpose (see the note on the clamp below).
-        { type: 'range', label: 'Levels', minKey: 'min', maxKey: 'max', scale: 'atan', modulatable: true },
+        { type: 'range', label: 'Levels', minKey: 'min', maxKey: 'max', scale: 'atan' },
     ],
     defaults: {
         c1: '#0a1030',

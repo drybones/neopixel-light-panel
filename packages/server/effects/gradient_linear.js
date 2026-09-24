@@ -39,26 +39,26 @@ module.exports = {
         // a wave direction and the wavefront stripes would say the wrong thing,
         // but the ramp's own colours say exactly the right one.
         { key: 'angle', type: 'angle', label: 'Angle', min: 0, max: 360, step: 1,
-          render: 'bands', stopsKey: 'stops', modulatable: true },
+          render: 'bands', stopsKey: 'stops' },
         // How many times the stop list is traversed across the panel. 1 is one
         // ramp edge to edge, which is what the effect this replaced hardcoded —
         // and the reason an angle near 90 looked so flat, since the projection
         // is normalised on the panel's *half-width* and the panel is only 0.875
         // tall. Log: 0.1 to 16 is two and a half decades of band count.
-        { key: 'repeats', type: 'number', label: 'Repeats', min: 0.1, max: 16, scale: 'log', modulatable: true },
+        { key: 'repeats', type: 'number', label: 'Repeats', min: 0.1, max: 16, scale: 'log' },
         gradientLut.TILING_SCHEMA,
         // In ramps rather than radians — wavelet and planewave measure phase on
         // a sine, this one measures it along a stop list. 1 is a whole traversal.
-        { key: 'phase', type: 'number', label: 'Phase', min: 0, max: 1, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'phase', type: 'number', label: 'Phase', min: 0, max: 1, step: 0.005, scale: 'linear' },
 
         { type: 'group', label: 'Motion' },
-        { key: 'scroll', type: 'number', label: 'Scroll', min: 0.002, max: 2, scale: 'log', zeroable: true, modulatable: true },
+        { key: 'scroll', type: 'number', label: 'Scroll', min: 0.002, max: 2, scale: 'log', zeroable: true },
         // Rotations per second, and the one speed in this codebase that is a
         // signed linear track rather than a log one: it does not span decades,
         // and a log slider cannot reach a negative at all, which would need a
         // direction enum beside it for a quantity that has no other use for one.
         // Anticlockwise for positive, the way the dial's numbers already run.
-        { key: 'spin', type: 'number', label: 'Spin', min: -0.5, max: 0.5, step: 0.005, scale: 'linear', modulatable: true },
+        { key: 'spin', type: 'number', label: 'Spin', min: -0.5, max: 0.5, step: 0.005, scale: 'linear' },
     ],
     defaults: {
         stops: [

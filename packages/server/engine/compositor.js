@@ -19,7 +19,7 @@
  */
 
 var effects = require('../effects');
-var color = require('./color');
+var clamp255 = require('./color').clamp255;
 
 /*
  * The rule every mode obeys:
@@ -109,20 +109,20 @@ function blendInto(dst, src, mode, opacity, n) {
                 o = a + b * opacity;
                 break;
             case 2: {
-                var bn = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var bn = clamp255(b);
                 o = a + (a * bn / 255 - a) * opacity;
                 break;
             }
             case 3: {
-                var an3 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn3 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an3 = clamp255(a);
+                var bn3 = clamp255(b);
                 var s = 255 - (255 - an3) * (255 - bn3) / 255;
                 o = a + (s - an3) * opacity;
                 break;
             }
             case 4: {
-                var an4 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn4 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an4 = clamp255(a);
+                var bn4 = clamp255(b);
                 var v = an4 < 128
                     ? 2 * an4 * bn4 / 255
                     : 255 - 2 * (255 - an4) * (255 - bn4) / 255;
@@ -141,21 +141,21 @@ function blendInto(dst, src, mode, opacity, n) {
             // Against white this is an invert — the cheapest mask available
             // here, and the reason the mode earns its case.
             case 6: {
-                var an6 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn6 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an6 = clamp255(a);
+                var bn6 = clamp255(b);
                 var d = an6 - bn6;
                 o = a + ((d < 0 ? -d : d) - an6) * opacity;
                 break;
             }
             case 7: {
-                var an7 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn7 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an7 = clamp255(a);
+                var bn7 = clamp255(b);
                 o = a + ((an7 > bn7 ? an7 : bn7) - an7) * opacity;
                 break;
             }
             case 8: {
-                var an8 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn8 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an8 = clamp255(a);
+                var bn8 = clamp255(b);
                 o = a + ((an8 < bn8 ? an8 : bn8) - an8) * opacity;
                 break;
             }
@@ -167,8 +167,8 @@ function blendInto(dst, src, mode, opacity, n) {
             // mid-grey pivot. Mid-grey is exactly identity, black squares the
             // backdrop and white is its complement.
             case 9: {
-                var an9 = a < 0 ? 0 : (a > 255 ? 255 : a);
-                var bn9 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var an9 = clamp255(a);
+                var bn9 = clamp255(b);
                 var sl = (an9 * an9 * (255 - 2 * bn9) / 255 + 2 * an9 * bn9) / 255;
                 o = a + (sl - an9) * opacity;
                 break;
@@ -186,7 +186,7 @@ function blendInto(dst, src, mode, opacity, n) {
             // only the source — the exact mirror of add and subtract, with a
             // mid-grey pivot instead of a black one.
             case 10: {
-                var bn10 = b < 0 ? 0 : (b > 255 ? 255 : b);
+                var bn10 = clamp255(b);
                 o = a + (2 * bn10 - 255) * opacity;
                 break;
             }
@@ -208,7 +208,6 @@ class Compositor {
             numPixels: this.numPixels,
             modelX: new Float32Array(this.numPixels),
             modelZ: new Float32Array(this.numPixels),
-            hsv: color.hsv,
         };
         for (var i = 0; i < this.numPixels; i++) {
             this.ctx.modelX[i] = model[i].point[0];

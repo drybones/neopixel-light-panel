@@ -13,6 +13,7 @@
 
 const fs = require('fs');
 const { PowerMeter } = require('./power');
+const { toByte } = require('./color');
 
 // Channel (1) + command (1) + length (2), ahead of the pixel data.
 const HEADER_BYTES = 4;
@@ -58,9 +59,9 @@ class PixelSink {
         // the finished frame. The product needs no second clamp: the value
         // is already in range and brightness is clamped to 0–1 on both ways
         // in (routes/system.js and SettingsStore.load).
-        const rb = (Math.max(0, Math.min(255, r | 0)) * this.brightness) | 0;
-        const gb = (Math.max(0, Math.min(255, g | 0)) * this.brightness) | 0;
-        const bb = (Math.max(0, Math.min(255, b | 0)) * this.brightness) | 0;
+        const rb = (toByte(r) * this.brightness) | 0;
+        const gb = (toByte(g) * this.brightness) | 0;
+        const bb = (toByte(b) * this.brightness) | 0;
 
         const buf = this.pixelBuffer;
         buf[offset] = rb;
