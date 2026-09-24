@@ -77,7 +77,7 @@ test('same host on another port is not same-origin', async () => {
 });
 
 test('a request with no Origin is not a browser page and passes', async () => {
-    // curl, tools/power-sweep.js.
+    // curl, or a script on the Pi.
     const { app, calls } = await harness([]);
     try {
         const res = await app.post('/api/scenes/reset');

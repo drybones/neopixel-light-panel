@@ -3,7 +3,8 @@
 # for correlating power events with what the panel was doing at the time.
 # Exact-moment undervoltage detection lives in power-watch.sh instead — this
 # loop is for correlation, not detection, so a 1s poll is fine even though
-# the underlying vcgencmd flags are latched (see plan/README for why).
+# the underlying vcgencmd flags are latched: get_throttled's since-boot bits
+# are sticky, so a dip between polls still shows up, just not exactly when.
 set -u
 
 LOG_FILE="${POWER_MONITOR_LOG:-$HOME/power-monitor.log}"

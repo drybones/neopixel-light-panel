@@ -7,6 +7,13 @@
  * always packs into one byte and an empty column is a zero — which is also the
  * skip test the sampler leans on for spaces and the wrap gap.
  *
+ * Glyphs are pure binary. Grey-level glyph art was tried and dropped: it was an
+ * attempt to round a bowl at 6x8 with two-column stems, where the counter is
+ * only two columns wide and a corner has nowhere to go. The fix for that is a
+ * wider cell, not a partial cell, and a face wide enough to curve properly
+ * (8x8) fits three characters on the panel, which is not a face worth having.
+ * Sub-pixel softness belongs to the sampler (engine/text-raster), not the art.
+ *
  * Glyph *width is the row length*, so variable width falls out of the art and
  * nothing declares it twice. One invariant test/text-font.test.js pins: every
  * digit within a face is the same width, or a clock reflows when the minute
@@ -478,8 +485,9 @@ function buildFont(art, tofuArt, height, fold) {
 }
 
 // The one list of faces: the lookup and the control that picks one are built
-// from it, so a face added here is reachable with no second edit. Ordered light
-// to heavy, which is the order they are worth trying in.
+// from it, so a face added here is reachable with no second code edit — only
+// API.md's `font` list and face table, which are prose. Ordered light to
+// heavy, which is the order they are worth trying in.
 const FACES = [
     { value: 'micro', label: '4×6 micro', font: buildFont(MICRO, MICRO_TOFU, 6, true) },
     { value: 'compact', label: '5×6 compact', font: buildFont(COMPACT, COMPACT_TOFU, 6, true) },

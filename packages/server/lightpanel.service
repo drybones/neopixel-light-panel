@@ -6,7 +6,11 @@ After=network.target fcserver.service
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/github/neopixel-light-panel/packages/server
-ExecStart=/home/pi/.nvm/versions/node/v24.20.0/bin/node app.js
+# nvm-exec picks the newest installed Node 24.x, so an `nvm install` of a
+# patch release doesn't strand this on a deleted path. It execs node, so
+# SIGTERM still reaches app.js and the scene store flushes on stop.
+Environment=NODE_VERSION=24
+ExecStart=/home/pi/.nvm/nvm-exec node app.js
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

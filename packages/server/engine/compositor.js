@@ -15,7 +15,10 @@
  * `multiply` or partial-opacity layer can still recover.
  *
  * All buffers and effect instances are allocated on the API write path
- * (syncScene), keyed by layer id; the per-frame path is allocation-free.
+ * (syncScene), keyed by layer id, so the compositor's own per-frame path
+ * allocates nothing. Effects hold to the same rule with one known exception:
+ * `text` builds a short cache-key string every frame and rebuilds its mask
+ * when the resolved line changes (once a second for a {ss} clock).
  */
 
 const effects = require('../effects');
