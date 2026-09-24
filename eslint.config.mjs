@@ -25,6 +25,15 @@ export default [
                 // one are harmless, and not this lint's business to churn.
                 varsIgnorePattern: '^React$',
             }],
+            // What keeps the server's modernisation (#115) from sliding back:
+            // block scope, no `var self = this` (an arrow keeps `this`), and
+            // Object.hasOwn over the prototype dance. `== null` stays legal,
+            // since it is the idiomatic null-or-undefined test.
+            'no-var': 'error',
+            'prefer-const': ['error', { destructuring: 'all' }],
+            'prefer-arrow-callback': 'error',
+            'prefer-object-has-own': 'error',
+            eqeqeq: ['error', 'smart'],
         },
     },
 

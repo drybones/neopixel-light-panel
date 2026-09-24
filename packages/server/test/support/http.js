@@ -28,7 +28,7 @@ function startApp(mount) {
             async function request(method, path, options) {
                 const opts = options || {};
                 const init = { method, headers: Object.assign({}, opts.headers) };
-                if (Object.prototype.hasOwnProperty.call(opts, 'body')) {
+                if (Object.hasOwn(opts, 'body')) {
                     init.headers['Content-Type'] = 'application/json';
                     // `raw` sends the string as-is, for the malformed-JSON case.
                     init.body = opts.raw ? opts.body : JSON.stringify(opts.body);
