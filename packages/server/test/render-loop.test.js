@@ -9,39 +9,39 @@ const { createTick, TICK_ERROR_LOG_MS } = require('../engine/render-loop');
 // restarts, and that a throwing frame costs a frame rather than the service.
 
 function harness() {
-    var calls = [];
-    var state = { scene: null, now: 1000, throwOnRender: false, errors: [] };
-    var tick = createTick({
-        store: { activeScene: function() { return state.scene; } },
+    const calls = [];
+    const state = { scene: null, now: 1000, throwOnRender: false, errors: [] };
+    const tick = createTick({
+        store: { activeScene() { return state.scene; } },
         compositor: {
-            renderFrame: function(scene, t) {
+            renderFrame(scene, t) {
                 if (state.throwOnRender) throw new Error('bad frame');
-                calls.push('render ' + scene.id + ' @' + t);
+                calls.push(`render ${scene.id} @${t}`);
             },
-            renderBlack: function() { calls.push('black'); },
+            renderBlack() { calls.push('black'); },
         },
         broadcaster: {
-            tick: function(scene, force) {
-                calls.push('broadcast ' + (scene ? scene.id : 'off') + (force ? ' forced' : ''));
+            tick(scene, force) {
+                calls.push(`broadcast ${scene ? scene.id : 'off'}${force ? ' forced' : ''}`);
             },
         },
         frameStats: {
-            restart: function() { calls.push('stats restart'); },
-            begin: function() { return 0; },
-            endRender: function() {},
-            end: function() {},
+            restart() { calls.push('stats restart'); },
+            begin() { return 0; },
+            endRender() {},
+            end() {},
         },
-        now: function() { return state.now; },
-        logError: function(msg) { state.errors.push(msg); },
+        now() { return state.now; },
+        logError(msg) { state.errors.push(msg); },
     });
-    return { tick: tick, calls: calls, state: state };
+    return { tick, calls, state };
 }
 
 test('an active scene renders and broadcasts its frame every tick', () => {
     // The broadcaster is handed the scene, not just told to send: one frame
     // carries the composite to everyone and that scene's layers to whoever
     // asked for them.
-    var h = harness();
+    const h = harness();
     h.state.scene = { id: 's1', layers: [] };
     h.tick();
     assert.deepStrictEqual(h.calls, ['stats restart', 'render s1 @1000', 'broadcast s1']);
@@ -50,7 +50,7 @@ test('an active scene renders and broadcasts its frame every tick', () => {
 test('off is one black frame, forced out to clients, and then nothing', () => {
     // Forced because an ordinary tick is throttled and skipped with no
     // clients — and the off frame is what a client connecting later replays.
-    var h = harness();
+    const h = harness();
     h.tick();
     h.tick();
     h.tick();
@@ -58,7 +58,7 @@ test('off is one black frame, forced out to clients, and then nothing', () => {
 });
 
 test('going off again after a scene renders a fresh black frame', () => {
-    var h = harness();
+    const h = harness();
     h.tick();                              // off
     h.state.scene = { id: 's1', layers: [] };
     h.tick();                              // on
@@ -71,9 +71,9 @@ test('going off again after a scene renders a fresh black frame', () => {
 test('the frame-rate soak restarts on a scene change, not on a return from off', () => {
     // Cost is per scene, so a switch restarts; off-and-back to the same scene
     // resumes the soak that was running.
-    var h = harness();
-    var s1 = { id: 's1', layers: [] };
-    var s2 = { id: 's2', layers: [] };
+    const h = harness();
+    const s1 = { id: 's1', layers: [] };
+    const s2 = { id: 's2', layers: [] };
     h.state.scene = s1; h.tick(); h.tick();
     h.state.scene = null; h.tick();
     h.state.scene = s1; h.tick();
@@ -82,7 +82,7 @@ test('the frame-rate soak restarts on a scene change, not on a return from off',
 });
 
 test('a throwing frame is caught, and the next tick still renders', () => {
-    var h = harness();
+    const h = harness();
     h.state.scene = { id: 's1', layers: [] };
     h.state.throwOnRender = true;
     assert.doesNotThrow(() => h.tick());
@@ -94,10 +94,10 @@ test('a throwing frame is caught, and the next tick still renders', () => {
 });
 
 test('a persistent fault logs once per interval, not once per tick', () => {
-    var h = harness();
+    const h = harness();
     h.state.scene = { id: 's1', layers: [] };
     h.state.throwOnRender = true;
-    for (var i = 0; i < 100; i++) { h.tick(); h.state.now += 10; } // 1s of ticks
+    for (let i = 0; i < 100; i++) { h.tick(); h.state.now += 10; } // 1s of ticks
     assert.strictEqual(h.state.errors.length, 1);
 
     h.state.now += TICK_ERROR_LOG_MS;

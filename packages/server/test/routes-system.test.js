@@ -90,8 +90,8 @@ test('PUT /api/brightness rejects junk rather than setting NaN', async () => {
     const { app, client, settings } = await harness();
     try {
         for (const junk of ['abc', 'NaN', 'Infinity', '-Infinity', 'null']) {
-            const res = await app.put('/api/brightness/' + encodeURIComponent(junk));
-            assert.strictEqual(res.status, 400, 'expected 400 for ' + JSON.stringify(junk));
+            const res = await app.put(`/api/brightness/${encodeURIComponent(junk)}`);
+            assert.strictEqual(res.status, 400, `expected 400 for ${JSON.stringify(junk)}`);
         }
         // An empty segment matches no PUT route at all, so it is a 404 rather
         // than a validation failure — worth pinning as the boundary between
@@ -136,7 +136,7 @@ test('PUT /api/fps demands a boolean, and 400s on an absent body', async () => {
     try {
         for (const body of [{ enabled: 'yes' }, { enabled: 1 }, { enabled: null }, {}]) {
             assert.strictEqual((await app.put('/api/fps', { body })).status, 400,
-                'expected 400 for ' + JSON.stringify(body));
+                `expected 400 for ${JSON.stringify(body)}`);
         }
         // express 5: no body means req.body is undefined, not {}
         assert.strictEqual((await app.put('/api/fps')).status, 400);
@@ -180,7 +180,7 @@ test('PUT /api/power rejects a non-object body', async () => {
     try {
         for (const body of ['a string', 42, null]) {
             assert.strictEqual((await app.put('/api/power', { body })).status, 400,
-                'expected 400 for ' + JSON.stringify(body));
+                `expected 400 for ${JSON.stringify(body)}`);
         }
         assert.strictEqual((await app.put('/api/power')).status, 400);
     } finally { await app.close(); }

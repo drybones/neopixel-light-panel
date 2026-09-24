@@ -322,7 +322,7 @@ test('a multi-wavelet scene sums per-layer additive blending correctly', () => {
     const scene = {
         id: 's1', name: 'multi-wavelet',
         layers: wavelets.map((w, i) => ({
-            id: 'w' + i, effectType: 'wavelet', params: w,
+            id: `w${i}`, effectType: 'wavelet', params: w,
             blendMode: 'add', opacity: 1, enabled: true, solo: false,
         })),
     };

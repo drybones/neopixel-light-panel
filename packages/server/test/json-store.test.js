@@ -66,7 +66,7 @@ test('save fsyncs the directory after renaming into place', (t) => {
     jsonStore.save(file, { n: 1 });
     t.mock.restoreAll();
 
-    assert.deepStrictEqual(synced, [file + '.tmp', dir]);
+    assert.deepStrictEqual(synced, [`${file}.tmp`, dir]);
 });
 
 test('a second save keeps the previous version as .bak', () => {
@@ -74,7 +74,7 @@ test('a second save keeps the previous version as .bak', () => {
     jsonStore.save(file, { n: 1 });
     jsonStore.save(file, { n: 2 });
     assert.deepStrictEqual(jsonStore.load(file), { n: 2 });
-    assert.deepStrictEqual(JSON.parse(fs.readFileSync(file + '.bak')), { n: 1 });
+    assert.deepStrictEqual(JSON.parse(fs.readFileSync(`${file}.bak`)), { n: 1 });
 });
 
 test('a truncated main file falls back to .bak', () => {
@@ -92,7 +92,7 @@ test('a truncated main file falls back to .bak', () => {
 test('load returns null when both main and .bak are corrupt', () => {
     const file = tmpFile('doc.json');
     fs.writeFileSync(file, 'not json');
-    fs.writeFileSync(file + '.bak', 'also not json');
+    fs.writeFileSync(`${file}.bak`, 'also not json');
     assert.strictEqual(jsonStore.load(file), null);
 });
 

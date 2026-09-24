@@ -8,19 +8,19 @@ const OPC = require('../opc');
 // sinks.test.js; this file is only about what happens to the socket.
 
 function listen() {
-    return new Promise(function(resolve) {
-        var server = net.createServer();
-        server.listen(0, '127.0.0.1', function() { resolve(server); });
+    return new Promise((resolve) => {
+        const server = net.createServer();
+        server.listen(0, '127.0.0.1', () => { resolve(server); });
     });
 }
 
 function closeServer(server) {
-    return new Promise(function(resolve) { server.close(resolve); });
+    return new Promise((resolve) => { server.close(resolve); });
 }
 
 function waitFor(predicate, ms) {
-    var deadline = Date.now() + (ms || 1000);
-    return new Promise(function(resolve, reject) {
+    const deadline = Date.now() + (ms || 1000);
+    return new Promise((resolve, reject) => {
         (function poll() {
             if (predicate()) return resolve();
             if (Date.now() > deadline) return reject(new Error('timed out waiting'));
@@ -35,11 +35,11 @@ test('a graceful close from fcserver resets the client, and the next frame recon
     // calls, so `connected` stayed true on a destroyed socket and every
     // subsequent frame was written into it. The panel froze on its last
     // frame and nothing crashed to restart the service.
-    var server = await listen();
-    var accepted = [];
-    server.on('connection', function(s) { accepted.push(s); });
+    const server = await listen();
+    const accepted = [];
+    server.on('connection', (s) => { accepted.push(s); });
 
-    var sink = new OPC('127.0.0.1', server.address().port, 1, { reconnectMs: 20 });
+    const sink = new OPC('127.0.0.1', server.address().port, 1, { reconnectMs: 20 });
     sink.setPixelCount(1);
     try {
         sink.writePixels();
@@ -62,19 +62,19 @@ test('a graceful close from fcserver resets the client, and the next frame recon
 
 test('while fcserver is absent, connection attempts are gated, not one per tick', async () => {
     // A port that refuses: listen, take the number, close.
-    var server = await listen();
-    var port = server.address().port;
+    const server = await listen();
+    const port = server.address().port;
     await closeServer(server);
 
-    var sink = new OPC('127.0.0.1', port, 1, { reconnectMs: 100 });
+    const sink = new OPC('127.0.0.1', port, 1, { reconnectMs: 100 });
     sink.setPixelCount(1);
-    var attempts = 0;
-    var realConnect = net.Socket.prototype.connect;
+    let attempts = 0;
+    const realConnect = net.Socket.prototype.connect;
     net.Socket.prototype.connect = function() { attempts++; return realConnect.apply(this, arguments); };
-    var logged = console.error;
+    const logged = console.error;
     console.error = function() {};
-    var frames = 0;
-    var timer = setInterval(function() { sink.writePixels(); frames++; }, 2);
+    let frames = 0;
+    const timer = setInterval(() => { sink.writePixels(); frames++; }, 2);
     try {
         await new Promise((r) => setTimeout(r, 40));
         assert.strictEqual(attempts, 1, 'one attempt inside the first gate window');
@@ -82,7 +82,7 @@ test('while fcserver is absent, connection attempts are gated, not one per tick'
         await new Promise((r) => setTimeout(r, 260));
         // ~300ms at a 100ms gate: a handful of attempts against ~150 frames.
         // Ungated, every frame after a refused connect opened a new socket.
-        assert.ok(attempts >= 2 && attempts <= 5, 'expected 2–5 attempts, got ' + attempts + ' over ' + frames + ' frames');
+        assert.ok(attempts >= 2 && attempts <= 5, `expected 2–5 attempts, got ${attempts} over ${frames} frames`);
         assert.strictEqual(sink.connected, false);
     } finally {
         // In finally, or a failing assertion leaves the interval keeping the

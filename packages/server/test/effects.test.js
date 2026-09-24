@@ -38,7 +38,7 @@ test('every effect renders its defaults without throwing', () => {
         const instance = mod.createInstance(ctx2);
         const out = new Float32Array(ctx2.numPixels * 3);
         instance.render(out, 12345, prepared);
-        assert.ok(out.every(v => Number.isFinite(v)), entry.type + ' produced non-finite values');
+        assert.ok(out.every(v => Number.isFinite(v)), `${entry.type} produced non-finite values`);
     }
 });
 
@@ -148,7 +148,7 @@ test('gradient LUT interpolates stops', () => {
     assert.strictEqual(p.lut[0], 0);
     assert.strictEqual(p.lut[255 * 3], 255);
     const mid = p.lut[128 * 3];
-    assert.ok(Math.abs(mid - 128) < 2, 'midpoint ' + mid);
+    assert.ok(Math.abs(mid - 128) < 2, `midpoint ${mid}`);
 });
 
 test('linear gradient maps panel extremes to stop colours', () => {
@@ -160,9 +160,9 @@ test('linear gradient maps panel extremes to stop colours', () => {
     };
     const out = new Float32Array(9);
     gradientLinear.createInstance(ctx).render(out, 0, p);
-    assert.ok(out[0] < 3, 'left edge should be near black, got ' + out[0]);
-    assert.ok(Math.abs(out[3] - 127.5) < 3, 'centre should be mid-red, got ' + out[3]);
-    assert.ok(out[6] > 252, 'right edge should be full red, got ' + out[6]);
+    assert.ok(out[0] < 3, `left edge should be near black, got ${out[0]}`);
+    assert.ok(Math.abs(out[3] - 127.5) < 3, `centre should be mid-red, got ${out[3]}`);
+    assert.ok(out[6] > 252, `right edge should be full red, got ${out[6]}`);
 });
 
 // The vertical axis inverts between param space (the dial draws 90 degrees as
@@ -195,10 +195,10 @@ test('linear gradient repeats traverse the stop list more than once', () => {
     const out = new Float32Array(15);
     gradientLinear.createInstance(ctx).render(out, 0,
         gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 0, repeats: 2 }));
-    assert.ok(out[3] < 3, 'the first stop should land a quarter in, got ' + out[3]);
-    assert.ok(out[9] > 252, 'the last stop should land three quarters in, got ' + out[9]);
-    assert.ok(Math.abs(out[0] - 127.5) < 3, 'left edge should fold to mid-ramp, got ' + out[0]);
-    assert.ok(Math.abs(out[12] - 127.5) < 3, 'right edge should fold to mid-ramp, got ' + out[12]);
+    assert.ok(out[3] < 3, `the first stop should land a quarter in, got ${out[3]}`);
+    assert.ok(out[9] > 252, `the last stop should land three quarters in, got ${out[9]}`);
+    assert.ok(Math.abs(out[0] - 127.5) < 3, `left edge should fold to mid-ramp, got ${out[0]}`);
+    assert.ok(Math.abs(out[12] - 127.5) < 3, `right edge should fold to mid-ramp, got ${out[12]}`);
 });
 
 test('gradient tiling decides what happens past the ends', () => {
@@ -215,9 +215,9 @@ test('gradient tiling decides what happens past the ends', () => {
             gradientLinear.prepare({ ...gradientLinear.defaults, stops: RAMP, angle: 0, tiling }));
         return out[0];
     }
-    assert.ok(edge('hold') > 252, 'hold should sit on the last stop, got ' + edge('hold'));
-    assert.ok(Math.abs(edge('repeat') - 63.75) < 3, 'repeat should sawtooth to 0.25, got ' + edge('repeat'));
-    assert.ok(Math.abs(edge('mirror') - 191.25) < 3, 'mirror should fold to 0.75, got ' + edge('mirror'));
+    assert.ok(edge('hold') > 252, `hold should sit on the last stop, got ${edge('hold')}`);
+    assert.ok(Math.abs(edge('repeat') - 63.75) < 3, `repeat should sawtooth to 0.25, got ${edge('repeat')}`);
+    assert.ok(Math.abs(edge('mirror') - 191.25) < 3, `mirror should fold to 0.75, got ${edge('mirror')}`);
 });
 
 test('radial gradient is symmetric around the centre', () => {

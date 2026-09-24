@@ -10,9 +10,9 @@ const gradient = effects.get('gradient_linear');
 test('every effect\'s defaults are a fixed point, with a default for every declared field', () => {
     for (const effect of effects.list()) {
         const out = coerceParams(effect, effect.defaults);
-        assert.deepStrictEqual(out, effect.defaults, effect.type + ' defaults do not survive coercion');
+        assert.deepStrictEqual(out, effect.defaults, `${effect.type} defaults do not survive coercion`);
         for (const [key, value] of Object.entries(out)) {
-            assert.notStrictEqual(value, undefined, effect.type + '.' + key + ' has no default');
+            assert.notStrictEqual(value, undefined, `${effect.type}.${key} has no default`);
         }
     }
 });
@@ -61,7 +61,7 @@ test('colours, enums, text, range and xy are each checked against their type', (
 test('stops that are not a usable list fall back to the default list', () => {
     for (const stops of [null, 'red', 3, [], [{ position: 0, color: '#ff0000' }], {}]) {
         assert.deepStrictEqual(coerceParams(gradient, { stops }).stops, gradient.defaults.stops,
-            'expected the default for ' + JSON.stringify(stops));
+            `expected the default for ${JSON.stringify(stops)}`);
     }
 });
 

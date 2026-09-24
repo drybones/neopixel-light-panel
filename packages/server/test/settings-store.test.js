@@ -38,7 +38,7 @@ test('both main and backup corrupt still yields usable defaults', () => {
     const file = tmpFile();
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, 'not json');
-    fs.writeFileSync(file + '.bak', 'also not json');
+    fs.writeFileSync(`${file}.bak`, 'also not json');
 
     const store = new SettingsStore(file);
     store.load();

@@ -102,6 +102,6 @@ test('particle effects render without allocation errors at max density', () => {
         for (let t = 0; t < 5000; t += 500) {
             instance.render(out, t, prepared);
         }
-        assert.ok(out.every(v => Number.isFinite(v)), type + ' produced non-finite output');
+        assert.ok(out.every(v => Number.isFinite(v)), `${type} produced non-finite output`);
     }
 });
