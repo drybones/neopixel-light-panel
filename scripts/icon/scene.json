@@ -1,0 +1,21 @@
+{
+    "version": 2,
+    "scenes": [
+        {
+            "id": "icon-ember-teal",
+            "name": "Icon: ember and teal",
+            "layers": [
+                {
+                    "effectType": "wavelet",
+                    "blendMode": "add",
+                    "params": { "color": "#ff7a00", "freq": 0.15, "lambda": 1.3, "delta": 0, "x": -0.75, "y": 0.55, "direction": "outward", "min": -0.7, "max": 0.75 }
+                },
+                {
+                    "effectType": "wavelet",
+                    "blendMode": "add",
+                    "params": { "color": "#0090ff", "freq": 0.15, "lambda": 1.3, "delta": 3.14, "x": 0.75, "y": -0.55, "direction": "outward", "min": -0.7, "max": 0.75 }
+                }
+            ]
+        }
+    ]
+}
