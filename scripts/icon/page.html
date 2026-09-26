@@ -1,0 +1,83 @@
+<!doctype html>
+<meta charset="utf-8">
+<!-- ledPaint imports './panelGrid' extensionless, as Vite allows; map it. -->
+<script type="importmap">
+  { "imports": { "/packages/ui/src/lib/panelGrid": "/packages/ui/src/lib/panelGrid.js" } }
+</script>
+<script type="module">
+  import { paintBloom, bloomParams, makeScratch, gridPositions } from '/packages/ui/src/lib/ledPaint.js';
+  import { cellForFrameIndex, COLS, ROWS } from '/packages/ui/src/lib/panelGrid.js';
+
+  // A strip-order frame as a ROWS x COLS grid of [r,g,b].
+  function toGrid(frame) {
+    const g = Array.from({ length: ROWS }, () => new Array(COLS));
+    frame.forEach((px, i) => {
+      const { col, row } = cellForFrameIndex(i, frame.length);
+      g[row][col] = px;
+    });
+    return g;
+  }
+
+  // Whole panel as the stage draws it, for choosing source frames.
+  window.paintPanel = (frame, w) => {
+    const h = w * ROWS / COLS;
+    const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    paintBloom(c.getContext('2d'), makeScratch(w, h), frame, gridPositions(w, h), bloomParams(w / COLS));
+    return c.toDataURL();
+  };
+
+  // Downscale by repeated halving, then one final step: a single big
+  // drawImage step aliases even with high smoothing quality.
+  function downscale(src, size) {
+    let cur = src;
+    while (cur.width / 2 >= size) {
+      const n = Object.assign(document.createElement('canvas'), { width: cur.width / 2, height: cur.height / 2 });
+      const x = n.getContext('2d');
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(cur, 0, 0, n.width, n.height);
+      cur = n;
+    }
+    const out = Object.assign(document.createElement('canvas'), { width: size, height: size });
+    const x = out.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(cur, 0, 0, size, size);
+    return out;
+  }
+
+  // One icon: a crop of the panel frame (or an explicit grid), laid out as
+  // LEDs on a square canvas and bloomed by the real renderer.
+  //   spec.frame | spec.grid, spec.crop {col,row,cols,rows}, spec.stride
+  //   spec.pad (fraction of the side kept clear), spec.scale (brightness
+  //   multiplier on the source colours), spec.bloom (BLOOM overrides),
+  //   spec.bg, spec.master (render size), spec.sizes
+  window.renderIcon = (spec) => {
+    let grid = spec.grid || toGrid(spec.frame);
+    const cr = spec.crop || { col: 0, row: 0, cols: grid[0].length, rows: grid.length };
+    const stride = spec.stride || 1;
+    const cells = [];
+    for (let r = 0; r < cr.rows; r++) {
+      for (let c = 0; c < cr.cols; c++) {
+        const px = grid[cr.row + r * stride][cr.col + c * stride];
+        const k = spec.scale ?? 1;
+        cells.push({ c, r, px: px.map((v) => Math.min(255, Math.round(v * k))) });
+      }
+    }
+    const M = spec.master || 1024;
+    const span = M * (1 - 2 * (spec.pad ?? 0.1));
+    const pitch = span / Math.max(cr.cols, cr.rows);
+    const x0 = (M - pitch * cr.cols) / 2 + pitch / 2;
+    const y0 = (M - pitch * cr.rows) / 2 + pitch / 2;
+    const positions = new Float32Array(cells.length * 2);
+    cells.forEach((e, i) => {
+      positions[i * 2] = x0 + e.c * pitch;
+      positions[i * 2 + 1] = y0 + e.r * pitch;
+    });
+    const master = Object.assign(document.createElement('canvas'), { width: M, height: M });
+    paintBloom(master.getContext('2d'), makeScratch(M, M), cells.map((e) => e.px), positions,
+      bloomParams(pitch, spec.bloom), spec.bg || '#0d0d0f');
+    const out = {};
+    for (const s of spec.sizes || [512, 180, 32, 16]) out[s] = downscale(master, s).toDataURL();
+    return out;
+  };
+  window.ready = true;
+</script>
