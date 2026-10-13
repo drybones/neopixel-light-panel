@@ -309,6 +309,102 @@ test('opacity halves a solid layer over black', () => {
     assert.deepStrictEqual(client.pixels[0], [127, 127, 127]);
 });
 
+function soloScene() {
+    return {
+        id: 's1', name: 'solo',
+        layers: [
+            { id: 'base', effectType: 'solid', params: { color: '#ffffff', level: 1 }, blendMode: 'normal', opacity: 1, enabled: true, solo: false },
+            { id: 'mul', effectType: 'solid', params: { color: '#ff8000', level: 1 }, blendMode: 'multiply', opacity: 1, enabled: true, solo: false },
+            { id: 'top', effectType: 'solid', params: { color: '#808080', level: 1 }, blendMode: 'multiply', opacity: 1, enabled: true, solo: false },
+        ],
+    };
+}
+
+test('a single soloed multiply layer renders as itself, not black (#132)', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    scene.layers[1].solo = true;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+
+    assert.deepStrictEqual(client.pixels[0], [255, 128, 0]);
+    assert.deepStrictEqual(Array.from(compositor.composite.subarray(0, 3)),
+        Array.from(compositor.getLayerBuffer('mul').subarray(0, 3)));
+    assert.strictEqual(scene.layers[1].blendMode, 'multiply');
+    assert.strictEqual(scene.layers[1]._blend, BLEND.multiply);
+});
+
+test('the solo base keeps its opacity', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    scene.layers[1].solo = true;
+    scene.layers[1].opacity = 0.5;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    assert.deepStrictEqual(client.pixels[0], [127, 64, 0]);
+});
+
+test('soloed layers above the base keep their real blend mode', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    scene.layers[1].solo = true;
+    scene.layers[2].solo = true;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    // #ff8000 multiplied by #808080: 255*128/255, 128*128/255, 0
+    assert.deepStrictEqual(client.pixels[0], [128, 64, 0]);
+});
+
+test('a disabled soloed layer is not the solo base', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    scene.layers[1].solo = true;
+    scene.layers[1].enabled = false;
+    scene.layers[2].solo = true;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    assert.deepStrictEqual(client.pixels[0], [128, 128, 128]);
+});
+
+test('un-soloing restores the real mix', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    const before = client.pixels[0].slice();
+
+    scene.layers[1].solo = true;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+
+    scene.layers[1].solo = false;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    assert.deepStrictEqual(client.pixels[0], before);
+    assert.strictEqual(scene.layers[1].blendMode, 'multiply');
+});
+
+test('without solo the bottom layer still blends onto black as configured', () => {
+    const client = makeClient();
+    const compositor = new Compositor(client, makeModel(2));
+    const store = new SceneStore(compositor, null);
+    const scene = soloScene();
+    scene.layers[0].enabled = false;
+    store.preprocess(scene);
+    compositor.renderFrame(scene, 0);
+    assert.deepStrictEqual(client.pixels[0], [0, 0, 0]);
+});
+
 test('a multi-wavelet scene sums per-layer additive blending correctly', () => {
     const model = makeModel(8);
     const client = makeClient();

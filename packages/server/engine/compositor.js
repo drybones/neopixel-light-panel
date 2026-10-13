@@ -244,8 +244,20 @@ class Compositor {
 
     // Draw-path: renders scene into this.composite and writes to the client.
     // scene._displayLayers is precomputed on the write path (enabled/solo filter).
+    //
+    // Solo draws its bottom layer as Normal (#132). The composite starts black,
+    // and over black Multiply, Darken, Subtract and Overlay all give black, so
+    // soloing the layer you most want to inspect showed an empty panel. The
+    // soloed layers are treated as a sub-stack: its base is Normal, everything
+    // above it keeps its real mode because now there is something to blend
+    // with. The base keeps its opacity — a half-opacity layer shows as half
+    // bright, which is what it contributes. Render-time only: the stored
+    // blendMode and layer._blend are untouched, so un-soloing restores the mix.
+    // Without solo the bottom layer still blends onto black as configured;
+    // that is the scene's own setup, not something to correct behind its back.
     renderFrame(scene, millis) {
         const display = scene._displayLayers || scene.layers;
+        const soloBase = scene._soloActive === true;
         const comp = this.composite;
         comp.fill(0);
 
@@ -258,7 +270,8 @@ class Compositor {
             // the panel. SceneStore de-duplicates ids so this should not fire.
             if (!entry || entry.effectType !== layer.effectType) continue;
             entry.instance.render(entry.buffer, millis, layer._prepared);
-            blendInto(comp, entry.buffer, layer._blend | 0, layer.opacity, this.numPixels);
+            const mode = soloBase && li === 0 ? BLEND.normal : layer._blend | 0;
+            blendInto(comp, entry.buffer, mode, layer.opacity, this.numPixels);
         }
 
         this.writeComposite();

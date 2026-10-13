@@ -723,6 +723,7 @@ label.settings-row { cursor: pointer; }
   text-overflow: ellipsis;
 }
 .layer-row-meta { font-size: 11px; color: var(--text-dim); }
+.layer-row-meta s { opacity: 0.7; }
 
 .icon-btn {
   background: none;
