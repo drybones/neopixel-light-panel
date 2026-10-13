@@ -178,6 +178,50 @@ body {
 /* Grey in every state: colouring the headline number is the whole signal, and
    a pill that changed colour all over would drown it. */
 .readout-detail { color: var(--text-dim); }
+/* The pill's tooltip (ReadoutPill has why it isn't `title`). Hidden by
+   visibility rather than display so the delay can be a transition: a beat
+   before showing, like a native tooltip, so sweeping the pointer across the
+   header doesn't flash it, and fading straight away on leave. Only where
+   something can hover — a tap would otherwise leave it stuck open over the
+   page. */
+.readout-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.readout-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 120ms, visibility 0s 120ms;
+}
+@media (hover: hover) {
+  .readout-wrap:hover .readout-tip {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 120ms 500ms, visibility 0s 500ms;
+  }
+}
+.readout:focus-visible + .readout-tip {
+  visibility: visible;
+  opacity: 1;
+  transition: none;
+}
 .readout-mode {
   color: var(--text-dim);
   border: 1px solid var(--border);
