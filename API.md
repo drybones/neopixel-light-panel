@@ -12,7 +12,7 @@ The panel plays one **scene** at a time. A scene is an ordered stack of **layers
 - **Params are coerced, not rejected.** Each param is checked against its schema entry's type — a finite number for `number`/`angle`/`xy`/`range`, a `#rrggbb` string for `color`, one of the `options` for `enum`, a string for `text`, at least `minStops` stops of `{position: number, color}` for `gradientStops` — and a value of the wrong type falls back to that param's default, leaving the rest of the layer alone. A numeric string counts as a number. Keys the schema does not declare pass through untouched. The returned layer shows what was stored.
 - Errors are `{ "error": "..." }` with a `4xx` for a request whose *shape* is wrong (a body that is not an object, `layers` that is not an array, malformed JSON) and a bare `500` for anything unexpected.
 - Blend modes: `normal`, `add`, `screen`, `lighten`, `subtract`, `multiply`, `darken`, `difference`, `overlay`, `soft_light`, `linear_light` — see [Blend modes](#blend-modes). Opacity is `0..1`. An unknown mode is stored as `normal`.
-- `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render.
+- `enabled: false` removes a layer from compositing; if any layer has `solo: true`, only solo layers render. The bottommost of them renders with `normal` blend whatever its stored `blendMode`, since the composite starts black and a `multiply` layer over black is black; layers above it keep their mode. This is render-time only — the stored `blendMode` is unchanged.
 - "Off" is not a scene: set the active scene to `null`.
 
 ### Scene shape

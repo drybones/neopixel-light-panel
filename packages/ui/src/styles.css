@@ -723,6 +723,7 @@ label.settings-row { cursor: pointer; }
   text-overflow: ellipsis;
 }
 .layer-row-meta { font-size: 11px; color: var(--text-dim); }
+.layer-row-meta s { opacity: 0.7; }
 
 .icon-btn {
   background: none;
@@ -785,6 +786,12 @@ label.settings-row { cursor: pointer; }
   align-items: baseline;
   gap: 8px;
   margin-bottom: 10px;
+}
+.param-note {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-dim);
 }
 .param-preset-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .param-preset-btn { font-size: 12px; padding: 4px 10px; }

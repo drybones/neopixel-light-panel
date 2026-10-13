@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import LedCanvas from '../preview/LedCanvas';
 import { subscribeLayer } from '../../api/lightStream';
+import { isBlendOverridden } from '../../lib/solo';
 
 // Live animated thumbnail of a single layer, fed by the stream's `layers`.
 // Falls back to colour swatches until the first frame arrives (the
@@ -16,8 +17,11 @@ function LayerThumb({ layerId }) {
 
 // Layer list, topmost layer first (Photoshop-style; the scene stores
 // layers bottom-first). Each row: swatch/thumbnail, effect name, blend +
-// opacity summary, visibility eye and solo toggle.
-export function LayerRow({ layer, effectName, selected, soloActive, onSelect, onToggleEnabled, onToggleSolo }) {
+// opacity summary, visibility eye and solo toggle. The solo base's real mode
+// is struck through, since the server draws it as normal (lib/solo).
+export function LayerRow({
+  layer, effectName, selected, soloActive, blendOverridden, onSelect, onToggleEnabled, onToggleSolo,
+}) {
   const dimmed = soloActive ? !layer.solo : !layer.enabled;
   return (
     <div
@@ -38,7 +42,11 @@ export function LayerRow({ layer, effectName, selected, soloActive, onSelect, on
       </div>
       <div className="layer-row-main">
         <div className="layer-row-name">{effectName}</div>
-        <div className="layer-row-meta">{layer.blendMode} · {Math.round(layer.opacity * 100)}%</div>
+        <div className="layer-row-meta">
+          {blendOverridden
+            ? <><s>{layer.blendMode}</s> normal (solo)</>
+            : layer.blendMode} · {Math.round(layer.opacity * 100)}%
+        </div>
       </div>
       <button
         type="button"
@@ -101,6 +109,7 @@ export default function LayerStack({ scene, effects, selectedLayerId, onSelect, 
           effectName={effectName(layer)}
           selected={layer.id === selectedLayerId}
           soloActive={soloActive}
+          blendOverridden={isBlendOverridden(scene.layers, layer)}
           onSelect={() => onSelect(layer.id)}
           onToggleEnabled={() => onUpdateLayer({ ...layer, enabled: !layer.enabled }, true)}
           onToggleSolo={() => onUpdateLayer({ ...layer, solo: !layer.solo }, true)}

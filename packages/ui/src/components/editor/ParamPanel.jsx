@@ -15,8 +15,10 @@ import { subscribeComposite, subscribeLayer } from '../../api/lightStream';
 // way (GET /api/blend-modes), labels and display order included, so a new
 // mode needs nothing here either. The list wraps onto as many lines as the
 // panel's width needs; nothing here decides where the breaks fall.
+// `blendOverridden` says the server is drawing this layer as Normal because
+// it is the solo base (lib/solo); the stored mode stays selected.
 export default function ParamPanel({
-  layer, effect, blendModes = [], onUpdate, onCommit, onDelete, onDuplicate,
+  layer, effect, blendModes = [], blendOverridden = false, onUpdate, onCommit, onDelete, onDuplicate,
 }) {
   const layerId = layer ? layer.id : null;
   // The XY pad's background is the selected layer's own live render; falls
@@ -35,6 +37,9 @@ export default function ParamPanel({
   if (!layer) {
     return <div className="param-panel param-panel--empty">Select a layer to edit it</div>;
   }
+
+  const blendMode = blendModes.find((m) => m.value === layer.blendMode);
+  const blendLabel = blendMode ? blendMode.label : layer.blendMode;
 
   function setParams(patch) {
     onUpdate({ ...layer, params: { ...layer.params, ...patch } });
@@ -199,6 +204,11 @@ export default function ParamPanel({
         value={layer.blendMode}
         onChange={(v) => { onUpdate({ ...layer, blendMode: v }); onCommit(); }}
       />
+      {blendOverridden && (
+        <p className="param-note">
+          Shown as Normal while soloed. Solo a layer beneath to see the {blendLabel} result.
+        </p>
+      )}
       <NumberControl
         entry={{ label: 'Opacity', min: 0, max: 1, step: 0.01, scale: 'linear' }}
         value={layer.opacity}

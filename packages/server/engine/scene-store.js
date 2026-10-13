@@ -142,6 +142,10 @@ function prepareScene(scene) {
     scene._displayLayers = soloed.length > 0
         ? soloed
         : scene.layers.filter((l) => l.enabled);
+    // Read by Compositor.renderFrame, which draws the bottom soloed layer as
+    // Normal (#132). Kept on the scene rather than written into that layer's
+    // _blend, which would outlive the solo.
+    scene._soloActive = soloed.length > 0;
     scene.layers.forEach((l) => {
         const effect = effects.get(l.effectType);
         l._prepared = effect ? prepareLayer(effect, l) : {};
