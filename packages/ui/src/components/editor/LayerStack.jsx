@@ -44,7 +44,7 @@ export function LayerRow({
         <div className="layer-row-name">{effectName}</div>
         <div className="layer-row-meta">
           {blendOverridden
-            ? <><s>{layer.blendMode}</s> normal (solo)</>
+            ? <><s>{layer.blendMode}</s> solo</>
             : layer.blendMode} · {Math.round(layer.opacity * 100)}%
         </div>
       </div>

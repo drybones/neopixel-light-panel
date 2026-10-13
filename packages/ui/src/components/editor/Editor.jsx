@@ -6,7 +6,6 @@ import LayerStack from './LayerStack';
 import ParamPanel from './ParamPanel';
 import EffectPicker from './EffectPicker';
 import { newId as newLayerId } from '../../lib/id';
-import { isBlendOverridden } from '../../lib/solo';
 import { downloadJson, slugify } from '../../lib/downloadJson';
 
 export default function Editor({ sceneId, onClose }) {
@@ -190,7 +189,6 @@ export default function Editor({ sceneId, onClose }) {
           layer={layer}
           effect={effect}
           blendModes={blendModes}
-          blendOverridden={isBlendOverridden(scene.layers, layer)}
           onUpdate={(updated) => handleLayerUpdate(updated)}
           onCommit={commitSelected}
           onDelete={deleteLayer}

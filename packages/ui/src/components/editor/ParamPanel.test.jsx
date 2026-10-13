@@ -175,15 +175,3 @@ test('an effect with no schema still renders the blend and opacity controls', ()
   expect(screen.getByText('Blend')).toBeTruthy();
   expect(screen.getByText('Opacity')).toBeTruthy();
 });
-
-test('the solo base carries a note naming the mode it is not showing (#132)', () => {
-  renderPanel({ layer: { ...LAYER, blendMode: 'multiply' }, blendOverridden: true });
-  expect(screen.getByText(/Shown as Normal while soloed/).textContent).toContain('Multiply result');
-  // The stored mode stays selected; only the render is overridden.
-  expect(screen.getByText('Multiply').classList.contains('segmented-item--on')).toBe(true);
-});
-
-test('no solo note unless the blend is overridden', () => {
-  renderPanel();
-  expect(screen.queryByText(/Shown as Normal while soloed/)).toBe(null);
-});
