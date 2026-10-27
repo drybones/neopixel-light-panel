@@ -8,17 +8,25 @@ updates:
     groups:
       # vite, vitest and @vitejs/plugin-react are peer-coupled — see #81, where
       # vite 8 orphans plugin-react 4 and plugin-react 6 orphans vite 6, so
-      # neither is mergeable alone. Listed first so it claims them before
-      # minor-and-patch does, keeping them in one PR at every update type.
+      # neither is mergeable alone. This group keeps them in one PR at every
+      # update type.
       build-tooling:
         patterns:
           - "vite"
           - "vitest"
           - "@vitejs/*"
+      # Must exclude build-tooling's patterns explicitly. Listing that group
+      # first does not stop this one also matching a vite/vitest minor or patch:
+      # Dependabot opened both and closed build-tooling as superseded every week
+      # (#147), so the coupled packages only stayed together by luck.
       minor-and-patch:
         update-types:
           - "minor"
           - "patch"
+        exclude-patterns:
+          - "vite"
+          - "vitest"
+          - "@vitejs/*"
     labels:
       - "dependencies"
     # 10 was hit on the first run (11 npm PRs opened — security PRs are exempt
