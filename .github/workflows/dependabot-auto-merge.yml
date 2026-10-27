@@ -1,0 +1,67 @@
+name: Dependabot auto-merge
+
+# Queues GitHub auto-merge on Dependabot PRs that need no judgement, so the
+# routine bumps land without anyone touching them. The merge itself waits on
+# the `test` and `pi-path` checks, which the ruleset on `main` makes required —
+# without that ruleset `--auto` has nothing to wait for and merges at once.
+#
+# Policy:
+#
+#   - patch and minor (including a grouped PR, where fetch-metadata reports the
+#     highest update type in the group): auto-merge once CI is green.
+#   - major, an unknown update type, or a maintainer change on the package: held
+#     with the `needs-review` label. Majors are excluded because a green CI run
+#     is not enough evidence for them here — #81's vite/plugin-react pair only
+#     went through as one coordinated change, and neither half was mergeable
+#     alone. A maintainer change is a supply-chain signal worth a human look
+#     whatever the version says.
+#
+# Whatever this leaves open — held PRs, and auto-merges that never fired because
+# CI went red — is picked up by the weekly Claude routine, which reads the
+# changelogs, merges what it judges safe, comments on the rest and emails a
+# summary. This workflow sends no notifications of its own.
+#
+# A merge made with GITHUB_TOKEN does not trigger the push-to-main CI run. That
+# is fine: the PR's own `test` and `pi-path` runs already gated it. Nothing here
+# deploys either — the Pi is only reachable from the LAN, so merged runtime
+# changes reach the panel on the next `npm run deploy`.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v3.1.0
+
+      - name: Queue auto-merge
+        if: >-
+          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+           steps.meta.outputs.update-type == 'version-update:semver-minor') &&
+          steps.meta.outputs.maintainer-changes != 'true'
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Hold for review
+        if: >-
+          !((steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+             steps.meta.outputs.update-type == 'version-update:semver-minor') &&
+            steps.meta.outputs.maintainer-changes != 'true')
+        run: |
+          gh pr edit "$PR_URL" --add-label needs-review
+          gh pr comment "$PR_URL" --body "Not auto-merged (update type: \`${UPDATE_TYPE:-unknown}\`, maintainer change: \`${MAINTAINER_CHANGES:-false}\`). Held for the weekly dependency review."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          MAINTAINER_CHANGES: ${{ steps.meta.outputs.maintainer-changes }}
